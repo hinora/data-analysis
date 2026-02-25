@@ -1,0 +1,456 @@
+openapi: 3.0.3
+info:
+  title: Session API
+  description: API for managing stock analysis sessions
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+
+tags:
+  - name: Sessions
+    description: Session management operations
+
+paths:
+  /sessions:
+    post:
+      tags:
+        - Sessions
+      summary: Create a new analysis session
+      description: Creates a new stock analysis session for a given stock symbol
+      operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '201':
+          description: Session created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Invalid request (invalid stock symbol or missing news sources)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Active session already exists for this stock
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConflictError'
+
+    get:
+      tags:
+        - Sessions
+      summary: List all sessions
+      description: Returns a list of all analysis sessions with their current status
+      operationId: listSessions
+      parameters:
+        - name: status
+          in: query
+          description: Filter by session status
+          schema:
+            $ref: '#/components/schemas/SessionStatus'
+        - name: limit
+          in: query
+          description: Maximum number of sessions to return
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          description: Number of sessions to skip
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionListResponse'
+
+  /sessions/{sessionId}:
+    get:
+      tags:
+        - Sessions
+      summary: Get session details
+      description: Returns detailed information about a specific session
+      operationId: getSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionDetail'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - Sessions
+      summary: Delete a session
+      description: Deletes a session and all associated data (historical data, news, analyses)
+      operationId: deleteSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '204':
+          description: Session deleted successfully
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /sessions/{sessionId}/news-sources:
+    put:
+      tags:
+        - Sessions
+      summary: Update news sources
+      description: Update the enabled news sources for a session
+      operationId: updateNewsSources
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNewsSourcesRequest'
+      responses:
+        '200':
+          description: News sources updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: At least one news source required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /sessions/{sessionId}/schedule:
+    put:
+      tags:
+        - Sessions
+      summary: Update daily schedule
+      description: Enable/disable daily scheduling and set custom schedule time
+      operationId: updateSchedule
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateScheduleRequest'
+      responses:
+        '200':
+          description: Schedule updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Invalid schedule time format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /sessions/{sessionId}/timeout:
+    put:
+      tags:
+        - Sessions
+      summary: Update pipeline timeout
+      description: Configure the timeout duration for AI agent pipelines
+      operationId: updateTimeout
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTimeoutRequest'
+      responses:
+        '200':
+          description: Timeout updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Invalid timeout value (must be 1-60 minutes)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      description: Session ID
+      schema:
+        type: string
+        format: objectid
+        example: "65abc123def456789012345"
+
+  schemas:
+    SessionStatus:
+      type: string
+      enum:
+        - initializing
+        - analyzing
+        - complete
+        - error
+
+    NewsSource:
+      type: string
+      enum:
+        - newsapi
+        - finnhub
+        - reddit
+        - rss
+
+    CreateSessionRequest:
+      type: object
+      required:
+        - stockSymbol
+        - newsSources
+      properties:
+        stockSymbol:
+          type: string
+          description: Stock ticker symbol
+          example: NVDA
+        newsSources:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewsSource'
+          minItems: 1
+          description: At least one news source required
+          example: ["newsapi", "reddit"]
+
+    UpdateNewsSourcesRequest:
+      type: object
+      required:
+        - newsSources
+      properties:
+        newsSources:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewsSource'
+          minItems: 1
+          description: At least one news source required
+
+    UpdateScheduleRequest:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Enable or disable daily scheduling
+        scheduleTime:
+          type: string
+          pattern: '^([01]\d|2[0-3]):([0-5]\d)$'
+          description: Custom schedule time in HH:MM format (24-hour)
+          example: "06:30"
+          nullable: true
+
+    UpdateTimeoutRequest:
+      type: object
+      required:
+        - pipelineTimeoutMinutes
+      properties:
+        pipelineTimeoutMinutes:
+          type: integer
+          minimum: 1
+          maximum: 60
+          description: Timeout in minutes for AI agent pipeline (1-60)
+          example: 10
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          format: objectid
+        stockSymbol:
+          type: string
+        companyName:
+          type: string
+        status:
+          $ref: '#/components/schemas/SessionStatus'
+        dailyScheduleEnabled:
+          type: boolean
+        scheduleTime:
+          type: string
+          nullable: true
+        newsSources:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewsSource'
+        pipelineTimeoutMinutes:
+          type: integer
+          minimum: 1
+          maximum: 60
+          description: Timeout in minutes for AI agent pipeline
+          default: 10
+        lastRunAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SessionDetail:
+      allOf:
+        - $ref: '#/components/schemas/Session'
+        - type: object
+          properties:
+            latestPrediction:
+              $ref: '#/components/schemas/PredictionSummary'
+            dataStats:
+              $ref: '#/components/schemas/DataStats'
+
+    PredictionSummary:
+      type: object
+      properties:
+        recommendation:
+          type: string
+          enum: [STRONG_BUY, BUY, HOLD, SELL, STRONG_SELL, NO_OPINION]
+        trendPrediction:
+          type: string
+          enum: [bullish, bearish, neutral]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        generatedAt:
+          type: string
+          format: date-time
+
+    DataStats:
+      type: object
+      properties:
+        historicalDataPoints:
+          type: integer
+        newsItemCount:
+          type: integer
+        predictionCount:
+          type: integer
+        dateRangeStart:
+          type: string
+          format: date
+        dateRangeEnd:
+          type: string
+          format: date
+
+    SessionListResponse:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Session'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    RunStartedResponse:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: objectid
+        sessionId:
+          type: string
+          format: objectid
+        status:
+          type: string
+          enum: [running]
+        startedAt:
+          type: string
+          format: date-time
+
+    SymbolValidationResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        symbol:
+          type: string
+        companyName:
+          type: string
+          nullable: true
+        exchange:
+          type: string
+          nullable: true
+        message:
+          type: string
+          nullable: true
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    ConflictError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            existingSessionId:
+              type: string
+              format: objectid

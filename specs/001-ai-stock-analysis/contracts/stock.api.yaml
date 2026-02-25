@@ -1,0 +1,81 @@
+openapi: 3.0.3
+info:
+  title: Stock API
+  description: API for stock data operations
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+
+tags:
+  - name: Stock
+    description: Stock data operations
+
+paths:
+  /stocks/validate/{symbol}:
+    get:
+      tags:
+        - Stock
+      summary: Validate stock symbol
+      description: Check if a stock symbol is valid before creating a session
+      operationId: validateSymbol
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          description: Stock symbol to validate (e.g., NVDA, AAPL)
+          schema:
+            type: string
+            example: NVDA
+      responses:
+        '200':
+          description: Symbol validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SymbolValidationResponse'
+        '400':
+          description: Invalid symbol format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    SymbolValidationResponse:
+      type: object
+      properties:
+        symbol:
+          type: string
+          description: The stock symbol that was validated
+        valid:
+          type: boolean
+          description: Whether the symbol is valid
+        companyName:
+          type: string
+          description: Company name if symbol is valid
+          nullable: true
+        exchange:
+          type: string
+          description: Stock exchange where the symbol is listed
+          nullable: true
+        currency:
+          type: string
+          description: Trading currency
+          nullable: true
+        message:
+          type: string
+          description: Additional message (e.g., error reason if invalid)
+          nullable: true
+      required:
+        - symbol
+        - valid
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string

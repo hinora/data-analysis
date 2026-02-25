@@ -1,0 +1,40 @@
+{
+  "name": "moleculer-ts",
+  "private": true,
+  "workspaces": [
+    "lib",
+    "apps/*/*"
+  ],
+  "scripts": {
+    "build:lib": "bash scripts/build-lib.sh",
+    "db:clear": "ts-node scripts/clear-database.ts",
+    "init:microservice": "ts-node scripts/init-microservice.ts",
+    "generate:types": "ts-node lib/codegen/generate-action-types.ts",
+    "generate:types:all": "ts-node lib/codegen/generate-all.ts",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write ."
+  },
+  "dependencies": {
+    "agenda": "^5.0.0",
+    "axios": "^1.9.0",
+    "dotenv": "^17.2.3",
+    "lodash": "^4.17.23",
+    "moleculer": "^0.14.35",
+    "moleculer-repl": "^0.7.4",
+    "mongoose": "^8.21.1",
+    "ollama": "^0.5.14",
+    "rss-parser": "^3.13.0",
+    "snoowrap": "^1.23.0",
+    "yahoo-finance2": "^3.13.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.12",
+    "@types/dotenv": "^6.1.1",
+    "@types/lodash": "^4.17.23",
+    "@types/node": "^20.0.0",
+    "nodemon": "^3.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0"
+  }
+}

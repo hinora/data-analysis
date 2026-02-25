@@ -1,0 +1,28 @@
+{
+  "name": "core.lib",
+  "version": "1.0.0",
+  "description": "Core library for moleculer-ts project",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./broker": "./broker/index.ts",
+    "./config": "./config/index.ts",
+    "./database": "./database/index.ts",
+    "./fs": "./fs/index.ts",
+    "./moleculer": "./moleculer/index.ts",
+    "./__generated__": "./__generated__/index.ts",
+    "./__generated__/*": "./__generated__/*.ts",
+    "./adapters": "./adapters/index.ts",
+    "./adapters/ai": "./adapters/ai/index.ts",
+    "./adapters/stock-data": "./adapters/stock-data/index.ts",
+    "./adapters/news": "./adapters/news/index.ts"
+  },
+  "scripts": {
+    "build": "rm -rf ./dist && tsc --project .",
+    "build:copy-json": "rsync --prune-empty-dirs -r --include='*/' --include='*/*.json' --exclude='*' ./ ./dist"
+  },
+  "dependencies": {
+    "mongoose": "^8.21.1"
+  }
+}

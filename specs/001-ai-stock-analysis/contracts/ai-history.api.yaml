@@ -1,0 +1,433 @@
+openapi: 3.0.3
+info:
+  title: AI Message History API
+  description: API for accessing AI agent message history for debugging
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+
+tags:
+  - name: AI History
+    description: AI agent message history operations
+
+paths:
+  /ai-history/sessions/{sessionId}:
+    get:
+      tags:
+        - AI History
+      summary: List AI message history
+      description: Returns the AI agent message history for a session
+      operationId: listAIHistory
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - name: agentType
+          in: query
+          description: Filter by agent type
+          schema:
+            $ref: '#/components/schemas/AgentType'
+        - name: runId
+          in: query
+          description: Filter by run ID
+          schema:
+            type: string
+            format: objectid
+        - name: success
+          in: query
+          description: Filter by success status
+          schema:
+            type: boolean
+        - name: startDate
+          in: query
+          description: Start date for history range
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          description: End date for history range
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          description: Maximum number of entries
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - name: offset
+          in: query
+          description: Offset for pagination
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: AI message history list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIHistoryListResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ai-history/{historyId}:
+    get:
+      tags:
+        - AI History
+      summary: Get AI message history entry
+      description: Returns a specific AI message history entry with full message details
+      operationId: getAIHistoryEntry
+      parameters:
+        - name: historyId
+          in: path
+          required: true
+          description: AI message history entry ID
+          schema:
+            type: string
+            format: objectid
+      responses:
+        '200':
+          description: AI message history entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIMessageHistory'
+        '404':
+          description: History entry not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ai-history/runs/{runId}:
+    get:
+      tags:
+        - AI History
+      summary: Get AI history by run
+      description: Returns all AI message history entries for a specific daily run
+      operationId: getAIHistoryByRun
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          description: Daily run log ID
+          schema:
+            type: string
+            format: objectid
+        - name: agentType
+          in: query
+          description: Filter by agent type
+          schema:
+            $ref: '#/components/schemas/AgentType'
+      responses:
+        '200':
+          description: AI message history for run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIHistoryByRunResponse'
+        '404':
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ai-history/stats:
+    get:
+      tags:
+        - AI History
+      summary: Get AI usage statistics
+      description: Returns aggregated AI usage statistics
+      operationId: getAIHistoryStats
+      parameters:
+        - name: sessionId
+          in: query
+          description: Filter by session ID
+          schema:
+            type: string
+            format: objectid
+        - name: days
+          in: query
+          description: Number of days to include in stats
+          schema:
+            type: integer
+            default: 30
+            maximum: 365
+      responses:
+        '200':
+          description: AI usage statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIUsageStats'
+
+components:
+  parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      description: Session ID
+      schema:
+        type: string
+        format: objectid
+
+  schemas:
+    AgentType:
+      type: string
+      enum:
+        - historical
+        - news
+        - prediction
+
+    MessageRole:
+      type: string
+      enum:
+        - system
+        - user
+        - assistant
+
+    Message:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/MessageRole'
+        content:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        tokenCount:
+          type: integer
+          nullable: true
+
+    AIMessageHistory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: objectid
+        sessionId:
+          type: string
+          format: objectid
+        runId:
+          type: string
+          format: objectid
+          nullable: true
+        agentType:
+          $ref: '#/components/schemas/AgentType'
+        model:
+          type: string
+          example: qwen3:14b
+        provider:
+          type: string
+          example: ollama
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        totalTokens:
+          type: integer
+        promptTokens:
+          type: integer
+        completionTokens:
+          type: integer
+        duration:
+          type: integer
+          description: Duration in milliseconds
+        success:
+          type: boolean
+        error:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          properties:
+            temperature:
+              type: number
+            maxTokens:
+              type: integer
+            topP:
+              type: number
+            requestId:
+              type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    AIHistorySummary:
+      type: object
+      description: Summarized view of AI history entry (without full message content)
+      properties:
+        id:
+          type: string
+          format: objectid
+        sessionId:
+          type: string
+          format: objectid
+        runId:
+          type: string
+          format: objectid
+          nullable: true
+        agentType:
+          $ref: '#/components/schemas/AgentType'
+        model:
+          type: string
+        provider:
+          type: string
+        messageCount:
+          type: integer
+        totalTokens:
+          type: integer
+        duration:
+          type: integer
+        success:
+          type: boolean
+        error:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    AIHistoryListResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          format: objectid
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/AIHistorySummary'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    AIHistoryByRunResponse:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: objectid
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/AIMessageHistory'
+        totalTokens:
+          type: integer
+        totalDuration:
+          type: integer
+
+    AgentStats:
+      type: object
+      properties:
+        agentType:
+          $ref: '#/components/schemas/AgentType'
+        requestCount:
+          type: integer
+        successCount:
+          type: integer
+        failureCount:
+          type: integer
+        totalTokens:
+          type: integer
+        averageTokens:
+          type: number
+        averageDuration:
+          type: number
+          description: Average duration in milliseconds
+
+    AIUsageStats:
+      type: object
+      properties:
+        period:
+          type: object
+          properties:
+            start:
+              type: string
+              format: date
+            end:
+              type: string
+              format: date
+            days:
+              type: integer
+        totalRequests:
+          type: integer
+        successfulRequests:
+          type: integer
+        failedRequests:
+          type: integer
+        successRate:
+          type: number
+          description: Success rate as percentage
+        totalTokens:
+          type: integer
+        averageTokensPerRequest:
+          type: number
+        averageDuration:
+          type: number
+          description: Average duration in milliseconds
+        modelBreakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              model:
+                type: string
+              provider:
+                type: string
+              requestCount:
+                type: integer
+              totalTokens:
+                type: integer
+        agentBreakdown:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentStats'
+
+    AIErrorsResponse:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: objectid
+              sessionId:
+                type: string
+                format: objectid
+              agentType:
+                $ref: '#/components/schemas/AgentType'
+              model:
+                type: string
+              error:
+                type: string
+              duration:
+                type: integer
+              createdAt:
+                type: string
+                format: date-time
+        total:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string

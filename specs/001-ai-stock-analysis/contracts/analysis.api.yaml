@@ -1,0 +1,709 @@
+openapi: 3.0.3
+info:
+  title: Analysis API
+  description: API for accessing stock analysis data and predictions
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+
+tags:
+  - name: Historical Data
+    description: Historical stock data operations
+  - name: News
+    description: News data and summaries
+  - name: Predictions
+    description: AI-generated predictions and analysis
+
+paths:
+  /stocks/sessions/{sessionId}/historical:
+    get:
+      tags:
+        - Historical Data
+      summary: Get historical stock data
+      description: Returns historical price data for a session
+      operationId: getHistoricalData
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - name: startDate
+          in: query
+          description: Start date for data range
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          description: End date for data range
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          description: Maximum number of data points
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+      responses:
+        '200':
+          description: Historical data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoricalDataResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /historical-analysis/sessions/{sessionId}:
+    get:
+      tags:
+        - Historical Data
+      summary: Get historical analysis
+      description: Returns the latest AI-generated analysis of historical data
+      operationId: getHistoricalAnalysis
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Historical analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoricalAnalysis'
+        '404':
+          description: Session or analysis not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /news/sessions/{sessionId}/items:
+    get:
+      tags:
+        - News
+      summary: Get news items
+      description: Returns collected news items for a session
+      operationId: getNewsItems
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - name: source
+          in: query
+          description: Filter by news source
+          schema:
+            $ref: '#/components/schemas/NewsSource'
+        - name: startDate
+          in: query
+          description: Start date for news range
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          description: End date for news range
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          description: Maximum number of items
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - name: offset
+          in: query
+          description: Offset for pagination
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: News items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsItemsResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /news/sessions/{sessionId}/summaries:
+    get:
+      tags:
+        - News
+      summary: Get news summaries
+      description: Returns AI-generated news summaries grouped by time period
+      operationId: getNewsSummaries
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - name: periodType
+          in: query
+          description: Summary period type
+          schema:
+            type: string
+            enum: [monthly, yearly]
+            default: monthly
+        - name: limit
+          in: query
+          description: Maximum number of summaries
+          schema:
+            type: integer
+            default: 12
+            maximum: 36
+      responses:
+        '200':
+          description: News summaries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsSummariesResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /predictions/sessions/{sessionId}:
+    get:
+      tags:
+        - Predictions
+      summary: List prediction reports
+      description: Returns a list of prediction reports for a session
+      operationId: listPredictions
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - name: limit
+          in: query
+          description: Maximum number of predictions
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+      responses:
+        '200':
+          description: Prediction reports
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionListResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /predictions/sessions/{sessionId}/latest:
+    get:
+      tags:
+        - Predictions
+      summary: Get latest prediction
+      description: Returns the most recent prediction report for a session
+      operationId: getLatestPrediction
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Latest prediction report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionReport'
+        '404':
+          description: Session or prediction not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /predictions/{predictionId}:
+    get:
+      tags:
+        - Predictions
+      summary: Get specific prediction
+      description: Returns a specific prediction report by ID
+      operationId: getPrediction
+      parameters:
+        - name: predictionId
+          in: path
+          required: true
+          description: Prediction ID
+          schema:
+            type: string
+            format: objectid
+      responses:
+        '200':
+          description: Prediction report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionReport'
+        '404':
+          description: Prediction not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      description: Session ID
+      schema:
+        type: string
+        format: objectid
+
+  schemas:
+    NewsSource:
+      type: string
+      enum:
+        - newsapi
+        - finnhub
+        - reddit
+        - rss
+
+    HistoricalDataPoint:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        open:
+          type: number
+        close:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        volume:
+          type: integer
+        adjustedClose:
+          type: number
+        source:
+          type: string
+
+    HistoricalDataResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          format: objectid
+        stockSymbol:
+          type: string
+        dataPoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistoricalDataPoint'
+        dateRangeStart:
+          type: string
+          format: date
+        dateRangeEnd:
+          type: string
+          format: date
+        total:
+          type: integer
+
+    KeyMetric:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          type: number
+        unit:
+          type: string
+        description:
+          type: string
+
+    HistoricalAnalysis:
+      type: object
+      properties:
+        id:
+          type: string
+          format: objectid
+        sessionId:
+          type: string
+          format: objectid
+        trendSummary:
+          type: string
+        volatility:
+          type: object
+          properties:
+            score:
+              type: number
+              minimum: 0
+              maximum: 1
+            description:
+              type: string
+        growthRate:
+          type: object
+          properties:
+            percentage:
+              type: number
+            period:
+              type: string
+        highestPoint:
+          type: object
+          properties:
+            price:
+              type: number
+            date:
+              type: string
+              format: date
+        lowestPoint:
+          type: object
+          properties:
+            price:
+              type: number
+            date:
+              type: string
+              format: date
+        averagePrice:
+          type: number
+        keyMetrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeyMetric'
+        dataPointsAnalyzed:
+          type: integer
+        dateRangeStart:
+          type: string
+          format: date
+        dateRangeEnd:
+          type: string
+          format: date
+        generatedAt:
+          type: string
+          format: date-time
+
+    NewsItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: objectid
+        source:
+          $ref: '#/components/schemas/NewsSource'
+        title:
+          type: string
+        content:
+          type: string
+        author:
+          type: string
+          nullable: true
+        url:
+          type: string
+          format: uri
+        publishedAt:
+          type: string
+          format: date-time
+        engagement:
+          type: object
+          properties:
+            likes:
+              type: integer
+            comments:
+              type: integer
+            shares:
+              type: integer
+            score:
+              type: integer
+
+    NewsItemsResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          format: objectid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewsItem'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    Theme:
+      type: object
+      properties:
+        topic:
+          type: string
+        frequency:
+          type: integer
+        sentiment:
+          type: number
+          minimum: -1
+          maximum: 1
+
+    KeyEvent:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        title:
+          type: string
+        impact:
+          type: string
+          enum: [positive, negative, neutral]
+        summary:
+          type: string
+
+    SourceBreakdown:
+      type: object
+      properties:
+        source:
+          $ref: '#/components/schemas/NewsSource'
+        count:
+          type: integer
+        averageSentiment:
+          type: number
+          minimum: -1
+          maximum: 1
+
+    NewsSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: objectid
+        periodType:
+          type: string
+          enum: [monthly, yearly]
+        periodStart:
+          type: string
+          format: date
+        periodEnd:
+          type: string
+          format: date
+        themes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Theme'
+        overallSentiment:
+          type: number
+          minimum: -1
+          maximum: 1
+        keyEvents:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeyEvent'
+        sourceBreakdown:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceBreakdown'
+        articleCount:
+          type: integer
+        generatedAt:
+          type: string
+          format: date-time
+
+    NewsSummariesResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          format: objectid
+        summaries:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewsSummary'
+
+    Recommendation:
+      type: string
+      enum:
+        - STRONG_BUY
+        - BUY
+        - HOLD
+        - SELL
+        - STRONG_SELL
+        - NO_OPINION
+
+    TrendPrediction:
+      type: string
+      enum:
+        - bullish
+        - bearish
+        - neutral
+
+    KeyFactor:
+      type: object
+      properties:
+        factor:
+          type: string
+        impact:
+          type: string
+          enum: [positive, negative, neutral]
+        weight:
+          type: number
+          minimum: 0
+          maximum: 1
+        source:
+          type: string
+
+    Risk:
+      type: object
+      properties:
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high]
+        mitigation:
+          type: string
+
+    Opportunity:
+      type: object
+      properties:
+        description:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        timeHorizon:
+          type: string
+
+    DataSourceInfo:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [historical, news]
+        count:
+          type: integer
+        dateRange:
+          type: object
+          properties:
+            start:
+              type: string
+              format: date
+            end:
+              type: string
+              format: date
+
+    PredictionReport:
+      type: object
+      properties:
+        id:
+          type: string
+          format: objectid
+        sessionId:
+          type: string
+          format: objectid
+        sentimentRating:
+          type: number
+          minimum: -1
+          maximum: 1
+        trendPrediction:
+          $ref: '#/components/schemas/TrendPrediction'
+        recommendation:
+          $ref: '#/components/schemas/Recommendation'
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        keyFactors:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeyFactor'
+        risks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Risk'
+        opportunities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Opportunity'
+        advice:
+          type: string
+        disclaimer:
+          type: string
+        dataSources:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataSourceInfo'
+        generatedAt:
+          type: string
+          format: date-time
+
+    PredictionListResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          format: objectid
+        predictions:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: objectid
+              recommendation:
+                $ref: '#/components/schemas/Recommendation'
+              trendPrediction:
+                $ref: '#/components/schemas/TrendPrediction'
+              confidence:
+                type: number
+              generatedAt:
+                type: string
+                format: date-time
+        total:
+          type: integer
+
+    PredictionComparison:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          format: objectid
+        predictions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PredictionReport'
+          minItems: 2
+          maxItems: 2
+        changes:
+          type: object
+          properties:
+            sentimentChange:
+              type: number
+            confidenceChange:
+              type: number
+            recommendationChanged:
+              type: boolean
+            trendChanged:
+              type: boolean
+            newFactors:
+              type: array
+              items:
+                type: string
+            removedFactors:
+              type: array
+              items:
+                type: string
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
