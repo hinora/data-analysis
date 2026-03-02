@@ -98,9 +98,9 @@ function mergeChunks(
       if (currentChunk.trim()) {
         chunks.push(currentChunk.trim());
       }
-      // Start new chunk with overlap from previous
+      // Start new chunk with overlap from previous, snapping to word boundary
       if (overlap > 0 && currentChunk.length > 0) {
-        const overlapText = currentChunk.slice(-overlap);
+        const overlapText = snapToWordBoundary(currentChunk, overlap);
         currentChunk = `${overlapText}${separator}${part}`;
       } else {
         currentChunk = part;
@@ -123,23 +123,62 @@ function mergeChunks(
 }
 
 /**
- * Hard split text at character boundary when no separator works
+ * Hard split text at word boundary when no separator works.
+ * Finds the nearest space before the chunk boundary to avoid splitting mid-word.
  */
 function hardSplit(text: string, chunkSize: number, overlap: number): string[] {
   const chunks: string[] = [];
   let start = 0;
 
   while (start < text.length) {
-    const end = Math.min(start + chunkSize, text.length);
+    let end = Math.min(start + chunkSize, text.length);
+
+    // If we're not at the end, find the last space to avoid splitting mid-word
+    if (end < text.length) {
+      const lastSpace = text.lastIndexOf(" ", end);
+      if (lastSpace > start) {
+        end = lastSpace;
+      }
+    }
+
     const chunk = text.slice(start, end).trim();
     if (chunk.length > 0) {
       chunks.push(chunk);
     }
-    start = end - overlap;
+
+    // Compute overlap start, snapping to a word boundary
+    const overlapStart = end - overlap;
+    if (overlapStart <= start) {
+      start = end;
+    } else {
+      const spaceAfterOverlap = text.indexOf(" ", overlapStart);
+      start =
+        spaceAfterOverlap > overlapStart && spaceAfterOverlap < end
+          ? spaceAfterOverlap + 1
+          : overlapStart;
+    }
+
     if (start >= text.length) break;
     // Prevent infinite loop
     if (end === text.length) break;
   }
 
   return chunks;
+}
+
+/**
+ * Extract overlap text from the end of a string, snapping to a word boundary.
+ * Takes approximately `overlap` characters from the end without splitting a word.
+ */
+function snapToWordBoundary(text: string, overlap: number): string {
+  if (text.length <= overlap) return text;
+
+  const cutPoint = text.length - overlap;
+  // Find the next space after the cut point so we start on a whole word
+  const spaceIndex = text.indexOf(" ", cutPoint);
+  if (spaceIndex !== -1 && spaceIndex < text.length) {
+    return text.slice(spaceIndex + 1);
+  }
+  // No space found — just take the tail (single long word edge case)
+  return text.slice(cutPoint);
 }

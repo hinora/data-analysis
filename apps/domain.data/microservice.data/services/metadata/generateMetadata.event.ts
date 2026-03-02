@@ -4,6 +4,7 @@
  * Triggered by metadata.generateMetadata event. Generates AI metadata for datasets:
  * - Structured: column descriptions, summary statistics, dataset description
  * - Unstructured: key topics, document summary, content domain, entities, word count
+ * - Unstructured embeddings: generates vector embeddings for each text chunk via AI adapter
  * - Relationship detection: scan session datasets for shared columns/topics
  *
  * Updates dataset metadataStatus through pending → in-progress → ready/failed.
@@ -56,6 +57,7 @@ export default defineEvent<DatasetImportedPayload>({
         await generateStructuredMetadata(dataset, ai, aiLogRepo, ctx);
       } else {
         await generateUnstructuredMetadata(dataset, ai, aiLogRepo, ctx);
+        await generateTextChunkEmbeddings(dataset, ai, aiLogRepo, ctx);
       }
 
       // Relationship detection
@@ -285,6 +287,76 @@ Respond with a JSON object (no markdown, no code blocks) with exactly this struc
       latencyMs,
       status: AILogStatus.SUCCESS,
     }),
+  );
+}
+
+/**
+ * Generate vector embeddings for all text chunks in an unstructured dataset.
+ * Processes chunks in batches to avoid overwhelming the AI adapter.
+ * Stores embeddings as JSON string arrays in the TextChunk.embedding column.
+ */
+async function generateTextChunkEmbeddings(
+  dataset: Dataset,
+  ai: ReturnType<typeof createAIAdapter>,
+  aiLogRepo: Repository<AILog>,
+  ctx: TypedContext<DatasetImportedPayload>,
+) {
+  const chunkRepo = dataSource.getRepository(TextChunk);
+
+  const chunks = await chunkRepo.find({
+    where: { datasetId: dataset.id },
+    order: { orderIndex: "ASC" },
+  });
+
+  if (chunks.length === 0) return;
+
+  const BATCH_SIZE = 20;
+  let totalDurationMs = 0;
+  let embeddedCount = 0;
+
+  for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+    const batch = chunks.slice(i, i + BATCH_SIZE);
+    const texts = batch.map((c) => c.content);
+
+    const startTime = Date.now();
+    const result = await ai.generateEmbeddings({ input: texts });
+    const latencyMs = Date.now() - startTime;
+    totalDurationMs += latencyMs;
+
+    // Update each chunk with its embedding
+    for (let j = 0; j < batch.length; j++) {
+      const embedding = result.embeddings[j];
+      if (embedding) {
+        await chunkRepo.update(batch[j].id, {
+          embedding: JSON.stringify(embedding),
+        });
+        embeddedCount++;
+      }
+    }
+
+    // Log each batch
+    await aiLogRepo.save(
+      aiLogRepo.create({
+        type: AILogType.METADATA,
+        sessionId: dataset.sessionId,
+        datasetId: dataset.id,
+        purpose: AILogPurpose.EMBEDDING_GENERATION,
+        promptSent: `Embedding batch ${Math.floor(i / BATCH_SIZE) + 1}: ${texts.length} chunks`,
+        responseReceived: `Generated ${result.embeddings.length} embeddings (${result.dimensions}d)`,
+        model: result.model,
+        provider: process.env.AI_PROVIDER || "ollama",
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        latencyMs,
+        status: AILogStatus.SUCCESS,
+      }),
+    );
+  }
+
+  ctx.broker.logger.info(
+    `Generated embeddings for ${embeddedCount}/${chunks.length} text chunks ` +
+      `in dataset ${dataset.id} (${totalDurationMs}ms)`,
   );
 }
 

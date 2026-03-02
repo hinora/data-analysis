@@ -6,7 +6,7 @@ Dataset-related events enable cross-service communication without tight coupling
 
 ## Event: `metadata.generateMetadata`
 
-Internal event within the data microservice. Emitted by the `upload.uploadFile` action (and `metadata.retryGeneration`) after a dataset is created. Triggers background AI metadata generation.
+Internal event within the data microservice. Emitted by the `upload.uploadFile` action (and `metadata.retryGeneration`) after a dataset is created. Triggers background AI metadata generation and embedding computation.
 
 ```mermaid
 sequenceDiagram
@@ -15,10 +15,29 @@ sequenceDiagram
 
     Upload->>Metadata: emit("metadata.generateMetadata", payload)
     Metadata->>Metadata: Generate AI metadata (structured/unstructured)
+    alt Unstructured dataset
+        Metadata->>Metadata: Generate vector embeddings for text chunks (batches of 20)
+    end
     Metadata->>Metadata: Detect cross-dataset relationships
     Metadata->>Metadata: Update metadataStatus → ready/failed
     Metadata-->>AnalysisSvc: emit("datasetEvent.metadataReady", payload)
 ```
+
+### Metadata Generation Details
+
+**Structured datasets:** AI generates column descriptions, summary statistics, and a dataset description from sample rows.
+
+**Unstructured datasets:**
+1. AI generates document summary, key topics, content domain, entities, and word count.
+2. **Embedding generation:** All text chunks are sent through `ai.generateEmbeddings()` in batches of 20. The resulting 768-dimensional vectors (nomic-embed-text) are stored in the `TextChunk.embedding` column for semantic search via pgvector.
+
+### Text Chunking
+
+Text from PDFs is split into chunks using a recursive character splitter with **word-boundary awareness**:
+- **Separator priority:** paragraph (`\n\n`) → newline (`\n`) → sentence (`. `) → word (` `)
+- **Target size:** ~800 characters per chunk with 200-character overlap
+- **Word safety:** Hard splits snap to the nearest word boundary (space) to avoid splitting words mid-token
+- Overlap regions also snap to word boundaries for clean context windows
 
 **Payload:**
 

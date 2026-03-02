@@ -39,6 +39,8 @@ export default defineAction<ListDatasetsParams, Dataset[]>({
         "sheetName",
         "importedAt",
         "createdAt",
+        "structuredMetadata",
+        "unstructuredMetadata",
       ],
     });
 
