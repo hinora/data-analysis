@@ -1,36 +1,60 @@
 /**
  * Clear Database Script
  *
- * Deletes all data from all local MongoDB databases used by the application.
+ * Truncates all tables in all local PostgreSQL databases used by the application.
+ * Preserves schema structure (tables, indexes, extensions, etc.) while removing all data.
  * Usage: npm run db:clear
  */
 
 import "dotenv/config";
-import mongoose from "mongoose";
+import { Client } from "pg";
 
 // Database names used by the application
-const DATABASES = ["analysisDb", "aiDb", "newsDb", "schedulerDb", "stockDb"];
+const DATABASES = ["analysis_db", "data_db"];
 
 async function clearDatabase(): Promise<void> {
-  const host = process.env.MONGODB_HOST || "localhost";
-  const port = process.env.MONGODB_PORT || "27017";
-  const baseUri = `mongodb://${host}:${port}`;
+  const host = process.env.POSTGRES_HOST || "localhost";
+  const port = process.env.POSTGRES_PORT || "5432";
+  const user = process.env.POSTGRES_USER || "postgres";
+  const password = process.env.POSTGRES_PASSWORD || "postgres";
 
-  console.log("🗑️  Clearing all databases...\n");
+  console.log("🗑️  Clearing all table data...\n");
 
   for (const dbName of DATABASES) {
+    const client = new Client({
+      host,
+      port: Number(port),
+      user,
+      password,
+      database: dbName,
+    });
+
     try {
-      const uri = `${baseUri}/${dbName}`;
-      const connection = await mongoose.createConnection(uri).asPromise();
+      await client.connect();
 
-      // Drop the entire database
-      await connection.dropDatabase();
-      console.log(`✅ Dropped database: ${dbName}`);
+      // Get all table names in the public schema
+      const result = await client.query<{ tablename: string }>(
+        "SELECT tablename FROM pg_tables WHERE schemaname = 'public'",
+      );
+      const tables = result.rows.map((row) => row.tablename);
 
-      await connection.close();
+      if (tables.length === 0) {
+        console.log(`⚠️  No tables found in: ${dbName}`);
+        continue;
+      }
+
+      // Truncate all tables with CASCADE to handle foreign key constraints, and reset identity columns
+      const tableList = tables.map((t) => `"${t}"`).join(", ");
+      await client.query(
+        `TRUNCATE TABLE ${tableList} RESTART IDENTITY CASCADE`,
+      );
+
+      console.log(`✅ Cleared ${tables.length} table(s) in: ${dbName}`);
     } catch (error) {
       const err = error as Error;
-      console.error(`❌ Error dropping ${dbName}: ${err.message}`);
+      console.error(`❌ Error clearing ${dbName}: ${err.message}`);
+    } finally {
+      await client.end();
     }
   }
 

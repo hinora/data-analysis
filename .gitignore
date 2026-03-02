@@ -34,4 +34,8 @@ npm-debug.log*
 coverage/
 .nyc_output/
 
+# Uploaded files (keep .gitkeep)
+data/uploads/*
+!data/uploads/.gitkeep
+
 *.d.ts.map

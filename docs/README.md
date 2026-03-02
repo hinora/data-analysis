@@ -27,7 +27,7 @@ npm run dev -w microservice.{name}
 - [Creating Services](./creating-services.md) - Guide to creating new microservices and actions
 - [Configuration](./configuration.md) - Configuration system and environment variables
 - [Type Generation](./type-generation.md) - How type-safe service calls work
-- [Database](./database.md) - MongoDB/Mongoose setup and conventions
+- [Database](./database.md) - PostgreSQL/TypeORM setup and conventions
 
 ### Domain Knowledge
 

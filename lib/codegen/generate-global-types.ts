@@ -260,7 +260,7 @@ function generateGlobalRegistry(
   let eventRegistryEntries = "";
 
   for (const action of actions) {
-    const importAlias = `${action.microservice.replace(/[.-]/g, "_")}_${action.serviceName}_${action.actionName}`;
+    const importAlias = `${action.microservice.replace(/[.-]/g, "_")}_${action.serviceName.replace(/[.-]/g, "_")}_${action.actionName.replace(/[.-]/g, "_")}`;
     const relativePath = path
       .relative(GLOBAL_OUTPUT_DIR, action.filePath.replace(/\.ts$/, ""))
       .replace(/\\/g, "/");
@@ -283,7 +283,7 @@ function generateGlobalRegistry(
   }
 
   for (const event of events) {
-    const importAlias = `event_${event.microservice.replace(/[.-]/g, "_")}_${event.serviceName}_${event.eventName}`;
+    const importAlias = `event_${event.microservice.replace(/[.-]/g, "_")}_${event.serviceName.replace(/[.-]/g, "_")}_${event.eventName.replace(/[.-]/g, "_")}`;
     const relativePath = path
       .relative(GLOBAL_OUTPUT_DIR, event.filePath.replace(/\.ts$/, ""))
       .replace(/\\/g, "/");

@@ -5,6 +5,10 @@
  * Default provider: ollama (per plan.md)
  */
 
+import {
+  SUPPORTED_AI_PROVIDERS,
+  type SupportedAIProvider,
+} from "../../config/utils";
 import { OllamaAdapter } from "./ollama.adapter";
 import type {
   AIAdapter,
@@ -17,25 +21,45 @@ export type {
   AIAdapter,
   AIMessage,
   AIMessageRole,
+  AIMessageWithToolRole,
+  AIMessageWithTools,
   AIProviderConfig,
   AIProviderType,
+  ChatWithToolsParams,
+  ChatWithToolsResponse,
   CreateAIAdapterOptions,
+  GenerateEmbeddingsParams,
+  GenerateEmbeddingsResult,
   GenerateJSONParams,
   GenerateJSONResult,
   GenerateTextParams,
   GenerateTextResult,
   Recommendation,
+  ToolCall,
+  ToolCallResult,
+  ToolDefinition,
+  ToolParameterSchema,
 } from "./types";
 
 /**
- * Get the default AI provider from environment
+ * Get the default AI provider from environment.
+ * Validates the provider value and throws if unsupported.
  */
 function getDefaultProvider(): AIProviderType {
   const provider = process.env.AI_PROVIDER?.toLowerCase();
-  if (provider === "gemini" || provider === "ollama") {
-    return provider;
+
+  if (!provider) {
+    return "ollama";
   }
-  return "ollama";
+
+  if (!SUPPORTED_AI_PROVIDERS.includes(provider as SupportedAIProvider)) {
+    throw new Error(
+      `Unknown AI provider: "${process.env.AI_PROVIDER}". ` +
+        `Supported providers: ${SUPPORTED_AI_PROVIDERS.join(", ")}`,
+    );
+  }
+
+  return provider as AIProviderType;
 }
 
 /**

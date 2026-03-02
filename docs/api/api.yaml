@@ -1,0 +1,629 @@
+openapi: 3.0.3
+info:
+  title: Data Analysis Platform API
+  description: |
+    REST API for the Data Analysis Platform.
+    All endpoints are exposed through the API Gateway (microservice.proxy) at `/api`.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development
+
+tags:
+  - name: Health
+    description: System health check
+  - name: Sessions
+    description: Analysis session management
+  - name: Conversations
+    description: Conversation threads within sessions
+  - name: Chat
+    description: AI-powered chat messaging
+  - name: Upload
+    description: File upload for sessions
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                  uptime:
+                    type: number
+                    description: Uptime in seconds
+
+  # ── Sessions ──────────────────────────────────────────────
+
+  /sessions:
+    post:
+      tags: [Sessions]
+      summary: Create a new session
+      operationId: createSession
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                  description: Optional session name. Auto-generated if omitted.
+      responses:
+        "200":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+    get:
+      tags: [Sessions]
+      summary: List sessions (paginated)
+      operationId: listSessions
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated session list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Session"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  totalPages:
+                    type: integer
+
+  /sessions/{id}:
+    get:
+      tags: [Sessions]
+      summary: Get a session by ID
+      operationId: getSession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags: [Sessions]
+      summary: Delete a session
+      description: |
+        Deletes the session and cascades to conversations and chat messages.
+        Emits `sessionData.sessionDeleted` event for cross-service cleanup.
+      operationId: deleteSession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Session deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  id:
+                    type: string
+                    format: uuid
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /sessions/{id}/rename:
+    patch:
+      tags: [Sessions]
+      summary: Rename a session
+      operationId: renameSession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+      responses:
+        "200":
+          description: Session renamed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Upload ────────────────────────────────────────────────
+
+  /sessions/{sessionId}/upload:
+    post:
+      tags: [Upload]
+      summary: Upload a file to a session
+      description: |
+        Handles file upload for a session:
+        1. Validates file type and size (max 100MB)
+        2. Computes SHA-256 hash and checks for duplicates
+        3. Saves original file to disk
+        4. Parses file and creates Dataset(s) with DataRecords/TextChunks
+        5. Emits metadata.generateMetadata event for metadata generation
+        6. Updates session datasetCount
+      operationId: uploadFile
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "File to upload (CSV, PDF, XLSX, XLSM)"
+      responses:
+        "200":
+          description: File uploaded and parsed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  originalFileId:
+                    type: string
+                    format: uuid
+                  datasets:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+                        datasetType:
+                          type: string
+                          enum: [structured-table, unstructured-text]
+                        rowCount:
+                          type: integer
+                        columnCount:
+                          type: integer
+                          nullable: true
+        "400":
+          description: Invalid file type, file too large, or duplicate file
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Conversations ─────────────────────────────────────────
+
+  /conversations:
+    post:
+      tags: [Conversations]
+      summary: Create a conversation
+      description: |
+        Creates a new conversation within a session. Automatically constructs
+        a system prompt from the session's datasets and stores it as the first message.
+      operationId: createConversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId]
+              properties:
+                sessionId:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
+                  description: Optional name. Auto-generated if omitted.
+      responses:
+        "200":
+          description: Conversation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationFull"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    get:
+      tags: [Conversations]
+      summary: List conversations for a session
+      operationId: listConversations
+      parameters:
+        - name: sessionId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Conversation list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConversationSummary"
+
+  /conversations/{id}:
+    get:
+      tags: [Conversations]
+      summary: Get a conversation by ID
+      operationId: getConversation
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
+      responses:
+        "200":
+          description: Conversation details including system prompt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationFull"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags: [Conversations]
+      summary: Delete a conversation
+      description: Cascade-deletes all messages and AI logs for this conversation.
+      operationId: deleteConversation
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
+      responses:
+        "200":
+          description: Conversation deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  id:
+                    type: string
+                    format: uuid
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /conversations/{id}/rename:
+    patch:
+      tags: [Conversations]
+      summary: Rename a conversation
+      operationId: renameConversation
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
+      responses:
+        "200":
+          description: Conversation renamed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationFull"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Chat ──────────────────────────────────────────────────
+
+  /chat/messages:
+    get:
+      tags: [Chat]
+      summary: Get conversation message history
+      operationId: getChatHistory
+      parameters:
+        - name: conversationId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: excludeSystem
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Exclude system-role messages from results
+      responses:
+        "200":
+          description: Paginated message history (chronological order)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChatMessage"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  hasMore:
+                    type: boolean
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    post:
+      tags: [Chat]
+      summary: Send a message and get AI response
+      description: |
+        Saves the user message, runs AI tool-calling orchestration loop
+        (up to 10 iterations), saves the assistant response with metadata
+        (confidence, citations, tools used, reasoning steps), and logs to AILog.
+      operationId: sendChatMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [conversationId, content]
+              properties:
+                conversationId:
+                  type: string
+                  format: uuid
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 10000
+      responses:
+        "200":
+          description: AI assistant response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  parameters:
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    ConversationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+              code:
+                type: integer
+                example: 404
+
+  schemas:
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+          enum: [empty, has-data, active, archived]
+        datasetCount:
+          type: integer
+        conversationCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ConversationSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        messageCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ConversationFull:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        systemPrompt:
+          type: string
+        messageCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        conversationId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [system, user, assistant]
+        content:
+          type: string
+        confidenceScore:
+          type: number
+          format: float
+          nullable: true
+          description: AI confidence score (0–1)
+        citedSources:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/CitedSource"
+        toolsUsed:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/ToolUsage"
+        reasoningSteps:
+          type: array
+          nullable: true
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    CitedSource:
+      type: object
+      properties:
+        datasetId:
+          type: string
+          format: uuid
+        datasetName:
+          type: string
+        columnName:
+          type: string
+          nullable: true
+
+    ToolUsage:
+      type: object
+      properties:
+        toolName:
+          type: string
+        parameters:
+          type: object
+        resultSummary:
+          type: string

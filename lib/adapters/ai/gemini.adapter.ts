@@ -8,6 +8,10 @@
 import type {
   AIAdapter,
   AIProviderConfig,
+  ChatWithToolsParams,
+  ChatWithToolsResponse,
+  GenerateEmbeddingsParams,
+  GenerateEmbeddingsResult,
   GenerateJSONParams,
   GenerateJSONResult,
   GenerateTextParams,
@@ -55,6 +59,30 @@ export class GeminiAdapter implements AIAdapter {
   async isAvailable(): Promise<boolean> {
     // TODO: Implement API key validation
     return false;
+  }
+
+  /**
+   * Chat with tool-calling support (stub)
+   */
+  async chatWithTools(
+    _params: ChatWithToolsParams,
+  ): Promise<ChatWithToolsResponse> {
+    throw new Error(
+      "GeminiAdapter.chatWithTools is not yet implemented. " +
+        "Please use AI_PROVIDER=ollama or implement this method.",
+    );
+  }
+
+  /**
+   * Generate embeddings (stub)
+   */
+  async generateEmbeddings(
+    _params: GenerateEmbeddingsParams,
+  ): Promise<GenerateEmbeddingsResult> {
+    throw new Error(
+      "GeminiAdapter.generateEmbeddings is not yet implemented. " +
+        "Please use AI_PROVIDER=ollama or implement this method.",
+    );
   }
 
   /**

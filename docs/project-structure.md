@@ -59,7 +59,19 @@ lib/
 │   ├── index.ts          # Exports config utilities
 │   ├── default.ts        # Default configuration
 │   ├── types.ts          # Config type definitions
-│   └── utils.ts          # Utility functions
+│   └── utils.ts          # Utility functions (defineConfig, validateAIProvider)
+├── adapters/             # External service adapters
+│   ├── ai/               # AI provider adapters
+│   │   ├── index.ts      # Factory: createAIAdapter(), createAIAdapterWithFallback()
+│   │   ├── types.ts      # AIAdapter interface, ToolDefinition, ChatWithToolsParams, etc.
+│   │   ├── ollama.adapter.ts   # Ollama adapter (chat, tools, embeddings, JSON, text)
+│   │   └── gemini.adapter.ts   # Gemini adapter (stub)
+│   └── file-parser/      # File parser adapters
+│       ├── index.ts      # Factory: getParser(filename) → CsvParser | PdfParser | XlsmParser
+│       └── utils/        # Shared utilities (column-sanitizer, type-inferrer, text-chunker)
+├── database/             # Database utilities
+│   ├── index.ts          # createDataSource() + entity exports
+│   └── ai-log.entity.ts  # Shared AILog entity (used by analysis + data microservices)
 ├── codegen/              # Type generation
 │   ├── generate-action-types.ts  # Single microservice generator
 │   └── generate-all.ts           # All microservices generator
@@ -79,8 +91,19 @@ import { createApp, defineAction } from "core.lib";
 
 // Import specific modules
 import { createApp, defineAction, run } from "core.lib/broker";
-import { defineConfig, createServiceConfig } from "core.lib/config";
+import { defineConfig, createServiceConfig, validateAIProvider } from "core.lib/config";
 import { ServiceBroker, Context } from "core.lib/moleculer";
+
+// AI adapters
+import { createAIAdapter, createAIAdapterWithFallback } from "core.lib/adapters/ai";
+import type { AIAdapter, ToolDefinition, ChatWithToolsParams } from "core.lib/adapters/ai";
+
+// File parsers
+import { getParser } from "core.lib/adapters/file-parser";
+
+// Database utilities
+import { createDataSource } from "core.lib/database";
+import { AILog, AILogType, AILogPurpose, AILogStatus } from "core.lib/database";
 ```
 
 ## apps/ - Microservices
@@ -89,13 +112,48 @@ Microservices are organized by domain:
 
 ```
 apps/
-├── domain.auth/
-│   └── microservice.auth/
-├── domain.book/
-│   └── microservice.book/
-└── domain.{name}/
-    └── microservice.{name}/
+├── domain.analysis/
+│   └── microservice.analysis/   # AI session & conversation management
+├── domain.data/
+│   └── microservice.data/       # Data ingestion, metadata, analysis tools
+├── domain.example/
+│   └── microservice.example/    # Example microservice (reference)
+└── domain.platform/
+    └── microservice.proxy/      # API gateway (moleculer-web)
 ```
+
+### Domain: Analysis
+
+**microservice.analysis** manages AI analysis sessions, conversations, and chat orchestration.
+
+| Service | Actions | Description |
+|---------|---------|-------------|
+| session | create, list, getSession, renameSession, deleteSession, updateSessionStatus | Session CRUD and lifecycle |
+| conversation | createConversation, listConversations, getConversation, renameConversation, deleteConversation | Conversation management with system prompts |
+| chat | sendMessage, getHistory | AI tool-calling orchestration loop (max 10 iterations) |
+| datasetEvent | *(event-only)* | Listens for `datasetEvent.metadataReady` from data microservice |
+
+**Entities:** Session, Conversation, ChatMessage, AILog
+**Database:** analysis_db (PostgreSQL)
+
+### Domain: Data
+
+**microservice.data** handles file upload, parsing, metadata generation, and 24 AI analysis tools.
+
+| Service | Actions | Description |
+|---------|---------|-------------|
+| upload | uploadFile | File upload with hash dedup, parsing (CSV/PDF/XLSM) |
+| dataset | listDatasets, getDataset, previewDataset, renameDataset, deleteDataset | Dataset CRUD and preview |
+| metadata | retryGeneration | Metadata regeneration trigger |
+| sessionData | *(event-only)* | Handles `sessionData.sessionDeleted` cascade cleanup |
+| tools | 15 structured + 9 unstructured tools | Data analysis via SQL/pgvector/AI |
+
+**Structured tools:** aggregate, sumField, avgField, count, getTopByField, countAndGroup, getDistinctValues, filterByCondition, getMinMax, correlateFields, pivotTable, joinDatasets, getPercentile, detectOutliers, sortByField
+
+**Unstructured tools:** semanticSearch, summarizeDocument, extractKeyTopics, extractEntities, answerFromContext, compareDocuments, findSimilarChunks, timelineExtraction, sentimentAnalysis
+
+**Entities:** OriginalFile, Dataset, DataRecord, TextChunk, AILog
+**Database:** data_db (PostgreSQL + pgvector)
 
 ### Microservice Structure
 

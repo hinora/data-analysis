@@ -21,6 +21,28 @@ After implementing actions or events You must to do these steps:
 
 ## Code Rules
 
+### Unique Service Names (Critical)
+
+**Moleculer requires every service name to be unique across the entire system.** The service name is derived from the folder name under `services/`. If two microservices both have a `services/session/` folder, they will both register a service called `session` — causing conflicts.
+
+- Before creating a new service folder, **check all microservices** to ensure no other microservice already uses that name.
+- If a service name must exist in multiple microservices, use **camelCase** suffix with the domain context (e.g., `sessionData` instead of `session`).
+- **Use camelCase for service folder names** (e.g., `sessionData`, `datasetEvent`). Do NOT use kebab-case (`session-data`).
+- The event naming convention is `{serviceName}.{eventFileName}` (e.g., `sessionData.sessionDeleted` from `services/sessionData/sessionDeleted.event.ts`). Ensure emit calls match the handler's registered event name.
+
+```
+❌ BAD: Two microservices with the same service folder name
+  microservice.analysis/services/session/   → service "session"
+  microservice.data/services/session/       → service "session" (CONFLICT!)
+
+❌ BAD: kebab-case service folder names
+  microservice.data/services/session-data/  → service "session-data"
+
+✅ GOOD: Unique camelCase service names across all microservices
+  microservice.analysis/services/session/       → service "session"
+  microservice.data/services/sessionData/       → service "sessionData"
+```
+
 ### Microservice Actions: Use `defineAction`
 
 - We are microservice based on Moleculer. Always build the system flow microservice rules.

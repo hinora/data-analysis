@@ -315,7 +315,7 @@ interface UuidRule extends BaseRule {
   version?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 }
 
-/** MongoDB ObjectID validator */
+/** ObjectID validator (Moleculer built-in, kept for legacy compat) */
 interface ObjectIDRule extends BaseRule {
   type: "objectID";
   /** The ObjectID class */

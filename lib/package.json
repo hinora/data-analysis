@@ -2,22 +2,26 @@
   "name": "core.lib",
   "version": "1.0.0",
   "description": "Core library for moleculer-ts project",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "index.ts",
+  "types": "index.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./*": "./dist/*.js",
-    "./broker": "./dist/broker/index.js",
-    "./config": "./dist/config/index.js",
-    "./database": "./dist/database/index.js",
-    "./fs": "./dist/fs/index.js",
-    "./moleculer": "./dist/moleculer/index.js",
-    "./adapters/ai": "./dist/adapters/ai/index.js",
-    "./adapters/stock-data": "./dist/adapters/stock-data/index.js",
-    "./adapters/news": "./dist/adapters/news/index.js"
+    ".": "./index.ts",
+    "./broker": "./broker/index.ts",
+    "./config": "./config/index.ts",
+    "./database": "./database/index.ts",
+    "./fs": "./fs/index.ts",
+    "./moleculer": "./moleculer/index.ts",
+    "./__generated__": "./__generated__/index.ts",
+    "./__generated__/*": "./__generated__/*.ts",
+    "./adapters": "./adapters/index.ts",
+    "./adapters/ai": "./adapters/ai/index.ts",
+    "./adapters/file-parser": "./adapters/file-parser/index.ts",
+    "./adapters/stock-data": "./adapters/stock-data/index.ts",
+    "./adapters/news": "./adapters/news/index.ts"
   },
   "scripts": {
-    "build": "rm -rf ./dist && tsc --project tsconfig.build.json",
+    "build": "rm -rf ./dist && tsc --project .",
     "build:copy-json": "rsync --prune-empty-dirs -r --include='*/' --include='*/*.json' --exclude='*' ./ ./dist"
-  }
+  },
+  "dependencies": {}
 }

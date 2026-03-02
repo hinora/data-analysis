@@ -129,6 +129,22 @@ export type AIProviderType = "gemini" | "ollama";
  */
 export interface AIAdapter {
   /**
+   * Chat with tool-calling support
+   * @param params - Messages, tools, and options
+   * @returns Response with content or tool calls
+   */
+  chatWithTools(params: ChatWithToolsParams): Promise<ChatWithToolsResponse>;
+
+  /**
+   * Generate vector embeddings for text inputs
+   * @param params - Text inputs and model selection
+   * @returns Embedding vectors
+   */
+  generateEmbeddings(
+    params: GenerateEmbeddingsParams,
+  ): Promise<GenerateEmbeddingsResult>;
+
+  /**
    * Generate structured JSON output
    * @param params - Generation parameters including prompt and optional schema
    * @returns Parsed JSON result with token usage
@@ -167,4 +183,141 @@ export interface CreateAIAdapterOptions {
   model?: string;
   /** Provider type override (defaults to AI_PROVIDER env var) */
   provider?: AIProviderType;
+}
+
+// ============================================================================
+// Tool-Calling Types (T007)
+// ============================================================================
+
+/**
+ * JSON Schema definition for tool parameters
+ */
+/**
+ * Property definition within a tool parameter schema
+ */
+export interface ToolPropertySchema {
+  description?: string;
+  enum?: string[];
+  items?: ToolPropertySchema & {
+    properties?: Record<string, ToolPropertySchema>;
+    required?: string[];
+  };
+  properties?: Record<string, ToolPropertySchema>;
+  required?: string[];
+  type: string;
+}
+
+export interface ToolParameterSchema {
+  description?: string;
+  properties: Record<string, ToolPropertySchema>;
+  required?: string[];
+  type: "object";
+}
+
+/**
+ * Definition of a tool that the AI can call
+ */
+export interface ToolDefinition {
+  function: {
+    description: string;
+    name: string;
+    parameters: ToolParameterSchema;
+  };
+  type: "function";
+}
+
+/**
+ * A tool call made by the AI model
+ */
+export interface ToolCall {
+  function: {
+    arguments: Record<string, unknown>;
+    name: string;
+  };
+  id?: string;
+}
+
+/**
+ * Result from executing a tool call
+ */
+export interface ToolCallResult {
+  content: string;
+  toolCallId?: string;
+}
+
+/**
+ * Extended AI message role including tool messages
+ */
+export type AIMessageWithToolRole = "assistant" | "system" | "tool" | "user";
+
+/**
+ * Message that can include tool calls (from assistant) or tool results
+ */
+export interface AIMessageWithTools {
+  content: string;
+  role: AIMessageWithToolRole;
+  toolCallId?: string;
+  toolCalls?: ToolCall[];
+}
+
+/**
+ * Parameters for chat with tool-calling support
+ */
+export interface ChatWithToolsParams {
+  /** Conversation messages including tool results */
+  messages: AIMessageWithTools[];
+  /** Model to use */
+  model?: string;
+  /** Temperature for randomness (0-1) */
+  temperature?: number;
+  /** Available tools for the AI to call */
+  tools: ToolDefinition[];
+}
+
+/**
+ * Response from chat with tool-calling
+ */
+export interface ChatWithToolsResponse {
+  /** Completion tokens used */
+  completionTokens: number;
+  /** Text content (final answer or empty if tool calls) */
+  content: string;
+  /** Processing duration in milliseconds */
+  durationMs: number;
+  /** Model used */
+  model: string;
+  /** Prompt tokens used */
+  promptTokens: number;
+  /** Tool calls requested by the AI (empty if final answer) */
+  toolCalls: ToolCall[];
+  /** Total tokens used */
+  totalTokens: number;
+}
+
+// ============================================================================
+// Embedding Types (T007)
+// ============================================================================
+
+/**
+ * Parameters for generating embeddings
+ */
+export interface GenerateEmbeddingsParams {
+  /** Text inputs to embed (batch support) */
+  input: string[];
+  /** Embedding model to use (e.g., "nomic-embed-text") */
+  model?: string;
+}
+
+/**
+ * Result from generating embeddings
+ */
+export interface GenerateEmbeddingsResult {
+  /** Number of dimensions per embedding */
+  dimensions: number;
+  /** Processing duration in milliseconds */
+  durationMs: number;
+  /** Generated embeddings (one per input) */
+  embeddings: number[][];
+  /** Model used */
+  model: string;
 }

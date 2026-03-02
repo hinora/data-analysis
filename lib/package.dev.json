@@ -15,6 +15,7 @@
     "./__generated__/*": "./__generated__/*.ts",
     "./adapters": "./adapters/index.ts",
     "./adapters/ai": "./adapters/ai/index.ts",
+    "./adapters/file-parser": "./adapters/file-parser/index.ts",
     "./adapters/stock-data": "./adapters/stock-data/index.ts",
     "./adapters/news": "./adapters/news/index.ts"
   },
@@ -22,7 +23,5 @@
     "build": "rm -rf ./dist && tsc --project .",
     "build:copy-json": "rsync --prune-empty-dirs -r --include='*/' --include='*/*.json' --exclude='*' ./ ./dist"
   },
-  "dependencies": {
-    "mongoose": "^8.21.1"
-  }
+  "dependencies": {}
 }

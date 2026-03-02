@@ -7,6 +7,48 @@ import { defaultConfig, getEnvConfig } from "./default";
 import type { AppConfig } from "./types";
 
 /**
+ * Supported AI providers
+ */
+export const SUPPORTED_AI_PROVIDERS = ["ollama", "gemini"] as const;
+export type SupportedAIProvider = (typeof SUPPORTED_AI_PROVIDERS)[number];
+
+/**
+ * Validate AI_PROVIDER environment variable on startup.
+ * If AI_PROVIDER is set, it must be a supported value.
+ * If AI_PROVIDER is not set, defaults to "ollama" (no error).
+ *
+ * Call this early in microservice startup for fail-fast behavior.
+ *
+ * @throws Error if AI_PROVIDER is set to an unsupported value
+ * @returns The validated provider name
+ *
+ * @example
+ * ```typescript
+ * import { validateAIProvider } from "core.lib/config";
+ *
+ * // In app.ts or moleculer.config.ts startup
+ * validateAIProvider(); // throws if AI_PROVIDER=invalid
+ * ```
+ */
+export function validateAIProvider(): SupportedAIProvider {
+  const provider = process.env.AI_PROVIDER?.toLowerCase();
+
+  if (!provider) {
+    return "ollama"; // default
+  }
+
+  if (!SUPPORTED_AI_PROVIDERS.includes(provider as SupportedAIProvider)) {
+    throw new Error(
+      `[AI Config] Unsupported AI_PROVIDER="${process.env.AI_PROVIDER}". ` +
+        `Supported providers: ${SUPPORTED_AI_PROVIDERS.join(", ")}. ` +
+        `Set AI_PROVIDER to one of these values or remove it to use the default (ollama).`,
+    );
+  }
+
+  return provider as SupportedAIProvider;
+}
+
+/**
  * Generate a random string of specified length
  * @param length - Length of the random string
  * @returns Random alphanumeric string

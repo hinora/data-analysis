@@ -7,7 +7,7 @@ const service = axios.create({
   // crossDomain: true,
   baseURL: process.env.BASE_API ?? "http://localhost:3000/api", // url = base url + request url
   // withCredentials: true, // send cookies when cross-domain requests
-  timeout: 100000, // request timeout
+  timeout: 600000, // request timeout
 });
 // request interceptor
 service.interceptors.request.use(

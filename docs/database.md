@@ -1,43 +1,58 @@
 # Database Integration
 
-This document explains how to set up and use MongoDB with Mongoose in your microservices.
+This document explains how to set up and use PostgreSQL with TypeORM in your microservices.
 
 ## Overview
 
-Each microservice connects to its own dedicated MongoDB database. The `core.lib` provides helper functions to manage database connections.
+Each microservice connects to its own dedicated PostgreSQL database. The `core.lib/database` module provides helpers to create and manage TypeORM `DataSource` instances. The pgvector extension is used for vector similarity search (embeddings).
 
 ## Setup
 
-### 1. Environment Variables
+### 1. Prerequisites
 
-Copy `.env.example` to `.env` in your microservice directory and configure the MongoDB connection:
+- **PostgreSQL 16+** with pgvector extension
+- Recommended Docker image: `pgvector/pgvector:pg16`
 
 ```bash
-# Option 1: Configure host and port (database name is set in code)
-MONGODB_HOST=localhost
-MONGODB_PORT=27017
-MONGODB_USER=myuser
-MONGODB_PASSWORD=mypassword
-
-# Option 2: Use a full connection URI
-AUTH_DB_URI=mongodb://localhost:27017/auth_db
-BOOK_DB_URI=mongodb://localhost:27017/book_db
+# Start PostgreSQL with pgvector via Docker
+docker run -d \
+  --name pgvector \
+  -e POSTGRES_PASSWORD=postgres \
+  -p 5432:5432 \
+  pgvector/pgvector:pg16
 ```
 
-### 2. Connect in app.ts
+### 2. Environment Variables
+
+Copy `.env.example` to `.env` in the project root and configure:
+
+```bash
+# PostgreSQL Configuration
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=analysis_db
+```
+
+### 3. Connect in app.ts
 
 The database connection is initialized in each microservice's `app.ts`:
 
 ```typescript
-import { createDatabase, createDatabaseUri } from "core.lib/database";
+import { createDataSource } from "core.lib/database";
+import { run } from "core.lib/broker";
+import app from "./moleculer.config";
 
-// Create database connection for your microservice
-const db = createDatabase({
-  uri: process.env.MY_DB_URI || createDatabaseUri("my_database"),
+// Create TypeORM DataSource for your microservice
+const dataSource = createDataSource({
+  database: process.env.POSTGRES_DB || "analysis_db",
+  entities: [/* import your entities here */],
 });
 
-// Connect to database before starting the app
-db.connect()
+// Initialize database then start the broker
+dataSource
+  .initialize()
   .then(() => run(app.broker))
   .catch((err: Error) => console.error(`Error occurred! ${err.message}`));
 ```
@@ -49,9 +64,9 @@ Each microservice should have a `db` folder with table files:
 ```
 microservice.name/
 ├── db/
-│   ├── index.ts          # Export all tables
-│   ├── user.table.ts     # User schema and queries
-│   └── book.table.ts     # Book schema and queries
+│   ├── index.ts              # Export all tables (entities + query objects)
+│   ├── user.table.ts         # User entity and queries
+│   └── dataRecord.table.ts   # DataRecord entity and queries
 ├── services/
 │   └── ...
 └── app.ts
@@ -60,115 +75,224 @@ microservice.name/
 ## Creating Table Files
 
 Each table file should contain:
-1. TypeScript interfaces for the document
-2. Mongoose schema definition
-3. Model creation
-4. Query functions (CRUD operations)
+1. TypeORM entity class with column decorators
+2. A query object exporting CRUD functions
 
 ### Example Table File
 
 ```typescript
 /**
- * User Table - Schema and Query Functions
+ * User Table - Entity and Query Functions
  */
-import mongoose, { Schema, Document, Model } from "mongoose";
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from "typeorm";
+import { getDataSource } from "core.lib/database";
 
 // ============================================
-// Types
+// Entity
 // ============================================
 
-export interface IUser {
-  email: string;
-  password: string;
+@Entity("users")
+export class User {
+  @PrimaryGeneratedColumn("uuid")
+  id!: string;
+
+  @Index({ unique: true })
+  @Column({ type: "varchar", length: 255 })
+  email!: string;
+
+  @Column({ type: "varchar", length: 255 })
+  password!: string;
+
+  @Column({ type: "varchar", length: 100, nullable: true })
   firstName?: string;
+
+  @Column({ type: "varchar", length: 100, nullable: true })
   lastName?: string;
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+
+  @Column({ type: "boolean", default: true })
+  isActive!: boolean;
+
+  @CreateDateColumn()
+  createdAt!: Date;
+
+  @UpdateDateColumn()
+  updatedAt!: Date;
 }
-
-export interface IUserDocument extends IUser, Document {}
-
-// ============================================
-// Schema
-// ============================================
-
-const userSchema = new Schema<IUserDocument>(
-  {
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
-      index: true,
-    },
-    password: {
-      type: String,
-      required: true,
-    },
-    firstName: {
-      type: String,
-      trim: true,
-    },
-    lastName: {
-      type: String,
-      trim: true,
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-  },
-  {
-    timestamps: true,
-  }
-);
-
-// ============================================
-// Model
-// ============================================
-
-export const UserModel = mongoose.model<IUserDocument>("User", userSchema);
 
 // ============================================
 // Query Functions
 // ============================================
 
+const getRepo = () => getDataSource().getRepository(User);
+
 export const UserTable = {
-  async create(data: Omit<IUser, "createdAt" | "updatedAt" | "isActive">) {
-    const user = new UserModel(data);
-    return user.save();
+  async create(data: Pick<User, "email" | "password" | "firstName" | "lastName">) {
+    const repo = getRepo();
+    const user = repo.create(data);
+    return repo.save(user);
   },
 
   async findById(id: string) {
-    return UserModel.findById(id);
+    return getRepo().findOneBy({ id });
   },
 
   async findByEmail(email: string) {
-    return UserModel.findOne({ email: email.toLowerCase() });
+    return getRepo().findOneBy({ email: email.toLowerCase() });
   },
 
-  async updateById(id: string, data: Partial<IUser>) {
-    return UserModel.findByIdAndUpdate(id, data, { new: true });
+  async updateById(id: string, data: Partial<User>) {
+    await getRepo().update(id, data);
+    return getRepo().findOneBy({ id });
   },
 
   async deleteById(id: string) {
-    const result = await UserModel.findByIdAndDelete(id);
-    return !!result;
+    const result = await getRepo().delete(id);
+    return (result.affected ?? 0) > 0;
   },
 
   async list(options: { limit?: number; offset?: number } = {}) {
     const { limit = 10, offset = 0 } = options;
-    
-    const [users, total] = await Promise.all([
-      UserModel.find().skip(offset).limit(limit).sort({ createdAt: -1 }),
-      UserModel.countDocuments(),
-    ]);
+    const repo = getRepo();
+
+    const [users, total] = await repo.findAndCount({
+      take: limit,
+      skip: offset,
+      order: { createdAt: "DESC" },
+    });
 
     return { users, total };
   },
 };
+```
+
+## JSONB Columns
+
+For schemaless or semi-structured data, use JSONB columns:
+
+```typescript
+@Entity("dataRecords")
+export class DataRecord {
+  @PrimaryGeneratedColumn("uuid")
+  id!: string;
+
+  @Column({ type: "uuid" })
+  datasetId!: string;
+
+  @Column({ type: "int" })
+  rowIndex!: number;
+
+  @Column({ type: "jsonb" })
+  data!: Record<string, unknown>;
+
+  @CreateDateColumn()
+  createdAt!: Date;
+}
+```
+
+### Querying JSONB
+
+Use TypeORM's QueryBuilder for JSONB operations:
+
+```typescript
+// Text accessor: data->>'key' returns text
+const rows = await repo
+  .createQueryBuilder("r")
+  .where("r.data->>'status' = :status", { status: "active" })
+  .getMany();
+
+// Numeric comparison: cast to numeric
+const rows = await repo
+  .createQueryBuilder("r")
+  .where("(r.data->>'revenue')::numeric > :min", { min: 1000 })
+  .getMany();
+
+// Containment: @> checks if JSONB contains another JSONB
+const rows = await repo
+  .createQueryBuilder("r")
+  .where("r.data @> :filter", { filter: JSON.stringify({ category: "tech" }) })
+  .getMany();
+
+// Check key existence
+const rows = await repo
+  .createQueryBuilder("r")
+  .where("r.data ? :key", { key: "email" })
+  .getMany();
+
+// Aggregate on JSONB values
+const result = await repo
+  .createQueryBuilder("r")
+  .select("AVG((r.data->>'revenue')::numeric)", "avgRevenue")
+  .getRawOne();
+```
+
+### JSONB Indexes (GIN)
+
+Add GIN indexes for fast JSONB lookups:
+
+```sql
+CREATE INDEX idx_dataRecords_data_gin ON "dataRecords" USING GIN (data);
+```
+
+Or via TypeORM migration:
+
+```typescript
+await queryRunner.query(
+  `CREATE INDEX "idx_dataRecords_data_gin" ON "dataRecords" USING GIN (data)`
+);
+```
+
+## pgvector — Vector Similarity
+
+For embedding-based search, use the pgvector extension:
+
+```typescript
+import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
+
+@Entity("textChunks")
+export class TextChunk {
+  @PrimaryGeneratedColumn("uuid")
+  id!: string;
+
+  @Column({ type: "uuid" })
+  datasetId!: string;
+
+  @Column({ type: "text" })
+  content!: string;
+
+  @Column({ type: "vector", length: 768, nullable: true })
+  embedding?: number[];
+}
+```
+
+### Cosine Similarity Search
+
+```typescript
+const embedding = await getEmbedding(queryText); // Float32 array from AI adapter
+
+const results = await dataSource.query(
+  `SELECT id, content, 1 - (embedding <=> $1::vector) AS similarity
+   FROM "textChunks"
+   WHERE "datasetId" = $2
+   ORDER BY embedding <=> $1::vector
+   LIMIT $3`,
+  [JSON.stringify(embedding), datasetId, 10]
+);
+```
+
+### HNSW Index for Performance
+
+```sql
+CREATE INDEX idx_textChunks_embedding_hnsw
+  ON "textChunks"
+  USING hnsw (embedding vector_cosine_ops)
+  WITH (m = 16, ef_construction = 64);
 ```
 
 ## Using Tables in Actions
@@ -185,12 +309,12 @@ export default defineAction({
 
     // Find user
     const user = await UserTable.findByEmail(email);
-    
+
     if (!user) {
       throw new Error("User not found");
     }
 
-    return { userId: user._id };
+    return { userId: user.id };
   },
 });
 ```
@@ -199,76 +323,92 @@ export default defineAction({
 
 The `core.lib/database` module provides:
 
-### `createDatabase(config)`
+### `createDataSource(config)`
 
-Creates a database connection object.
+Creates a TypeORM `DataSource` instance.
 
 ```typescript
-import { createDatabase } from "core.lib/database";
+import { createDataSource } from "core.lib/database";
 
-const db = createDatabase({
-  uri: "mongodb://localhost:27017/mydb",
-  options: {
-    maxPoolSize: 10,
-  },
+const dataSource = createDataSource({
+  database: "analysis_db",
+  entities: [User, DataRecord, TextChunk],
+  synchronize: false, // Use migrations in production
 });
 
-await db.connect();
-console.log(db.isConnected()); // true
-await db.disconnect();
+await dataSource.initialize();
+console.log(dataSource.isInitialized); // true
+await dataSource.destroy();
 ```
 
-### `createDatabaseUri(dbName)`
+### `getDataSource()`
 
-Generates a MongoDB URI from environment variables.
+Get the current initialized DataSource for repository access.
 
 ```typescript
-import { createDatabaseUri } from "core.lib/database";
+import { getDataSource } from "core.lib/database";
 
-// Uses MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD env vars
-const uri = createDatabaseUri("auth_db");
-// Returns: mongodb://localhost:27017/auth_db
-// Or with auth: mongodb://user:password@localhost:27017/auth_db?authSource=admin
+const repo = getDataSource().getRepository(User);
+const users = await repo.find();
 ```
 
-### `getMongoose()`
+## Migrations
 
-Get the mongoose instance for advanced operations.
+Use TypeORM migrations for schema changes in production:
 
-### `getConnection()`
+```bash
+# Generate a migration from entity changes
+npx typeorm migration:generate -d src/data-source.ts src/migrations/AddUserTable
 
-Get the current mongoose connection.
+# Run pending migrations
+npx typeorm migration:run -d src/data-source.ts
+
+# Revert last migration
+npx typeorm migration:revert -d src/data-source.ts
+```
+
+During development, you can enable `synchronize: true` in the DataSource config to auto-sync schema from entities. **Never use `synchronize: true` in production.**
 
 ## Best Practices
 
 1. **One database per microservice**: Each microservice should have its own database for isolation.
 
-2. **Use indexes**: Add indexes to frequently queried fields.
+2. **Use indexes**: Add indexes to frequently queried columns. Use GIN indexes for JSONB columns and HNSW indexes for vector columns.
 
-3. **Type everything**: Use TypeScript interfaces for type safety.
+3. **Type everything**: Use TypeORM entity classes with proper column types for type safety.
 
 4. **Centralize queries**: Keep all queries in the table file for consistency.
 
 5. **Handle errors**: Always handle database errors gracefully in your actions.
 
-6. **Use transactions**: For multi-document operations, use MongoDB transactions.
+6. **Use transactions**: For multi-table operations, use TypeORM's `QueryRunner`:
 
 ```typescript
-import { getMongoose } from "core.lib/database";
+import { getDataSource } from "core.lib/database";
 
 async function transferBook(fromUserId: string, toUserId: string, bookId: string) {
-  const session = await getMongoose().startSession();
-  session.startTransaction();
-  
+  const queryRunner = getDataSource().createQueryRunner();
+  await queryRunner.connect();
+  await queryRunner.startTransaction();
+
   try {
-    // Perform operations with session
-    await BookModel.updateOne({ _id: bookId }, { ownerId: toUserId }, { session });
-    await session.commitTransaction();
+    await queryRunner.manager
+      .createQueryBuilder()
+      .update("books")
+      .set({ ownerId: toUserId })
+      .where("id = :bookId", { bookId })
+      .execute();
+
+    await queryRunner.commitTransaction();
   } catch (error) {
-    await session.abortTransaction();
+    await queryRunner.rollbackTransaction();
     throw error;
   } finally {
-    session.endSession();
+    await queryRunner.release();
   }
 }
 ```
+
+7. **Use camelCase**: All table names and column names use camelCase (e.g., `dataRecords`, `createdAt`, `datasetId`). TypeORM will auto-quote identifiers to preserve casing in PostgreSQL.
+
+8. **Prefer QueryBuilder for complex queries**: Use TypeORM's QueryBuilder for joins, subqueries, JSONB operations, and raw SQL when the repository API is insufficient.

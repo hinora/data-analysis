@@ -269,13 +269,13 @@ function generateRegistryFile(
   let eventRegistryEntries = "";
 
   for (const action of actions) {
-    const importName = action.fullName.replace(/\./g, "_");
+    const importName = action.fullName.replace(/[.-]/g, "_");
     actionImports += `import type * as ${importName} from "./actions/${action.fullName}";\n`;
     actionRegistryEntries += `  "${action.fullName}": { params: ${importName}.Params; result: ${importName}.Result };\n`;
   }
 
   for (const event of events) {
-    const importName = `event_${event.fullName.replace(/\./g, "_")}`;
+    const importName = `event_${event.fullName.replace(/[.-]/g, "_")}`;
     eventImports += `import type * as ${importName} from "./events/${event.fullName}";\n`;
     eventRegistryEntries += `  "${event.fullName}": { payload: ${importName}.Payload };\n`;
   }

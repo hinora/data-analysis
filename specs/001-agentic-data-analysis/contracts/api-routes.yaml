@@ -1,0 +1,650 @@
+openapi: "3.0.3"
+info:
+  title: Agentic AI Document Analysis — API Routes
+  version: "1.0.0"
+  description: |
+    API routes for the Agentic AI Document Analysis feature.
+    All endpoints are exposed through the API Gateway (microservice.proxy).
+    Backend actions are Moleculer service actions routed via moleculer-web.
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development
+
+tags:
+  - name: Sessions
+    description: Analysis session management
+  - name: Datasets
+    description: Dataset browsing and management
+  - name: Upload
+    description: File upload and import
+  - name: Conversations
+    description: Conversation management within sessions
+  - name: Chat
+    description: AI chat and analysis
+  - name: Metadata
+    description: AI-generated metadata management
+
+paths:
+  # ─── Sessions ───────────────────────────────────────────
+  /sessions:
+    get:
+      tags: [Sessions]
+      summary: List all sessions
+      operationId: session.listSessions
+      description: "Moleculer action: `session.listSessions`"
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: Session list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items: { $ref: "#/components/schemas/SessionSummary" }
+                  total: { type: integer }
+                  page: { type: integer }
+                  limit: { type: integer }
+
+    post:
+      tags: [Sessions]
+      summary: Create a new session
+      operationId: session.createSession
+      description: "Moleculer action: `session.createSession`"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Optional session name. Auto-generated if omitted.
+                  maxLength: 200
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+
+  /sessions/{sessionId}:
+    get:
+      tags: [Sessions]
+      summary: Get session details
+      operationId: session.getSession
+      description: "Moleculer action: `session.getSession`"
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+      responses:
+        "200":
+          description: Session details
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+        "404":
+          description: Session not found
+
+    put:
+      tags: [Sessions]
+      summary: Rename a session
+      operationId: session.renameSession
+      description: "Moleculer action: `session.renameSession`"
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 200 }
+      responses:
+        "200":
+          description: Session renamed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+
+    delete:
+      tags: [Sessions]
+      summary: Delete a session and all associated data
+      operationId: session.deleteSession
+      description: "Moleculer action: `session.deleteSession`. Emits `session.deleted` event to cascade delete data in microservice.data."
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+      responses:
+        "200":
+          description: Session deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+
+  # ─── Upload ─────────────────────────────────────────────
+  /sessions/{sessionId}/upload:
+    post:
+      tags: [Upload]
+      summary: Upload and import a file
+      operationId: upload.uploadFile
+      description: |
+        Moleculer action: `upload.uploadFile`.
+        Accepts PDF, CSV, or XLSM files. Parses the file, detects structure,
+        imports data, stores original file, and emits `metadata.generateMetadata` event
+        for background metadata generation.
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File to upload (PDF, CSV, or XLSM). Max 100 MB.
+      responses:
+        "201":
+          description: File imported successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  datasets:
+                    type: array
+                    items: { $ref: "#/components/schemas/Dataset" }
+                    description: One or more datasets created from the file
+                  originalFile: { $ref: "#/components/schemas/OriginalFile" }
+        "400":
+          description: Invalid file (unsupported format, too large, malformed)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: Duplicate file (same hash already exists in session)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  existingDatasets:
+                    type: array
+                    items: { $ref: "#/components/schemas/DatasetSummary" }
+
+  # ─── Datasets ───────────────────────────────────────────
+  /sessions/{sessionId}/datasets:
+    get:
+      tags: [Datasets]
+      summary: List datasets in a session
+      operationId: dataset.listDatasets
+      description: "Moleculer action: `dataset.listDatasets`"
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+      responses:
+        "200":
+          description: Dataset list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  datasets:
+                    type: array
+                    items: { $ref: "#/components/schemas/DatasetSummary" }
+
+  /sessions/{sessionId}/datasets/{datasetId}:
+    get:
+      tags: [Datasets]
+      summary: Get dataset details with metadata
+      operationId: dataset.getDataset
+      description: "Moleculer action: `dataset.getDataset`"
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+        - $ref: "#/components/parameters/datasetId"
+      responses:
+        "200":
+          description: Dataset details
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dataset" }
+
+    put:
+      tags: [Datasets]
+      summary: Rename a dataset
+      operationId: dataset.renameDataset
+      description: "Moleculer action: `dataset.renameDataset`"
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+        - $ref: "#/components/parameters/datasetId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        "200":
+          description: Dataset renamed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dataset" }
+
+    delete:
+      tags: [Datasets]
+      summary: Delete a dataset and its data
+      operationId: dataset.deleteDataset
+      description: "Moleculer action: `dataset.deleteDataset`. Removes dataset, DataRecords, TextChunks, AILogs (metadata type), and OriginalFile if no other datasets reference it."
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+        - $ref: "#/components/parameters/datasetId"
+      responses:
+        "200":
+          description: Dataset deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+
+  /sessions/{sessionId}/datasets/{datasetId}/preview:
+    get:
+      tags: [Datasets]
+      summary: Preview dataset rows
+      operationId: dataset.previewDataset
+      description: "Moleculer action: `dataset.previewDataset`. Returns first N rows with both original and camelCase column keys."
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+        - $ref: "#/components/parameters/datasetId"
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, minimum: 1, maximum: 200 }
+      responses:
+        "200":
+          description: Data preview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  columnMappings:
+                    type: array
+                    items: { $ref: "#/components/schemas/ColumnMapping" }
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                  totalRows: { type: integer }
+
+  # ─── Metadata ───────────────────────────────────────────
+  /sessions/{sessionId}/datasets/{datasetId}/metadata/retry:
+    post:
+      tags: [Metadata]
+      summary: Retry failed metadata generation
+      operationId: metadata.retryGeneration
+      description: "Moleculer action: `metadata.retryGeneration`. Re-triggers AI metadata generation for a dataset with status 'failed'."
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+        - $ref: "#/components/parameters/datasetId"
+      responses:
+        "200":
+          description: Metadata generation re-triggered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  metadataStatus: { type: string, enum: [pending] }
+        "400":
+          description: Dataset metadata is not in 'failed' state
+
+  # ─── Conversations ──────────────────────────────────────
+  /sessions/{sessionId}/conversations:
+    get:
+      tags: [Conversations]
+      summary: List conversations in a session
+      operationId: conversation.listConversations
+      description: "Moleculer action: `conversation.listConversations`"
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+      responses:
+        "200":
+          description: Conversation list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversations:
+                    type: array
+                    items: { $ref: "#/components/schemas/ConversationSummary" }
+
+    post:
+      tags: [Conversations]
+      summary: Create a new conversation
+      operationId: conversation.createConversation
+      description: |
+        Moleculer action: `conversation.createConversation`.
+        Constructs a system prompt from the current session state (datasets, metadata, tools)
+        and stores it as the first message.
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Optional conversation name. Auto-generated if omitted.
+                  maxLength: 200
+      responses:
+        "201":
+          description: Conversation created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Conversation" }
+
+  /sessions/{sessionId}/conversations/{conversationId}:
+    get:
+      tags: [Conversations]
+      summary: Get conversation details
+      operationId: conversation.getConversation
+      description: "Moleculer action: `conversation.getConversation`"
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+        - $ref: "#/components/parameters/conversationId"
+      responses:
+        "200":
+          description: Conversation details
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Conversation" }
+
+    put:
+      tags: [Conversations]
+      summary: Rename a conversation
+      operationId: conversation.renameConversation
+      description: "Moleculer action: `conversation.renameConversation`"
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+        - $ref: "#/components/parameters/conversationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 200 }
+      responses:
+        "200":
+          description: Conversation renamed
+
+    delete:
+      tags: [Conversations]
+      summary: Delete a conversation
+      operationId: conversation.deleteConversation
+      description: "Moleculer action: `conversation.deleteConversation`. Removes conversation, all ChatMessages, and all AILogs (chat type)."
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+        - $ref: "#/components/parameters/conversationId"
+      responses:
+        "200":
+          description: Conversation deleted
+
+  # ─── Chat ───────────────────────────────────────────────
+  /sessions/{sessionId}/conversations/{conversationId}/messages:
+    get:
+      tags: [Chat]
+      summary: Get conversation message history
+      operationId: chat.getHistory
+      description: "Moleculer action: `chat.getHistory`. Returns paginated messages in chronological order."
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+        - $ref: "#/components/parameters/conversationId"
+        - name: page
+          in: query
+          schema: { type: integer, default: 1, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: Message history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items: { $ref: "#/components/schemas/ChatMessage" }
+                  total: { type: integer }
+                  page: { type: integer }
+                  limit: { type: integer }
+
+    post:
+      tags: [Chat]
+      summary: Send a message and get AI response
+      operationId: chat.sendMessage
+      description: |
+        Moleculer action: `chat.sendMessage`.
+        Sends the user's question to the AI agent. The backend orchestrates a tool-calling
+        loop: sends system prompt + conversation history + user message to AI, executes tool
+        calls via Moleculer actions, and loops until the AI produces a final answer (max 10
+        iterations). Returns the complete AI response.
+      parameters:
+        - $ref: "#/components/parameters/sessionId"
+        - $ref: "#/components/parameters/conversationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  description: User's question or message
+                  minLength: 1
+                  maxLength: 10000
+      responses:
+        "200":
+          description: AI response
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantMessage" }
+        "408":
+          description: AI processing timeout (>3 minutes)
+
+# ─── Components ─────────────────────────────────────────
+components:
+  parameters:
+    sessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: { type: string }
+      description: Session identifier
+
+    datasetId:
+      name: datasetId
+      in: path
+      required: true
+      schema: { type: string }
+      description: Dataset identifier
+
+    conversationId:
+      name: conversationId
+      in: path
+      required: true
+      schema: { type: string }
+      description: Conversation identifier
+
+  schemas:
+    Session:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        status: { type: string, enum: [empty, has-data, active, archived] }
+        datasetCount: { type: integer }
+        conversationCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    SessionSummary:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        status: { type: string }
+        datasetCount: { type: integer }
+        conversationCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Dataset:
+      type: object
+      properties:
+        id: { type: string }
+        sessionId: { type: string }
+        name: { type: string }
+        fileType: { type: string, enum: [csv, pdf, xlsm] }
+        datasetType: { type: string, enum: [structured-table, unstructured-text] }
+        metadataStatus: { type: string, enum: [pending, in-progress, ready, failed] }
+        rowCount: { type: integer }
+        columnCount: { type: integer, nullable: true }
+        columnMappings:
+          type: array
+          items: { $ref: "#/components/schemas/ColumnMapping" }
+          nullable: true
+        structuredMetadata: { type: object, nullable: true }
+        unstructuredMetadata: { type: object, nullable: true }
+        relationships: { type: array, items: { type: object }, nullable: true }
+        importedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+
+    DatasetSummary:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        fileType: { type: string }
+        datasetType: { type: string }
+        metadataStatus: { type: string }
+        rowCount: { type: integer }
+        columnCount: { type: integer, nullable: true }
+        importedAt: { type: string, format: date-time }
+
+    ColumnMapping:
+      type: object
+      properties:
+        original: { type: string }
+        camelCase: { type: string }
+        detectedType: { type: string, enum: [string, number, date, boolean] }
+        order: { type: integer }
+
+    OriginalFile:
+      type: object
+      properties:
+        id: { type: string }
+        filename: { type: string }
+        mimeType: { type: string }
+        fileSize: { type: integer }
+        fileHash: { type: string }
+
+    Conversation:
+      type: object
+      properties:
+        id: { type: string }
+        sessionId: { type: string }
+        name: { type: string }
+        systemPrompt: { type: string }
+        messageCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ConversationSummary:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        messageCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ChatMessage:
+      type: object
+      properties:
+        id: { type: string }
+        role: { type: string, enum: [system, user, assistant] }
+        content: { type: string }
+        confidenceScore: { type: number, nullable: true }
+        citedSources: { type: array, items: { type: object }, nullable: true }
+        toolsUsed: { type: array, items: { type: object }, nullable: true }
+        reasoningSteps: { type: array, items: { type: string }, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    AssistantMessage:
+      type: object
+      description: AI response with metadata
+      properties:
+        id: { type: string }
+        role: { type: string, enum: [assistant] }
+        content: { type: string }
+        confidenceScore: { type: number, minimum: 0, maximum: 1 }
+        citedSources:
+          type: array
+          items:
+            type: object
+            properties:
+              datasetId: { type: string }
+              datasetName: { type: string }
+              columnName: { type: string, nullable: true }
+        toolsUsed:
+          type: array
+          items:
+            type: object
+            properties:
+              toolName: { type: string }
+              parameters: { type: object }
+              resultSummary: { type: string }
+        reasoningSteps:
+          type: array
+          items: { type: string }
+        disclaimer: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    Error:
+      type: object
+      properties:
+        code: { type: integer }
+        message: { type: string }
+        details: { type: object, nullable: true }

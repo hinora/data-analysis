@@ -390,3 +390,113 @@ params: {
   },
 }
 ```
+
+## Using AI Adapters
+
+The AI adapter system provides a unified interface for interacting with AI providers (Ollama, Gemini).
+
+### Creating an Adapter
+
+```typescript
+import { createAIAdapter, createAIAdapterWithFallback } from "core.lib/adapters/ai";
+
+// Sync — uses AI_PROVIDER env var (default: ollama)
+const ai = createAIAdapter();
+
+// Async with fallback — tries configured provider, falls back to Ollama
+const ai = await createAIAdapterWithFallback();
+
+// Force specific provider
+const ai = createAIAdapter({ provider: "ollama", model: "qwen3:14b" });
+```
+
+### Chat with Tool Calling
+
+```typescript
+import type { ToolDefinition } from "core.lib/adapters/ai";
+
+const tools: ToolDefinition[] = [
+  {
+    name: "getWeather",
+    description: "Get current weather for a city",
+    parameters: {
+      type: "object",
+      properties: {
+        city: { type: "string", description: "City name" },
+      },
+      required: ["city"],
+    },
+  },
+];
+
+const response = await ai.chatWithTools({
+  messages: [{ role: "user", content: "What's the weather in Tokyo?" }],
+  tools,
+});
+
+// response.toolCalls contains requested tool invocations
+// response.content contains the text response (if no tool call)
+```
+
+### Generating Embeddings
+
+```typescript
+const result = await ai.generateEmbeddings({
+  texts: ["Hello world", "Another sentence"],
+  model: "nomic-embed-text", // optional, uses default
+});
+// result.embeddings: number[][] (768-dim vectors)
+```
+
+### AI Provider Validation
+
+Call `validateAIProvider()` at startup for fail-fast behavior:
+
+```typescript
+import { validateAIProvider } from "core.lib/config";
+
+// Throws if AI_PROVIDER is set to an unsupported value
+validateAIProvider();
+```
+
+## Using File Parsers
+
+Parse CSV, PDF, and XLSM files using the file parser factory:
+
+```typescript
+import { getParser } from "core.lib/adapters/file-parser";
+
+const parser = getParser("data.csv"); // returns CsvParser, PdfParser, or XlsmParser
+const result = await parser.parse(fileBuffer);
+// result.datasets: ParsedDataset[] (one per sheet/table)
+// result.errors: string[]
+```
+
+## Database Setup with TypeORM
+
+Microservices that need a database use TypeORM with PostgreSQL:
+
+```typescript
+// db/index.ts
+import { createDataSource } from "core.lib/database";
+import { MyEntity } from "./my-entity.entity";
+
+export const dataSource = createDataSource({
+  url: process.env.MY_DB_URI || "postgresql://localhost:5432/my_db",
+  entities: [MyEntity],
+  synchronize: true, // dev only
+});
+
+export { MyEntity } from "./my-entity.entity";
+```
+
+Then initialize in `app.ts`:
+
+```typescript
+import { dataSource } from "./db";
+
+async function main() {
+  await dataSource.initialize();
+  // ... start broker
+}
+```

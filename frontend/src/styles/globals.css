@@ -1,0 +1,159 @@
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Markdown styles for assistant chat messages */
+.markdown-assistant p {
+  margin: 0 0 8px 0;
+}
+
+.markdown-assistant p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-assistant h1,
+.markdown-assistant h2,
+.markdown-assistant h3,
+.markdown-assistant h4,
+.markdown-assistant h5,
+.markdown-assistant h6 {
+  margin: 12px 0 6px 0;
+  line-height: 1.3;
+}
+
+.markdown-assistant ul,
+.markdown-assistant ol {
+  margin: 4px 0 8px 0;
+  padding-left: 24px;
+}
+
+.markdown-assistant li {
+  margin-bottom: 4px;
+}
+
+.markdown-assistant code {
+  background-color: rgba(0, 0, 0, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+}
+
+.markdown-assistant pre {
+  background-color: rgba(0, 0, 0, 0.06);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.markdown-assistant pre code {
+  background: none;
+  padding: 0;
+}
+
+.markdown-assistant blockquote {
+  border-left: 3px solid #ccc;
+  padding-left: 12px;
+  margin: 8px 0;
+  color: #555;
+}
+
+.markdown-assistant table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  width: 100%;
+}
+
+.markdown-assistant th,
+.markdown-assistant td {
+  border: 1px solid #ddd;
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.markdown-assistant th {
+  background-color: rgba(0, 0, 0, 0.04);
+  font-weight: 600;
+}
+
+.markdown-assistant strong {
+  font-weight: 600;
+}
+
+.markdown-assistant hr {
+  border: none;
+  border-top: 1px solid #ddd;
+  margin: 12px 0;
+}
+
+/* Markdown styles for user chat messages */
+.markdown-user p {
+  margin: 0 0 8px 0;
+}
+
+.markdown-user p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-user code {
+  background-color: rgba(255, 255, 255, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+}
+
+.markdown-user pre {
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.markdown-user pre code {
+  background: none;
+  padding: 0;
+}
+
+.markdown-user ul,
+.markdown-user ol {
+  margin: 4px 0 8px 0;
+  padding-left: 24px;
+}
+
+.markdown-user li {
+  margin-bottom: 4px;
+}

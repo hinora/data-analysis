@@ -133,7 +133,7 @@ const ApiGatewayService: ServiceSchema = {
         busboyConfig: {
           limits: {
             files: 1,
-            fileSize: 5 * 1024 * 1024, // 5MB
+            fileSize: 100 * 1024 * 1024, // 100MB
           },
         },
 
@@ -143,15 +143,14 @@ const ApiGatewayService: ServiceSchema = {
           // Health check endpoint
           "GET /health": "proxy.health",
 
-          // File upload aliases
-          // Avatar upload using multipart form data
-          "PUT /users/me/avatar": "multipart:user.updateAvatar",
+          // File upload — multipart mode so busboy parses and sets ctx.meta.filename/mimetype
+          "POST /sessions/:sessionId/upload": "multipart:upload.uploadFile",
         },
 
         // Calling options
         callOptions: {
-          timeout: 30000, // 30 seconds
-          retries: 3,
+          timeout: 600000, // 2 minutes (large file uploads)
+          retries: 0,
         },
 
         // Before call hook - add request headers to context meta

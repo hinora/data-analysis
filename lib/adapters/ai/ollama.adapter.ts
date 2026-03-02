@@ -10,16 +10,43 @@ import { Ollama } from "ollama";
 import type {
   AIAdapter,
   AIProviderConfig,
+  ChatWithToolsParams,
+  ChatWithToolsResponse,
+  GenerateEmbeddingsParams,
+  GenerateEmbeddingsResult,
   GenerateJSONParams,
   GenerateJSONResult,
   GenerateTextParams,
   GenerateTextResult,
+  ToolCall,
 } from "./types";
 
-const DEFAULT_MODEL = "qwen3:14b";
+const DEFAULT_MODEL = "qwen3:8b";
 const DEFAULT_HOST = "http://localhost:11434";
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
+
+/**
+ * Strip think-tag reasoning from model output.
+ * Qwen3 and similar reasoning models wrap internal reasoning in `<think>...</think>` tags.
+ *
+ * Handles three cases:
+ * 1. Standard: `<think>reasoning</think>actual response`
+ * 2. Orphaned close: `reasoning</think>actual response` (Ollama may strip the opening tag)
+ * 3. Unclosed open: `actual response<think>reasoning...` (rare, defensive)
+ */
+function stripThinkTags(content: string): string {
+  // 1. Standard paired tags
+  let result = content.replace(/<think>[\s\S]*?<\/think>/gi, "");
+
+  // 2. Orphaned </think> without opening — strip everything before and including it
+  result = result.replace(/^[\s\S]*?<\/think>/gi, "");
+
+  // 3. Unclosed <think> — strip from tag to end
+  result = result.replace(/<think>[\s\S]*$/gi, "");
+
+  return result.trim();
+}
 
 export interface OllamaAdapterOptions {
   /** Host URL (default: http://localhost:11434) */
@@ -148,11 +175,99 @@ export class OllamaAdapter implements AIAdapter {
 
     return {
       completionTokens,
-      content: response.message.content,
+      content: stripThinkTags(response.message.content),
       durationMs,
       model,
       promptTokens,
       totalTokens: promptTokens + completionTokens,
+    };
+  }
+
+  async chatWithTools(
+    params: ChatWithToolsParams,
+  ): Promise<ChatWithToolsResponse> {
+    const startTime = Date.now();
+    const model = params.model || this.config.defaultModel;
+
+    // Convert messages to Ollama format
+    const messages = params.messages.map((msg) => ({
+      content: msg.content,
+      role: msg.role as "assistant" | "system" | "tool" | "user",
+    }));
+
+    // Convert tool definitions to Ollama format
+    const tools = params.tools.map((tool) => ({
+      function: {
+        description: tool.function.description,
+        name: tool.function.name,
+        parameters: tool.function.parameters,
+      },
+      type: "function" as const,
+    }));
+
+    const response = await this.executeWithRetry(async () => {
+      return this.client.chat({
+        messages,
+        model,
+        options: {
+          num_ctx: 8192,
+          temperature: params.temperature ?? 0.3,
+        },
+        stream: false,
+        tools,
+      });
+    });
+
+    const durationMs = Date.now() - startTime;
+    const completionTokens = response.eval_count || 0;
+    const promptTokens = response.prompt_eval_count || 0;
+
+    // Extract tool calls from response
+    const toolCalls: ToolCall[] = (response.message.tool_calls || []).map(
+      (tc: {
+        function: { arguments: Record<string, unknown>; name: string };
+      }) => ({
+        function: {
+          arguments: tc.function.arguments,
+          name: tc.function.name,
+        },
+      }),
+    );
+
+    return {
+      completionTokens,
+      content: stripThinkTags(response.message.content || ""),
+      durationMs,
+      model,
+      promptTokens,
+      toolCalls,
+      totalTokens: promptTokens + completionTokens,
+    };
+  }
+
+  async generateEmbeddings(
+    params: GenerateEmbeddingsParams,
+  ): Promise<GenerateEmbeddingsResult> {
+    const startTime = Date.now();
+    const model =
+      params.model || process.env.EMBEDDING_MODEL || "nomic-embed-text";
+
+    const response = await this.executeWithRetry(async () => {
+      return this.client.embed({
+        input: params.input,
+        model,
+      });
+    });
+
+    const durationMs = Date.now() - startTime;
+    const dimensions =
+      response.embeddings.length > 0 ? response.embeddings[0].length : 0;
+
+    return {
+      dimensions,
+      durationMs,
+      embeddings: response.embeddings,
+      model,
     };
   }
 

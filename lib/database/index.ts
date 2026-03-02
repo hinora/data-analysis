@@ -1,6 +1,63 @@
 /**
- * Database module - MongoDB connection helper using Mongoose
+ * Database module - TypeORM data source helpers for PostgreSQL
+ *
+ * Provides:
+ * - createDataSource() utility for microservice data source configuration
+ * - Shared entities (AILog) used across microservices
  */
 
-export * from "./mongoose";
-export * from "./types";
+import { DataSource, type DataSourceOptions, type EntitySchema } from "typeorm";
+
+export type { ToolCallLog } from "./ai-log.entity";
+export {
+  AILog,
+  AILogPurpose,
+  AILogStatus,
+  AILogType,
+} from "./ai-log.entity";
+
+/**
+ * Options for creating a microservice data source
+ */
+export interface CreateDataSourceOptions {
+  /** Database connection URI (e.g., postgres://user:pass@host:5432/dbname) */
+  databaseUri: string;
+  /** TypeORM entity classes to register */
+  entities: (Function | EntitySchema)[];
+  /** Enable pgvector extension (default: false) */
+  enableVector?: boolean;
+  /** Enable logging (default: false in production) */
+  logging?: boolean;
+  /** Migration paths */
+  migrations?: string[];
+  /** Enable synchronize for development (default: based on NODE_ENV) */
+  synchronize?: boolean;
+}
+
+/**
+ * Create a TypeORM DataSource for a microservice
+ *
+ * @param options - Data source configuration
+ * @returns Initialized DataSource (not yet connected)
+ */
+export function createDataSource(options: CreateDataSourceOptions): DataSource {
+  const {
+    databaseUri,
+    entities,
+    enableVector = false,
+    logging = false,
+    migrations = [],
+    synchronize = process.env.NODE_ENV === "development",
+  } = options;
+
+  const dsOptions: DataSourceOptions = {
+    entities,
+    logging,
+    migrations,
+    synchronize,
+    type: "postgres",
+    url: databaseUri,
+  };
+
+  return new DataSource(dsOptions);
+}
