@@ -138,10 +138,23 @@ export default defineAction<SendMessageParams, SendMessageResult>({
           tools: iteration <= MAX_TOOL_ITERATIONS - 1 ? tools : [], // No tools on last iteration
         });
 
+        ctx.broker.logger.info(
+          `AI response (iteration ${iteration}):`,
+          response,
+        );
+
         totalPromptTokens += response.promptTokens || 0;
         totalCompletionTokens += response.completionTokens || 0;
 
         if (response.toolCalls && response.toolCalls.length > 0) {
+          // Add the assistant message (with tool calls) to history so the model
+          // sees its own request when processing results on the next iteration.
+          messages.push({
+            role: "assistant",
+            content: response.content || "",
+            toolCalls: response.toolCalls,
+          });
+
           // Execute tool calls
           for (const toolCall of response.toolCalls) {
             const fnName = toolCall.function.name;
@@ -158,8 +171,9 @@ export default defineAction<SendMessageParams, SendMessageResult>({
               );
               reasoningSteps.push(`Unknown tool: ${fnName} — skipped`);
               messages.push({
-                role: "assistant",
+                role: "tool",
                 content: `Tool ${fnName} is not available.`,
+                toolName: fnName,
               });
               continue;
             }
@@ -185,20 +199,18 @@ export default defineAction<SendMessageParams, SendMessageResult>({
               toolsUsed.push({
                 toolName: fnName,
                 parameters: fnArgs,
-                resultSummary:
-                  resultStr.length > 500
-                    ? `${resultStr.slice(0, 500)}...`
-                    : resultStr,
+                resultSummary: resultStr,
               });
 
               reasoningSteps.push(
                 `Tool ${fnName} returned (${toolDuration}ms)`,
               );
 
-              // Add tool result to messages for the AI to process
+              // Add tool result to messages as a "tool" role message
               messages.push({
-                role: "assistant",
-                content: `Tool call: ${fnName}\nResult: ${resultStr.slice(0, 3000)}`,
+                role: "tool",
+                content: resultStr,
+                toolName: fnName,
               });
 
               // Track cited sources from tool parameters
@@ -221,8 +233,9 @@ export default defineAction<SendMessageParams, SendMessageResult>({
               ctx.broker.logger.info(`Tool ${fnName} failed: ${errMsg}`);
               reasoningSteps.push(`Tool ${fnName} failed: ${errMsg}`);
               messages.push({
-                role: "assistant",
+                role: "tool",
                 content: `Tool ${fnName} failed: ${errMsg}`,
+                toolName: fnName,
               });
             }
           }

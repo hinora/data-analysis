@@ -63,6 +63,6 @@ export class TextChunk {
   @Column({ nullable: true, type: "text" })
   embedding: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 }

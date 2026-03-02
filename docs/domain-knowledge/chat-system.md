@@ -89,12 +89,13 @@ sequenceDiagram
         AI-->>ChatSvc: response (text or tool calls)
         
         alt Tool calls present
+            ChatSvc->>ChatSvc: Append assistant message with toolCalls to history
             loop For each tool call
                 ChatSvc->>Tools: ctx.call("tools.<name>", args)
                 Tools-->>ChatSvc: tool result
+                ChatSvc->>ChatSvc: Append role:"tool" message with toolName
                 ChatSvc->>ChatSvc: Record reasoning step + cited sources
             end
-            ChatSvc->>ChatSvc: Append tool results to messages
         else Final response (no tool calls)
             ChatSvc->>ChatSvc: Extract confidence score
             ChatSvc->>ChatSvc: Break loop
@@ -155,6 +156,31 @@ Every AI interaction is recorded in the `AILog` table for auditability:
 - Stores `iterationCount`, `confidenceScore`, and `status` (success/failed)
 
 ## Response Post-Processing
+
+### Tool Message Protocol
+
+The AI tool-calling loop follows the Ollama/OpenAI message protocol. Correct message ordering is critical for the model to process tool results:
+
+1. **Assistant message with `toolCalls`** — when the AI requests tool calls, the full assistant response (including the `toolCalls` array) is appended to the message history. This lets the model see its own tool requests on the next iteration.
+2. **Tool result messages with `role: "tool"`** — each tool execution result is added as a separate message with `role: "tool"` and `toolName` set to the function name. The Ollama adapter maps `toolName` to Ollama's `tool_name` field.
+
+```typescript
+// After AI responds with tool calls:
+messages.push({
+  role: "assistant",
+  content: response.content || "",
+  toolCalls: response.toolCalls,   // preserved for model context
+});
+
+// After each tool executes:
+messages.push({
+  role: "tool",
+  content: resultStr,              // tool output as text
+  toolName: fnName,                // maps to Ollama's tool_name
+});
+```
+
+**Why this matters:** If tool results are sent as `role: "assistant"` without the original tool-call request, the model loses context about what it asked for and returns empty responses.
 
 ### Think Tag Stripping
 

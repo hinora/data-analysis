@@ -43,9 +43,9 @@ export class Session {
   @Column({ default: 0, type: "integer" })
   conversationCount: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 }

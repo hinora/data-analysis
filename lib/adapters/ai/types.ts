@@ -258,6 +258,8 @@ export interface AIMessageWithTools {
   role: AIMessageWithToolRole;
   toolCallId?: string;
   toolCalls?: ToolCall[];
+  /** Tool name for role:"tool" messages (identifies which tool produced the result) */
+  toolName?: string;
 }
 
 /**

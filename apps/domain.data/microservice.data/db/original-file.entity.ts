@@ -42,7 +42,7 @@ export class OriginalFile {
   @Column({ length: 1000, type: "varchar" })
   storagePath: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
   @OneToMany("Dataset", "originalFile")

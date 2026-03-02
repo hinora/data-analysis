@@ -189,11 +189,37 @@ export class OllamaAdapter implements AIAdapter {
     const startTime = Date.now();
     const model = params.model || this.config.defaultModel;
 
-    // Convert messages to Ollama format
-    const messages = params.messages.map((msg) => ({
-      content: msg.content,
-      role: msg.role as "assistant" | "system" | "tool" | "user",
-    }));
+    // Convert messages to Ollama format, preserving tool_calls and tool_name
+    const messages = params.messages.map((msg) => {
+      const ollamaMsg: {
+        content: string;
+        role: "assistant" | "system" | "tool" | "user";
+        tool_calls?: {
+          function: { arguments: Record<string, unknown>; name: string };
+        }[];
+        tool_name?: string;
+      } = {
+        content: msg.content,
+        role: msg.role as "assistant" | "system" | "tool" | "user",
+      };
+
+      // Preserve tool_calls on assistant messages so the model sees its own requests
+      if (msg.toolCalls && msg.toolCalls.length > 0) {
+        ollamaMsg.tool_calls = msg.toolCalls.map((tc) => ({
+          function: {
+            arguments: tc.function.arguments,
+            name: tc.function.name,
+          },
+        }));
+      }
+
+      // Preserve tool_name on tool-role messages
+      if (msg.role === "tool" && msg.toolName) {
+        ollamaMsg.tool_name = msg.toolName;
+      }
+
+      return ollamaMsg;
+    });
 
     // Convert tool definitions to Ollama format
     const tools = params.tools.map((tool) => ({
@@ -205,6 +231,7 @@ export class OllamaAdapter implements AIAdapter {
       type: "function" as const,
     }));
 
+    // console.log("Ollama chatWithTools request:", { messages });
     const response = await this.executeWithRetry(async () => {
       return this.client.chat({
         messages,
@@ -217,6 +244,8 @@ export class OllamaAdapter implements AIAdapter {
         tools,
       });
     });
+
+    // console.log("Ollama response with tools:", response);
 
     const durationMs = Date.now() - startTime;
     const completionTokens = response.eval_count || 0;

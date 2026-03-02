@@ -79,6 +79,6 @@ export class ChatMessage {
   @Column({ nullable: true, type: "jsonb" })
   reasoningSteps: string[] | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 }

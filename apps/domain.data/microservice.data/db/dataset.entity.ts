@@ -160,10 +160,10 @@ export class Dataset {
   @Column({ nullable: true, type: "jsonb" })
   relationships: RelationshipSuggestion[] | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 
   @OneToMany("DataRecord", "dataset")

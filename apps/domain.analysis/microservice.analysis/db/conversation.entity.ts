@@ -41,10 +41,10 @@ export class Conversation {
   @Column({ default: 0, type: "integer" })
   messageCount: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 
   @OneToMany("ChatMessage", "conversation")

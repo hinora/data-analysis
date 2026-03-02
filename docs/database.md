@@ -119,10 +119,10 @@ export class User {
   @Column({ type: "boolean", default: true })
   isActive!: boolean;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt!: Date;
 }
 
@@ -191,7 +191,7 @@ export class DataRecord {
   @Column({ type: "jsonb" })
   data!: Record<string, unknown>;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt!: Date;
 }
 ```

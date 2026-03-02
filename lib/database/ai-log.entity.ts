@@ -119,6 +119,6 @@ export class AILog {
   @Column({ nullable: true, type: "text" })
   errorMessage: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 }

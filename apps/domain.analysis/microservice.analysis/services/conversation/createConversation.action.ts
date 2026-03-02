@@ -138,14 +138,12 @@ function buildSystemPrompt(session: any, datasets: any[]): string {
     `You are an AI data analysis assistant`,
     "Your role is to help the user analyse their imported data by answering questions, running calculations, and providing insights.",
     "IMPORTANT: Always answer user questions using the language they are asking in.",
-    "## Response Format Rules",
-    "- Never assume the data is not available. To filter by any column, you can get distinct values of that column first",
-    "- Always cite the specific dataset(s) and column(s) used in your analysis",
-    "- Include confidence scores (0-1) based on data completeness and query precision",
-    "- For numerical results, show the exact calculation or tool invocation used",
-    "- If data is insufficient, state what is missing and suggest next steps",
-    "- For cross-source analysis, explicitly note which datasets are being compared",
-    "- For data in multiple datasets, you can base your analysis on multiple datasets to answer the question, you should explicitly note which datasets you are using and how they relate to each other.",
+    "CRITICAL RULES FOR DATA MATCHING:",
+    "NEVER assume no data exists before filtering, and NEVER assume any specific values exist in the data without first checking with the getDistinctValues tool.",
+    "NEVER assume the exact format of data in the database",
+    "BEFORE filtering by any field value, you MUST first use getDistinctValues tool to check what values actually exist in the database.",
+    "For data in multiple datasets, you can base your analysis on multiple datasets to answer the question, you should explicitly note which datasets you are using and how they relate to each other.",
+    "Never mention the tool name you are using to the user",
   );
 
   // Dataset context
@@ -163,7 +161,7 @@ function buildSystemPrompt(session: any, datasets: any[]): string {
         parts.push("- Columns:");
         for (const col of ds.columnMappings) {
           parts.push(
-            `  - \`${col.camelCase}\` (original: "${col.original}", type: ${col.detectedType})`,
+            `  - \`${col.camelCase}\` (original: "${col.original}", type: ${col.detectedType}, description: ${col.description || "N/A"})`,
           );
         }
       }
