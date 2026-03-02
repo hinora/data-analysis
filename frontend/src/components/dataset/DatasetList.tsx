@@ -10,7 +10,7 @@ interface DatasetItem {
   fileType: string;
   datasetType: string;
   rowCount: number;
-  columnCount: number;
+  columnCount: number | null;
   metadataStatus: string;
   createdAt: string;
 }

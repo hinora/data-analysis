@@ -51,6 +51,7 @@ export default defineAction<FilterByConditionParams, unknown>({
 
   async handler(ctx: TypedContext<FilterByConditionParams>) {
     const { datasetId, conditions, limit = 100 } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
     const qb = repo

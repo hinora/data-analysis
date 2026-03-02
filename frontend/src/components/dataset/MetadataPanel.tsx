@@ -6,10 +6,12 @@
  */
 
 import type React from "react";
-import type { Dataset } from "@/hooks/useDataset";
 
 interface MetadataPanelProps {
-  dataset: Dataset;
+  metadataStatus: string;
+  structuredMetadata?: Record<string, unknown> | null;
+  unstructuredMetadata?: Record<string, unknown> | null;
+  relationships?: unknown[] | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -19,8 +21,12 @@ const STATUS_COLORS: Record<string, string> = {
   failed: "#ef4444",
 };
 
-export const MetadataPanel: React.FC<MetadataPanelProps> = ({ dataset }) => {
-  const statusColor = STATUS_COLORS[dataset.metadataStatus] || "#94a3b8";
+export const MetadataPanel: React.FC<MetadataPanelProps> = ({
+  metadataStatus,
+  structuredMetadata,
+  unstructuredMetadata,
+}) => {
+  const statusColor = STATUS_COLORS[metadataStatus] || "#94a3b8";
 
   return (
     <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 16 }}>
@@ -45,34 +51,34 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ dataset }) => {
             fontWeight: 500,
           }}
         >
-          {dataset.metadataStatus}
+          {metadataStatus}
         </span>
       </div>
 
-      {dataset.metadataStatus === "pending" && (
+      {metadataStatus === "pending" && (
         <p style={{ color: "#94a3b8", fontSize: 13 }}>
           Metadata generation is queued...
         </p>
       )}
 
-      {dataset.metadataStatus === "in-progress" && (
+      {metadataStatus === "in-progress" && (
         <p style={{ color: "#f59e0b", fontSize: 13 }}>
           AI is analysing this dataset...
         </p>
       )}
 
-      {dataset.metadataStatus === "failed" && (
+      {metadataStatus === "failed" && (
         <p style={{ color: "#ef4444", fontSize: 13 }}>
           Metadata generation failed. Use retry to regenerate.
         </p>
       )}
 
-      {dataset.metadataStatus === "ready" && dataset.structuredMetadata && (
-        <StructuredMetadataView metadata={dataset.structuredMetadata} />
+      {metadataStatus === "ready" && structuredMetadata && (
+        <StructuredMetadataView metadata={structuredMetadata} />
       )}
 
-      {dataset.metadataStatus === "ready" && dataset.unstructuredMetadata && (
-        <UnstructuredMetadataView metadata={dataset.unstructuredMetadata} />
+      {metadataStatus === "ready" && unstructuredMetadata && (
+        <UnstructuredMetadataView metadata={unstructuredMetadata} />
       )}
     </div>
   );

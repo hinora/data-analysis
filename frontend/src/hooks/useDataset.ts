@@ -52,10 +52,26 @@ export interface UploadResult {
   }>;
 }
 
+export interface DatasetPreviewDataset {
+  id: string;
+  name: string;
+  fileType: string;
+  datasetType: string;
+  rowCount: number;
+  columnCount: number | null;
+}
+
+export interface DatasetPreviewColumn {
+  original: string;
+  camelCase: string;
+  detectedType: string;
+}
+
 export interface DatasetPreview {
-  columns: ColumnMapping[];
+  dataset: DatasetPreviewDataset;
+  columns: DatasetPreviewColumn[];
   rows: Record<string, unknown>[];
-  total: number;
+  previewCount: number;
 }
 
 // --- Query Keys ---

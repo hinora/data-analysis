@@ -21,6 +21,7 @@ export default defineAction<TimelineExtractionParams, unknown>({
 
   async handler(ctx: TypedContext<TimelineExtractionParams>) {
     const { datasetId } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const chunkRepo = dataSource.getRepository(TextChunk);
 
     const chunks = await chunkRepo.find({

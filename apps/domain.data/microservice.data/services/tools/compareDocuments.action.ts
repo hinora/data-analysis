@@ -24,6 +24,13 @@ export default defineAction<CompareDocumentsParams, unknown>({
 
   async handler(ctx: TypedContext<CompareDocumentsParams>) {
     const { datasetId1, datasetId2 } = ctx.params;
+
+    // Validate both datasets exist
+    await Promise.all([
+      ctx.call("dataset.getDataset", { id: datasetId1 }),
+      ctx.call("dataset.getDataset", { id: datasetId2 }),
+    ]);
+
     const chunkRepo = dataSource.getRepository(TextChunk);
     const datasetRepo = dataSource.getRepository(Dataset);
 

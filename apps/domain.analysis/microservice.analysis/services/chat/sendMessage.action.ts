@@ -345,7 +345,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "sumField",
-        description: "Sum a numeric field in a dataset with optional groupBy",
+        description:
+          "[STRUCTURED DATA ONLY] Sum a numeric field in a structured-table dataset with optional groupBy. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -365,7 +366,7 @@ function buildToolDefinitions(): ToolDefinition[] {
       function: {
         name: "avgField",
         description:
-          "Average a numeric field in a dataset with optional groupBy",
+          "[STRUCTURED DATA ONLY] Average a numeric field in a structured-table dataset with optional groupBy. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -385,7 +386,7 @@ function buildToolDefinitions(): ToolDefinition[] {
       function: {
         name: "count",
         description:
-          "Count records in a dataset with optional filter conditions",
+          "[STRUCTURED DATA ONLY] Count records in a structured-table dataset with optional filter conditions. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -403,7 +404,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "getTopByField",
-        description: "Get top N records sorted by a field",
+        description:
+          "[STRUCTURED DATA ONLY] Get top N records sorted by a field in a structured-table dataset. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -426,7 +428,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "countAndGroup",
-        description: "Count records grouped by one or more fields",
+        description:
+          "[STRUCTURED DATA ONLY] Count records grouped by one or more fields in a structured-table dataset. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -445,7 +448,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "getDistinctValues",
-        description: "Get distinct values with counts for a field",
+        description:
+          "[STRUCTURED DATA ONLY] Get distinct values with counts for a field in a structured-table dataset. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -461,7 +465,7 @@ function buildToolDefinitions(): ToolDefinition[] {
       function: {
         name: "filterByCondition",
         description:
-          "Filter records by conditions (equals, range, contains, in)",
+          "[STRUCTURED DATA ONLY] Filter records in a structured-table dataset by conditions (equals, range, contains, in). Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -514,7 +518,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "getMinMax",
-        description: "Get min and max values for a field",
+        description:
+          "[STRUCTURED DATA ONLY] Get min and max values for a field in a structured-table dataset. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -529,7 +534,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "correlateFields",
-        description: "Calculate Pearson correlation between two numeric fields",
+        description:
+          "[STRUCTURED DATA ONLY] Calculate Pearson correlation between two numeric fields in a structured-table dataset. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -545,7 +551,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "aggregate",
-        description: "Multi-field aggregation pipeline",
+        description:
+          "[STRUCTURED DATA ONLY] Multi-field aggregation pipeline for structured-table datasets. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -589,13 +596,14 @@ function buildToolDefinitions(): ToolDefinition[] {
       function: {
         name: "semanticSearch",
         description:
-          "Search text chunks by semantic similarity using vector embeddings",
+          "[UNSTRUCTURED TEXT ONLY] Search text chunks by semantic similarity using vector embeddings. Only works on unstructured-text datasets. Do NOT use on structured-table datasets. Requires at least one of sessionId or datasetId (or both).",
         parameters: {
           type: "object",
           properties: {
             sessionId: {
               type: "string",
-              description: "Session UUID for scope",
+              description:
+                "Session UUID for scope (optional if datasetId provided)",
             },
             query: { type: "string", description: "Search query text" },
             topK: {
@@ -604,10 +612,11 @@ function buildToolDefinitions(): ToolDefinition[] {
             },
             datasetId: {
               type: "string",
-              description: "Optional dataset UUID to scope search",
+              description:
+                "Dataset UUID to scope search (optional if sessionId provided)",
             },
           },
-          required: ["sessionId", "query"],
+          required: ["query"],
         },
       },
     },
@@ -615,7 +624,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "summarizeDocument",
-        description: "Generate an AI summary of a text dataset",
+        description:
+          "[UNSTRUCTURED TEXT ONLY] Generate an AI summary of an unstructured-text dataset. Do NOT use on structured-table datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -634,7 +644,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "extractKeyTopics",
-        description: "Extract main topics from a text dataset",
+        description:
+          "[UNSTRUCTURED TEXT ONLY] Extract main topics from an unstructured-text dataset. Do NOT use on structured-table datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -654,7 +665,7 @@ function buildToolDefinitions(): ToolDefinition[] {
       function: {
         name: "extractEntities",
         description:
-          "Extract entities (people, orgs, dates, locations, monetary) from text",
+          "[UNSTRUCTURED TEXT ONLY] Extract entities (people, orgs, dates, locations, monetary) from an unstructured-text dataset. Do NOT use on structured-table datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -675,7 +686,7 @@ function buildToolDefinitions(): ToolDefinition[] {
       function: {
         name: "answerFromContext",
         description:
-          "Answer a question using retrieved text context via vector search",
+          "[UNSTRUCTURED TEXT ONLY] Answer a question using retrieved text context via vector search on unstructured-text datasets. Do NOT use on structured-table datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -698,7 +709,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "pivotTable",
-        description: "Create a pivot table (cross-tabulation) from a dataset",
+        description:
+          "[STRUCTURED DATA ONLY] Create a pivot table (cross-tabulation) from a structured-table dataset. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -729,7 +741,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "joinDatasets",
-        description: "Join two datasets on matching fields",
+        description:
+          "[STRUCTURED DATA ONLY] Join two structured-table datasets on matching fields. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -772,7 +785,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "getPercentile",
-        description: "Calculate percentile values for a numeric field",
+        description:
+          "[STRUCTURED DATA ONLY] Calculate percentile values for a numeric field in a structured-table dataset. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -797,7 +811,7 @@ function buildToolDefinitions(): ToolDefinition[] {
       function: {
         name: "detectOutliers",
         description:
-          "Detect outliers in a numeric field using IQR or z-score method",
+          "[STRUCTURED DATA ONLY] Detect outliers in a numeric field of a structured-table dataset using IQR or z-score method. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -825,7 +839,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "sortByField",
-        description: "Sort and return records by a specified field",
+        description:
+          "[STRUCTURED DATA ONLY] Sort and return records from a structured-table dataset by a specified field. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -858,7 +873,7 @@ function buildToolDefinitions(): ToolDefinition[] {
       function: {
         name: "compareDocuments",
         description:
-          "Compare two text datasets for similarities and differences",
+          "[UNSTRUCTURED TEXT ONLY] Compare two unstructured-text datasets for similarities and differences. Do NOT use on structured-table datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -880,7 +895,7 @@ function buildToolDefinitions(): ToolDefinition[] {
       function: {
         name: "findSimilarChunks",
         description:
-          "Find text chunks similar to a given chunk using vector embeddings",
+          "[UNSTRUCTURED TEXT ONLY] Find text chunks similar to a given chunk using vector embeddings. Only works on unstructured-text datasets. Do NOT use on structured-table datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -906,7 +921,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "timelineExtraction",
-        description: "Extract temporal events and dates from text documents",
+        description:
+          "[UNSTRUCTURED TEXT ONLY] Extract temporal events and dates from an unstructured-text dataset. Do NOT use on structured-table datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -920,7 +936,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: "function",
       function: {
         name: "sentimentAnalysis",
-        description: "Analyze sentiment of text content from a dataset",
+        description:
+          "[UNSTRUCTURED TEXT ONLY] Analyze sentiment of text content from an unstructured-text dataset. Do NOT use on structured-table datasets.",
         parameters: {
           type: "object",
           properties: {

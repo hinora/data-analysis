@@ -49,6 +49,12 @@ export default defineAction<JoinDatasetsParams, unknown>({
       limit = 100,
     } = ctx.params;
 
+    // Validate both datasets exist
+    await Promise.all([
+      ctx.call("dataset.getDataset", { id: leftDatasetId }),
+      ctx.call("dataset.getDataset", { id: rightDatasetId }),
+    ]);
+
     const joinClause =
       joinType === "left"
         ? "LEFT JOIN"

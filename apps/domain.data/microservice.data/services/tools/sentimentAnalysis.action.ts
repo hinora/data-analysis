@@ -28,6 +28,7 @@ export default defineAction<SentimentAnalysisParams, unknown>({
 
   async handler(ctx: TypedContext<SentimentAnalysisParams>) {
     const { datasetId, granularity = "document" } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const chunkRepo = dataSource.getRepository(TextChunk);
 
     const chunks = await chunkRepo.find({

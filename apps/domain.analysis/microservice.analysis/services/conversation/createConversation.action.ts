@@ -135,52 +135,81 @@ function buildSystemPrompt(session: any, datasets: any[]): string {
 
   // Mission statement
   parts.push(
-    `You are an AI data analysis assistant`,
+    "You are an AI data analysis assistant.",
     "Your role is to help the user analyse their imported data by answering questions, running calculations, and providing insights.",
     "IMPORTANT: Always answer user questions using the language they are asking in.",
-    "CRITICAL RULES FOR DATA MATCHING:",
-    "NEVER assume no data exists before filtering, and NEVER assume any specific values exist in the data without first checking with the getDistinctValues tool.",
-    "NEVER assume the exact format of data in the database",
-    "BEFORE filtering by any field value, you MUST first use getDistinctValues tool to check what values actually exist in the database.",
-    "For data in multiple datasets, you can base your analysis on multiple datasets to answer the question, you should explicitly note which datasets you are using and how they relate to each other.",
-    "Never mention the tool name you are using to the user",
+    "",
+  );
+
+  // Tool selection rules — critical for avoiding structured/unstructured confusion
+  parts.push(
+    "## CRITICAL: Tool Selection Rules by Dataset Type",
+    "",
+    "Each dataset has a `type` field that is either `structured-table` or `unstructured-text`.",
+    "You MUST choose tools based on the dataset type. Using the wrong category of tools will produce errors or nonsensical results.",
+    "",
+    "### Structured Data Tools (ONLY for `structured-table` datasets)",
+    "These tools operate on tabular row/column data (CSV, Excel). They query numeric fields, filter rows, aggregate values, etc.",
+    "- sumField, avgField, count, getTopByField, countAndGroup, getDistinctValues",
+    "- filterByCondition, getMinMax, correlateFields, aggregate",
+    "- pivotTable, joinDatasets, getPercentile, detectOutliers, sortByField",
+    "",
+    "### Unstructured Text Tools (ONLY for `unstructured-text` datasets)",
+    "These tools operate on text documents (PDF, TXT, DOCX). They use vector embeddings and AI to search, summarize, and extract information from text.",
+    "- semanticSearch, summarizeDocument, extractKeyTopics, extractEntities",
+    "- answerFromContext, compareDocuments, findSimilarChunks",
+    "- timelineExtraction, sentimentAnalysis",
+    "",
+    "### How to decide which tools to use:",
+    "1. Look at the dataset `type` field listed below.",
+    "2. If the dataset type is `structured-table` → use ONLY Structured Data Tools.",
+    "3. If the dataset type is `unstructured-text` → use ONLY Unstructured Text Tools.",
+    "4. NEVER use sumField, avgField, count, filterByCondition, getDistinctValues, or other structured tools on an `unstructured-text` dataset — they will fail because text datasets have no tabular rows/columns.",
+    "5. NEVER use semanticSearch, summarizeDocument, extractKeyTopics, answerFromContext, or other text tools on a `structured-table` dataset — they will fail because structured datasets have no text chunks or embeddings.",
+    "6. If the user's question involves both structured and unstructured datasets, use the appropriate tool category for each dataset separately, then combine the insights in your answer.",
+    "",
+  );
+
+  // Data matching rules
+  parts.push(
+    "## Data Matching Rules",
+    "- NEVER assume no data exists before filtering, and NEVER assume any specific values exist in the data without first checking with the getDistinctValues tool.",
+    "- NEVER assume the exact format of data in the database.",
+    "- BEFORE filtering by any field value, you MUST first use getDistinctValues tool to check what values actually exist in the database.",
+    "- For data in multiple datasets, you can base your analysis on multiple datasets to answer the question. You should explicitly note which datasets you are using and how they relate to each other.",
+    "- Never mention the tool name you are using to the user.",
+    "",
   );
 
   // Dataset context
   if (datasets.length > 0) {
+    const structuredDatasets = datasets.filter(
+      (ds) => ds.datasetType === "structured-table",
+    );
+    const unstructuredDatasets = datasets.filter(
+      (ds) => ds.datasetType === "unstructured-text",
+    );
+
     parts.push("## Available Datasets", "");
 
-    for (const ds of datasets) {
-      parts.push(`### ${ds.name}`);
-      parts.push(`- ID: ${ds.id}`);
-      parts.push(`- Type: ${ds.datasetType}`);
-      parts.push(`- Format: ${ds.fileType}`);
-      parts.push(`- Rows: ${ds.rowCount}`);
-
-      if (ds.columnMappings && ds.columnMappings.length > 0) {
-        parts.push("- Columns:");
-        for (const col of ds.columnMappings) {
-          parts.push(
-            `  - \`${col.camelCase}\` (original: "${col.original}", type: ${col.detectedType}, description: ${col.description || "N/A"})`,
-          );
-        }
+    if (structuredDatasets.length > 0) {
+      parts.push(
+        "### Structured Table Datasets (use Structured Data Tools only)",
+        "",
+      );
+      for (const ds of structuredDatasets) {
+        appendDatasetInfo(parts, ds);
       }
+    }
 
-      if (ds.structuredMetadata?.datasetDescription) {
-        parts.push(
-          `- Description: ${ds.structuredMetadata.datasetDescription}`,
-        );
+    if (unstructuredDatasets.length > 0) {
+      parts.push(
+        "### Unstructured Text Datasets (use Unstructured Text Tools only)",
+        "",
+      );
+      for (const ds of unstructuredDatasets) {
+        appendDatasetInfo(parts, ds);
       }
-
-      if (ds.unstructuredMetadata?.documentSummary) {
-        parts.push(`- Summary: ${ds.unstructuredMetadata.documentSummary}`);
-      }
-
-      if (ds.unstructuredMetadata?.keyTopics?.length > 0) {
-        parts.push(`- Topics: ${ds.unstructuredMetadata.keyTopics.join(", ")}`);
-      }
-
-      parts.push("");
     }
   } else {
     parts.push("No datasets have been imported to this session yet.", "");
@@ -193,4 +222,35 @@ function buildSystemPrompt(session: any, datasets: any[]): string {
   }
 
   return joined;
+}
+
+function appendDatasetInfo(parts: string[], ds: any): void {
+  parts.push(`#### ${ds.name}`);
+  parts.push(`- ID: ${ds.id}`);
+  parts.push(`- Type: ${ds.datasetType}`);
+  parts.push(`- Format: ${ds.fileType}`);
+  parts.push(`- Rows: ${ds.rowCount}`);
+
+  if (ds.columnMappings && ds.columnMappings.length > 0) {
+    parts.push("- Columns:");
+    for (const col of ds.columnMappings) {
+      parts.push(
+        `  - \`${col.camelCase}\` (original: "${col.original}", type: ${col.detectedType}, description: ${col.description || "N/A"})`,
+      );
+    }
+  }
+
+  if (ds.structuredMetadata?.datasetDescription) {
+    parts.push(`- Description: ${ds.structuredMetadata.datasetDescription}`);
+  }
+
+  if (ds.unstructuredMetadata?.documentSummary) {
+    parts.push(`- Summary: ${ds.unstructuredMetadata.documentSummary}`);
+  }
+
+  if (ds.unstructuredMetadata?.keyTopics?.length > 0) {
+    parts.push(`- Topics: ${ds.unstructuredMetadata.keyTopics.join(", ")}`);
+  }
+
+  parts.push("");
 }

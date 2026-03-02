@@ -237,7 +237,7 @@ export class OllamaAdapter implements AIAdapter {
         messages,
         model,
         options: {
-          num_ctx: 8192,
+          num_ctx: 8192 * 2,
           temperature: params.temperature ?? 0.3,
         },
         stream: false,

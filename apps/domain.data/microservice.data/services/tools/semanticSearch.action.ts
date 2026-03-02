@@ -2,24 +2,27 @@
  * Semantic Search Tool
  *
  * Search text chunks by semantic similarity using vector embeddings (pgvector).
+ * Requires at least one of sessionId or datasetId (or both).
  */
 
 import type { TypedContext } from "core.lib/__generated__";
 import { createAIAdapter } from "core.lib/adapters/ai";
 import { defineAction } from "core.lib/broker";
+import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 
 export interface SemanticSearchParams {
-  sessionId: string;
-  query: string;
-  topK?: number;
   datasetId?: string;
+  query: string;
+  sessionId?: string;
+  topK?: number;
 }
 
 export default defineAction<SemanticSearchParams, unknown>({
   params: {
-    sessionId: { type: "uuid" },
+    datasetId: { type: "uuid", optional: true },
     query: { type: "string", min: 1 },
+    sessionId: { type: "uuid", optional: true },
     topK: {
       type: "number",
       integer: true,
@@ -28,11 +31,29 @@ export default defineAction<SemanticSearchParams, unknown>({
       optional: true,
       default: 5,
     },
-    datasetId: { type: "uuid", optional: true },
   },
 
   async handler(ctx: TypedContext<SemanticSearchParams>) {
     const { sessionId, query, topK = 5, datasetId } = ctx.params;
+
+    // Require at least one of sessionId or datasetId
+    if (!sessionId && !datasetId) {
+      throw new Errors.MoleculerClientError(
+        "At least one of sessionId or datasetId must be provided",
+        422,
+        "VALIDATION_ERROR",
+        { fields: ["sessionId", "datasetId"] },
+      );
+    }
+
+    // Validate session exists if provided
+    if (sessionId) {
+      await ctx.call("session.getSession", { id: sessionId });
+    }
+    // Validate dataset exists if provided
+    if (datasetId) {
+      await ctx.call("dataset.getDataset", { id: datasetId });
+    }
 
     // Generate embedding for the query
     const ai = createAIAdapter();
@@ -56,23 +77,30 @@ export default defineAction<SemanticSearchParams, unknown>({
         tc."sourcePage",
         tc."sourceSection",
         tc."orderIndex",
-        tc.embedding <=> $1::vector AS distance,
+        tc.embedding::vector <=> $1::vector AS distance,
         d.name AS "datasetName"
-      FROM text_chunk tc
-      JOIN dataset d ON d.id = tc."datasetId"
-      WHERE tc."sessionId" = $2
-        AND tc.embedding IS NOT NULL
+      FROM "textChunks" tc
+      JOIN "datasets" d ON d.id = tc."datasetId"
+      WHERE tc.embedding IS NOT NULL
     `;
 
-    const params: unknown[] = [embeddingStr, sessionId];
+    const params: unknown[] = [embeddingStr];
+    let paramIndex = 2;
+
+    if (sessionId) {
+      sql += ` AND tc."sessionId" = $${paramIndex}`;
+      params.push(sessionId);
+      paramIndex++;
+    }
 
     if (datasetId) {
-      sql += ` AND tc."datasetId" = $3`;
+      sql += ` AND tc."datasetId" = $${paramIndex}`;
       params.push(datasetId);
+      paramIndex++;
     }
 
     sql += `
-      ORDER BY tc.embedding <=> $1::vector
+      ORDER BY tc.embedding::vector <=> $1::vector
       LIMIT ${topK}
     `;
 

@@ -34,6 +34,13 @@ export default defineAction<AnswerFromContextParams, unknown>({
   async handler(ctx: TypedContext<AnswerFromContextParams>) {
     const { sessionId, question, topK = 5, datasetId } = ctx.params;
 
+    // Validate session exists
+    await ctx.call("session.getSession", { id: sessionId });
+    // Validate dataset exists if provided
+    if (datasetId) {
+      await ctx.call("dataset.getDataset", { id: datasetId });
+    }
+
     // Generate embedding for the question
     const ai = createAIAdapter();
     const embeddingResult = await ai.generateEmbeddings({
@@ -54,9 +61,9 @@ export default defineAction<AnswerFromContextParams, unknown>({
         tc."sourcePage",
         tc."sourceSection",
         d.name AS "datasetName",
-        tc.embedding <=> $1::vector AS distance
-      FROM text_chunk tc
-      JOIN dataset d ON d.id = tc."datasetId"
+        tc.embedding::vector <=> $1::vector AS distance
+      FROM "textChunks" tc
+      JOIN "datasets" d ON d.id = tc."datasetId"
       WHERE tc."sessionId" = $2
         AND tc.embedding IS NOT NULL
     `;
@@ -67,7 +74,7 @@ export default defineAction<AnswerFromContextParams, unknown>({
       params.push(datasetId);
     }
 
-    sql += ` ORDER BY tc.embedding <=> $1::vector LIMIT ${topK}`;
+    sql += ` ORDER BY tc.embedding::vector <=> $1::vector LIMIT ${topK}`;
 
     const chunks = await dataSource.query(sql, params);
 

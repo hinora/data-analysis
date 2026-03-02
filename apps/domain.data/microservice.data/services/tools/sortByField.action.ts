@@ -47,6 +47,7 @@ export default defineAction<SortByFieldParams, unknown>({
       limit = 100,
       numeric,
     } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
     // Auto-detect if not explicitly specified

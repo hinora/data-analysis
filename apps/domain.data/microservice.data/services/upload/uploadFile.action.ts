@@ -291,21 +291,36 @@ export default defineAction<UploadFileParams, UploadFileResult>({
         rowCount: savedDataset.rowCount,
         columnCount: savedDataset.columnCount,
       });
-
-      // Emit metadata.generateMetadata event for metadata generation
-      await ctx.emit("metadata.generateMetadata", {
-        datasetId: savedDataset.id,
-        sessionId,
-        datasetType: savedDataset.datasetType,
-        name: savedDataset.name,
-      });
     }
 
-    // Update session dataset count via cross-service call
+    // Emit a single metadata.generateMetadata event with all datasets.
+    // The handler processes them sequentially (one by one) to limit Ollama load.
+    // Do NOT await — ctx.emit() waits for local handlers to complete.
+    ctx
+      .emit("metadata.generateMetadata", {
+        sessionId,
+        datasets: createdDatasets.map((d) => ({
+          datasetId: d.id,
+          datasetType: d.datasetType,
+          name: d.name,
+        })),
+      })
+      .catch((err: unknown) => {
+        ctx.broker.logger.error(
+          "Failed to emit metadata.generateMetadata:",
+          err,
+        );
+      });
+
+    // Update session dataset count via cross-service call.
+    // Use broker.call() instead of ctx.call() to create a fresh context
+    // with its own timeout — ctx.call() inherits the parent context's remaining
+    // timeout, which may already be exhausted after file parsing + DB inserts.
     try {
-      await ctx.call("session.updateSessionStatus", {
+      await ctx.broker.call("session.updateSessionStatus", {
         sessionId,
         trigger: "dataset-imported",
+        count: createdDatasets.length,
       });
     } catch (err) {
       ctx.broker.logger.warn(

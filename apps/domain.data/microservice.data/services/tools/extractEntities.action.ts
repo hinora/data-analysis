@@ -31,6 +31,7 @@ export default defineAction<ExtractEntitiesParams, unknown>({
       datasetId,
       entityTypes = ["person", "organization", "date", "location", "monetary"],
     } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const chunkRepo = dataSource.getRepository(TextChunk);
 
     const chunks = await chunkRepo.find({

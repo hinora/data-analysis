@@ -31,6 +31,11 @@ export default defineAction<FindSimilarChunksParams, unknown>({
   async handler(ctx: TypedContext<FindSimilarChunksParams>) {
     const { chunkId, topK = 5, sessionId } = ctx.params;
 
+    // Validate session exists if provided
+    if (sessionId) {
+      await ctx.call("session.getSession", { id: sessionId });
+    }
+
     // Get the source chunk embedding
     const sourceChunk = await dataSource.query(
       `SELECT id, embedding, "sessionId", content FROM text_chunk WHERE id = $1`,

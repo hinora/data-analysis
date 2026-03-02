@@ -39,6 +39,7 @@ export default defineAction<GetTopByFieldParams, unknown>({
 
   async handler(ctx: TypedContext<GetTopByFieldParams>) {
     const { datasetId, field, limit = 10, order = "DESC" } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
     const numeric = await isFieldNumeric({ datasetId, field, repo });

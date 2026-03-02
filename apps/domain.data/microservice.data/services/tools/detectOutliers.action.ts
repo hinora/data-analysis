@@ -32,6 +32,7 @@ export default defineAction<DetectOutliersParams, unknown>({
 
   async handler(ctx: TypedContext<DetectOutliersParams>) {
     const { datasetId, field, method = "iqr", threshold = 1.5 } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
     await assertFieldIsNumeric({

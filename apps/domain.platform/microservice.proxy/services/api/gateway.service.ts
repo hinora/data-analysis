@@ -190,15 +190,19 @@ const ApiGatewayService: ServiceSchema = {
         onError(
           _req: GatewayRequest,
           res: ServerResponse,
-          err: Error & { code?: number },
+          err: Error & { code?: number | string },
         ): void {
+          const statusCode =
+            typeof err.code === "number" && err.code >= 100 && err.code < 600
+              ? err.code
+              : 500;
           res.setHeader("Content-Type", "application/json; charset=utf-8");
-          res.writeHead(err.code || 500);
+          res.writeHead(statusCode);
           res.end(
             JSON.stringify({
-              success: false,
+              code: statusCode,
               message: err.message,
-              code: err.code || 500,
+              success: false,
             }),
           );
         },
@@ -209,15 +213,19 @@ const ApiGatewayService: ServiceSchema = {
     onError(
       _req: GatewayRequest,
       res: ServerResponse,
-      err: Error & { code?: number },
+      err: Error & { code?: number | string },
     ): void {
+      const statusCode =
+        typeof err.code === "number" && err.code >= 100 && err.code < 600
+          ? err.code
+          : 500;
       res.setHeader("Content-Type", "application/json; charset=utf-8");
-      res.writeHead(err.code || 500);
+      res.writeHead(statusCode);
       res.end(
         JSON.stringify({
-          success: false,
+          code: statusCode,
           message: err.message,
-          code: err.code || 500,
+          success: false,
         }),
       );
     },

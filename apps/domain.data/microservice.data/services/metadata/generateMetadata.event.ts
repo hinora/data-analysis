@@ -21,104 +21,129 @@ import { DataRecord } from "../../db/data-record.entity";
 import { Dataset, DatasetType, MetadataStatus } from "../../db/dataset.entity";
 import { TextChunk } from "../../db/text-chunk.entity";
 
-export interface DatasetImportedPayload {
+export interface DatasetEntry {
   datasetId: string;
-  sessionId: string;
   datasetType: string;
   name: string;
 }
 
-export default defineEvent<DatasetImportedPayload>({
+export interface GenerateMetadataPayload {
+  datasets: DatasetEntry[];
+  sessionId: string;
+}
+
+export default defineEvent<GenerateMetadataPayload>({
   group: "metadata-workers",
 
-  async handler(ctx: TypedContext<DatasetImportedPayload>) {
-    const { datasetId, sessionId, datasetType } = ctx.params;
-    const datasetRepo = dataSource.getRepository(Dataset);
-    const aiLogRepo = dataSource.getRepository(AILog);
+  async handler(ctx: TypedContext<GenerateMetadataPayload>) {
+    const { datasets, sessionId } = ctx.params;
 
-    // Set status to in-progress
-    await datasetRepo.update(datasetId, {
-      metadataStatus: MetadataStatus.IN_PROGRESS,
-    });
+    ctx.broker.logger.info(
+      `Starting sequential metadata generation for ${datasets.length} dataset(s) in session ${sessionId}`,
+    );
 
-    const ai = createAIAdapter();
-    const startTime = Date.now();
-
-    try {
-      const dataset = await datasetRepo.findOneBy({ id: datasetId });
-      if (!dataset) {
-        ctx.broker.logger.warn(
-          `Dataset ${datasetId} not found for metadata generation`,
-        );
-        return;
-      }
-
-      if (datasetType === DatasetType.STRUCTURED_TABLE) {
-        await generateStructuredMetadata(dataset, ai, aiLogRepo, ctx);
-      } else {
-        await generateUnstructuredMetadata(dataset, ai, aiLogRepo, ctx);
-        await generateTextChunkEmbeddings(dataset, ai, aiLogRepo, ctx);
-      }
-
-      // Relationship detection
-      await detectRelationships(dataset, datasetRepo, ai, aiLogRepo, ctx);
-
-      // Mark as ready
-      await datasetRepo.update(datasetId, {
-        metadataStatus: MetadataStatus.READY,
-      });
-
-      ctx.broker.logger.info(
-        `Metadata generation complete for dataset ${datasetId} (${Date.now() - startTime}ms)`,
-      );
-
-      // Emit metadata ready event
-      await ctx.emit("datasetEvent.metadataReady", {
-        datasetId,
-        sessionId,
-        name: dataset.name,
-      });
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      ctx.broker.logger.error(
-        `Metadata generation failed for dataset ${datasetId}: ${errorMessage}`,
-      );
-
-      await datasetRepo.update(datasetId, {
-        metadataStatus: MetadataStatus.FAILED,
-      });
-
-      // Log failure
-      await aiLogRepo.save(
-        aiLogRepo.create({
-          type: AILogType.METADATA,
-          sessionId,
-          datasetId,
-          purpose: AILogPurpose.STRUCTURED_METADATA,
-          promptSent: "metadata generation failed",
-          responseReceived: errorMessage,
-          model:
-            ai.getConfig?.()?.defaultModel ||
-            process.env.OLLAMA_MODEL ||
-            "unknown",
-          provider: process.env.AI_PROVIDER || "ollama",
-          promptTokens: 0,
-          completionTokens: 0,
-          totalTokens: 0,
-          latencyMs: Date.now() - startTime,
-          status: AILogStatus.FAILED,
-          errorMessage,
-        }),
-      );
+    // Process datasets one by one to limit Ollama concurrency
+    for (const entry of datasets) {
+      await processOneDataset(entry, sessionId, ctx);
     }
+
+    ctx.broker.logger.info(
+      `All metadata generation complete for session ${sessionId} (${datasets.length} datasets)`,
+    );
   },
 });
+
+async function processOneDataset(
+  entry: DatasetEntry,
+  sessionId: string,
+  ctx: TypedContext<GenerateMetadataPayload>,
+) {
+  const { datasetId, datasetType } = entry;
+  const datasetRepo = dataSource.getRepository(Dataset);
+  const aiLogRepo = dataSource.getRepository(AILog);
+
+  // Set status to in-progress
+  await datasetRepo.update(datasetId, {
+    metadataStatus: MetadataStatus.IN_PROGRESS,
+  });
+
+  const ai = createAIAdapter();
+  const startTime = Date.now();
+
+  try {
+    const dataset = await datasetRepo.findOneBy({ id: datasetId });
+    if (!dataset) {
+      ctx.broker.logger.warn(
+        `Dataset ${datasetId} not found for metadata generation`,
+      );
+      return;
+    }
+
+    if (datasetType === DatasetType.STRUCTURED_TABLE) {
+      await generateStructuredMetadata(dataset, ai, aiLogRepo, ctx);
+    } else {
+      await generateUnstructuredMetadata(dataset, ai, aiLogRepo, ctx);
+      await generateTextChunkEmbeddings(dataset, ai, aiLogRepo, ctx);
+    }
+
+    // Relationship detection
+    await detectRelationships(dataset, datasetRepo, ai, aiLogRepo, ctx);
+
+    // Mark as ready
+    await datasetRepo.update(datasetId, {
+      metadataStatus: MetadataStatus.READY,
+    });
+
+    ctx.broker.logger.info(
+      `Metadata generation complete for dataset ${datasetId} (${Date.now() - startTime}ms)`,
+    );
+
+    // Emit metadata ready event
+    await ctx.emit("datasetEvent.metadataReady", {
+      datasetId,
+      sessionId,
+      name: dataset.name,
+    });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    ctx.broker.logger.error(
+      `Metadata generation failed for dataset ${datasetId}: ${errorMessage}`,
+    );
+
+    await datasetRepo.update(datasetId, {
+      metadataStatus: MetadataStatus.FAILED,
+    });
+
+    // Log failure
+    await aiLogRepo.save(
+      aiLogRepo.create({
+        type: AILogType.METADATA,
+        sessionId,
+        datasetId,
+        purpose: AILogPurpose.STRUCTURED_METADATA,
+        promptSent: "metadata generation failed",
+        responseReceived: errorMessage,
+        model:
+          ai.getConfig?.()?.defaultModel ||
+          process.env.OLLAMA_MODEL ||
+          "unknown",
+        provider: process.env.AI_PROVIDER || "ollama",
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        latencyMs: Date.now() - startTime,
+        status: AILogStatus.FAILED,
+        errorMessage,
+      }),
+    );
+  }
+}
 
 async function generateStructuredMetadata(
   dataset: Dataset,
   ai: ReturnType<typeof createAIAdapter>,
   aiLogRepo: Repository<AILog>,
-  _ctx: TypedContext<DatasetImportedPayload>,
+  _ctx: TypedContext<GenerateMetadataPayload>,
 ) {
   const recordRepo = dataSource.getRepository(DataRecord);
 
@@ -216,7 +241,7 @@ async function generateUnstructuredMetadata(
   dataset: Dataset,
   ai: ReturnType<typeof createAIAdapter>,
   aiLogRepo: Repository<AILog>,
-  _ctx: TypedContext<DatasetImportedPayload>,
+  _ctx: TypedContext<GenerateMetadataPayload>,
 ) {
   const chunkRepo = dataSource.getRepository(TextChunk);
 
@@ -299,7 +324,7 @@ async function generateTextChunkEmbeddings(
   dataset: Dataset,
   ai: ReturnType<typeof createAIAdapter>,
   aiLogRepo: Repository<AILog>,
-  ctx: TypedContext<DatasetImportedPayload>,
+  ctx: TypedContext<GenerateMetadataPayload>,
 ) {
   const chunkRepo = dataSource.getRepository(TextChunk);
 
@@ -365,7 +390,7 @@ async function detectRelationships(
   datasetRepo: Repository<Dataset>,
   _ai: ReturnType<typeof createAIAdapter>,
   _aiLogRepo: Repository<AILog>,
-  _ctx: TypedContext<DatasetImportedPayload>,
+  _ctx: TypedContext<GenerateMetadataPayload>,
 ) {
   // Find other datasets in the same session
   const otherDatasets = await datasetRepo.find({

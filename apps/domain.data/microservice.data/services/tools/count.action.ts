@@ -22,6 +22,7 @@ export default defineAction<CountParams, unknown>({
 
   async handler(ctx: TypedContext<CountParams>) {
     const { datasetId, filters } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
     const qb = repo

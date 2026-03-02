@@ -112,7 +112,25 @@ sequenceDiagram
 
 Tools are mapped to Moleculer service actions via `TOOL_TO_ACTION`. Max 10 tool-calling iterations per request.
 
-#### Structured Data Tools
+**Tool selection is driven by dataset type.** Each tool definition includes a `[STRUCTURED DATA ONLY]` or `[UNSTRUCTURED TEXT ONLY]` prefix in its description so the AI model knows which tools apply to which datasets.
+
+#### Tool-to-Dataset-Type Mapping
+
+```mermaid
+flowchart LR
+    Q[User Question] --> DT{Dataset Type?}
+    DT -->|structured-table| ST[Structured Data Tools]
+    DT -->|unstructured-text| UT[Unstructured Text Tools]
+    ST --> R1[sumField, avgField, count, filterByCondition, ...]
+    UT --> R2[semanticSearch, summarizeDocument, answerFromContext, ...]
+```
+
+The system prompt explicitly groups datasets by type and tells the AI:
+- **`structured-table`** datasets → use ONLY structured data tools (tabular row/column operations)
+- **`unstructured-text`** datasets → use ONLY unstructured text tools (vector search, summarization, entity extraction)
+- NEVER mix tool categories across dataset types
+
+#### Structured Data Tools (for `structured-table` datasets only)
 
 | Tool                | Action                     | Description                                        |
 |---------------------|----------------------------|----------------------------------------------------|
@@ -132,7 +150,7 @@ Tools are mapped to Moleculer service actions via `TOOL_TO_ACTION`. Max 10 tool-
 | `sortByField`       | `tools.sortByField`        | Sort records by field(s) with limit                |
 | `sumField`          | `tools.sumField`           | Sum a numeric field with optional groupBy          |
 
-#### Unstructured Text Tools
+#### Unstructured Text Tools (for `unstructured-text` datasets only)
 
 | Tool                 | Action                       | Description                                         |
 |----------------------|------------------------------|-----------------------------------------------------|
@@ -141,7 +159,7 @@ Tools are mapped to Moleculer service actions via `TOOL_TO_ACTION`. Max 10 tool-
 | `extractEntities`    | `tools.extractEntities`      | Extract people, orgs, dates, locations, monetary     |
 | `extractKeyTopics`   | `tools.extractKeyTopics`     | Identify main topics and themes                      |
 | `findSimilarChunks`  | `tools.findSimilarChunks`    | Find semantically similar text passages              |
-| `semanticSearch`     | `tools.semanticSearch`       | Vector similarity search across text chunks          |
+| `semanticSearch`     | `tools.semanticSearch`       | Vector similarity search across text chunks (sessionId and/or datasetId) |
 | `sentimentAnalysis`  | `tools.sentimentAnalysis`    | Determine sentiment of text passages                 |
 | `summarizeDocument`  | `tools.summarizeDocument`    | Generate a summary of a text dataset                 |
 | `timelineExtraction` | `tools.timelineExtraction`   | Extract and order date-referenced events             |

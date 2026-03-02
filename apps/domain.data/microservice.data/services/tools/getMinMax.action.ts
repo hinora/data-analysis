@@ -23,6 +23,7 @@ export default defineAction<GetMinMaxParams, unknown>({
 
   async handler(ctx: TypedContext<GetMinMaxParams>) {
     const { datasetId, field } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
     const numeric = await isFieldNumeric({ datasetId, field, repo });

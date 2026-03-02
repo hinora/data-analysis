@@ -41,6 +41,8 @@ export default defineAction<PivotTableParams, unknown>({
       aggregation = "sum",
     } = ctx.params;
 
+    await ctx.call("dataset.getDataset", { id: datasetId });
+
     // First get distinct column values
     const repo = dataSource.getRepository(DataRecord);
 

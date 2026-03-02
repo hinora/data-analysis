@@ -15,6 +15,8 @@ import { dataSource } from "../../db";
 import { Session, SessionStatus } from "../../db/session.entity";
 
 export interface UpdateSessionStatusParams {
+  /** Number of datasets to add/remove (default: 1) */
+  count?: number;
   sessionId: string;
   trigger: "dataset-imported" | "conversation-created" | "dataset-deleted";
 }
@@ -31,6 +33,7 @@ export default defineAction<
   UpdateSessionStatusResult
 >({
   params: {
+    count: { type: "number", integer: true, min: 1, optional: true },
     sessionId: { type: "uuid" },
     trigger: {
       type: "enum",
@@ -53,17 +56,18 @@ export default defineAction<
     }
 
     const previousStatus = session.status;
+    const count = ctx.params.count || 1;
     let changed = false;
 
     if (ctx.params.trigger === "dataset-imported") {
       // empty → has-data on first dataset import
       if (session.status === SessionStatus.EMPTY) {
         session.status = SessionStatus.HAS_DATA;
-        session.datasetCount = (session.datasetCount || 0) + 1;
+        session.datasetCount = (session.datasetCount || 0) + count;
         changed = true;
       } else {
         // Just increment dataset count
-        session.datasetCount = (session.datasetCount || 0) + 1;
+        session.datasetCount = (session.datasetCount || 0) + count;
         changed = true;
       }
     } else if (ctx.params.trigger === "conversation-created") {

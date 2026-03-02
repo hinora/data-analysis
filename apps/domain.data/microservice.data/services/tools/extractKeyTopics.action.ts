@@ -30,6 +30,7 @@ export default defineAction<ExtractKeyTopicsParams, unknown>({
 
   async handler(ctx: TypedContext<ExtractKeyTopicsParams>) {
     const { datasetId, maxTopics = 10 } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const chunkRepo = dataSource.getRepository(TextChunk);
 
     const chunks = await chunkRepo.find({

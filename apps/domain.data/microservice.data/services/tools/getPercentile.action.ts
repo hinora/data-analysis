@@ -34,6 +34,7 @@ export default defineAction<GetPercentileParams, unknown>({
       field,
       percentiles = [25, 50, 75, 90, 95, 99],
     } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
     await assertFieldIsNumeric({

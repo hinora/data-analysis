@@ -25,6 +25,7 @@ export default defineAction<CorrelateFieldsParams, unknown>({
 
   async handler(ctx: TypedContext<CorrelateFieldsParams>) {
     const { datasetId, field1, field2 } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
     await Promise.all([

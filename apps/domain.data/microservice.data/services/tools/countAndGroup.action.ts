@@ -22,6 +22,7 @@ export default defineAction<CountAndGroupParams, unknown>({
 
   async handler(ctx: TypedContext<CountAndGroupParams>) {
     const { datasetId, fields } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
     const selectParts = fields.map((f) => `r.data->>'${f}' AS "${f}"`);

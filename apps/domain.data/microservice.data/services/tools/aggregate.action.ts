@@ -44,6 +44,7 @@ export default defineAction<AggregateParams, unknown>({
 
   async handler(ctx: TypedContext<AggregateParams>) {
     const { datasetId, aggregations, groupBy, filters } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
     const qb = repo

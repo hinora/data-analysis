@@ -88,8 +88,8 @@ export interface RelationshipSuggestion {
 @Entity("datasets")
 @Index("idx_datasets_sessionId_createdAt", ["sessionId", "createdAt"])
 @Index(
-  "idx_datasets_sessionId_sourceFileHash",
-  ["sessionId", "sourceFileHash"],
+  "idx_datasets_sessionId_sourceFileHash_name",
+  ["sessionId", "sourceFileHash", "name"],
   {
     unique: true,
   },

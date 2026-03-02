@@ -30,6 +30,7 @@ export class XlsmParser implements FileParserAdapter {
     let workbook: XLSX.WorkBook;
     try {
       workbook = XLSX.read(buffer, {
+        cellDates: true,
         cellFormula: false,
         type: "buffer",
       });
@@ -54,6 +55,9 @@ export class XlsmParser implements FileParserAdapter {
       });
 
       if (aoa.length === 0) continue;
+
+      // Fill merged cells so values propagate across merge ranges
+      this.fillMergedCells(aoa, worksheet);
 
       // Detect multiple tables within the sheet
       const tables = this.detectTables(aoa);
@@ -94,7 +98,9 @@ export class XlsmParser implements FileParserAdapter {
   }
 
   /**
-   * Detect separate tables within a sheet by scanning for blank row boundaries
+   * Detect separate tables within a sheet by scanning for blank row boundaries.
+   * Each contiguous block of non-blank rows becomes one candidate table.
+   * Width-aware header detection in buildDataset handles mixed narrow/wide blocks.
    */
   private detectTables(aoa: unknown[][]): unknown[][][] {
     const tables: unknown[][][] = [];
@@ -116,7 +122,6 @@ export class XlsmParser implements FileParserAdapter {
       }
     }
 
-    // Don't forget the last table
     if (currentTable.length > 0) {
       tables.push(currentTable);
     }
@@ -125,7 +130,8 @@ export class XlsmParser implements FileParserAdapter {
   }
 
   /**
-   * Build a ParsedDataset from a table's array-of-arrays
+   * Build a ParsedDataset from a table's array-of-arrays.
+   * Uses smart header detection to skip title rows and combine multi-row headers.
    */
   private buildDataset(
     table: unknown[][],
@@ -136,15 +142,42 @@ export class XlsmParser implements FileParserAdapter {
   ): ParsedDataset | null {
     if (table.length < 1) return null;
 
-    // First row = headers
-    const rawHeaders = table[0].map((h) =>
-      h !== null && h !== undefined ? String(h).trim() : "",
-    );
+    // Find the actual header row (skip title/metadata/data-only rows)
+    const headerRowIdx = this.findHeaderRowIndex(table);
 
-    // Filter out empty headers
-    const validColumns = rawHeaders
+    // -1 means no valid header row found (e.g. all rows are numeric data)
+    if (headerRowIdx < 0) {
+      return null;
+    }
+
+    // Detect multi-row header span
+    const headerRowCount = this.countHeaderRows(table, headerRowIdx);
+
+    // Combine multi-row headers into a single header array
+    const headerSlice = table.slice(
+      headerRowIdx,
+      headerRowIdx + headerRowCount,
+    );
+    const combinedHeaders = this.combineHeaderRows(headerSlice);
+
+    // Data starts after all header rows
+    const allDataRows = table.slice(headerRowIdx + headerRowCount);
+
+    // Include columns that have a header OR contain data (assign generated names)
+    const validColumns = combinedHeaders
       .map((h, i) => ({ header: h, index: i }))
-      .filter((col) => col.header.length > 0);
+      .filter((col) => {
+        if (col.header.length > 0) return true;
+        // Check if this column has any non-empty data
+        return allDataRows.some((row) => {
+          const v = row[col.index];
+          return v !== null && v !== undefined && String(v).trim() !== "";
+        });
+      })
+      .map((col) => ({
+        ...col,
+        header: col.header.length > 0 ? col.header : `column${col.index + 1}`,
+      }));
 
     if (validColumns.length === 0) {
       errors.push({
@@ -157,7 +190,23 @@ export class XlsmParser implements FileParserAdapter {
     const headers = validColumns.map((c) => c.header);
     const sanitizedNames = sanitizeColumnNames(headers);
 
-    const dataRows = table.slice(1);
+    // Filter out empty data rows (rows where all mapped cells are null/empty)
+    const dataRows = allDataRows.filter((row) =>
+      validColumns.some((col) => {
+        const value = row[col.index];
+        return (
+          value !== null && value !== undefined && String(value).trim() !== ""
+        );
+      }),
+    );
+
+    if (dataRows.length === 0) {
+      errors.push({
+        message: `No data rows found in ${name}`,
+        severity: "warning",
+      });
+      return null;
+    }
 
     // Build column mappings
     const columnMappings: ColumnMapping[] = headers.map((original, idx) => {
@@ -171,7 +220,7 @@ export class XlsmParser implements FileParserAdapter {
       };
     });
 
-    // Build data rows
+    // Build data row objects
     const rows = dataRows.map((row) => {
       const obj: Record<string, unknown> = {};
       for (let idx = 0; idx < validColumns.length; idx++) {
@@ -190,5 +239,156 @@ export class XlsmParser implements FileParserAdapter {
       sheetName,
       tablePosition,
     };
+  }
+
+  /**
+   * Combine multiple header rows into a single header array.
+   * Joins distinct non-empty values per column with a space separator.
+   */
+  private combineHeaderRows(headerRows: unknown[][]): string[] {
+    const maxCols = Math.max(...headerRows.map((r) => r.length));
+    const combined: string[] = [];
+
+    for (let c = 0; c < maxCols; c++) {
+      const parts: string[] = [];
+      for (const row of headerRows) {
+        const cell = c < row.length ? row[c] : null;
+        if (cell === null || cell === undefined) continue;
+        const text =
+          cell instanceof Date
+            ? this.formatDateValue(cell)
+            : String(cell).trim();
+        if (text !== "" && !parts.includes(text)) {
+          parts.push(text);
+        }
+      }
+      combined.push(parts.join(" "));
+    }
+
+    return combined;
+  }
+
+  /**
+   * Count how many consecutive rows starting from headerStart form the header.
+   * Stops when a row has predominantly numeric values (indicating a data row).
+   */
+  private countHeaderRows(table: unknown[][], headerStart: number): number {
+    const MAX_HEADER_ROWS = 4;
+    let count = 1;
+
+    for (
+      let i = headerStart + 1;
+      i < Math.min(headerStart + MAX_HEADER_ROWS, table.length);
+      i++
+    ) {
+      const row = table[i];
+      const nonEmpty = row.filter(
+        (cell) =>
+          cell !== null && cell !== undefined && String(cell).trim() !== "",
+      );
+
+      if (nonEmpty.length < 3) break;
+
+      const numericCount = nonEmpty.filter(
+        (cell) => typeof cell === "number",
+      ).length;
+
+      // More than half numeric values indicates a data row
+      if (numericCount / nonEmpty.length > 0.5) break;
+
+      count++;
+    }
+
+    return count;
+  }
+
+  /**
+   * Fill merged cell regions so every cell in a merge range holds the top-left value.
+   * Ensures merged headers and category labels propagate to all spanned cells.
+   */
+  private fillMergedCells(aoa: unknown[][], worksheet: XLSX.WorkSheet): void {
+    const merges = worksheet["!merges"];
+    if (!merges || merges.length === 0) return;
+
+    for (const merge of merges) {
+      const { e, s } = merge;
+      const value = aoa[s.r]?.[s.c];
+      if (value === null || value === undefined) continue;
+
+      for (let r = s.r; r <= e.r; r++) {
+        if (!aoa[r]) continue;
+        for (let c = s.c; c <= e.c; c++) {
+          if (r === s.r && c === s.c) continue;
+          while (aoa[r].length <= c) {
+            aoa[r].push(null);
+          }
+          aoa[r][c] = value;
+        }
+      }
+    }
+  }
+
+  /**
+   * Find the index of the actual header row within a table block.
+   * Uses width-aware detection: the header row width must be proportional
+   * to the table's maximum row width. Skips narrow metadata rows,
+   * merged title rows (all identical values), and data rows (mostly numeric).
+   *
+   * @returns Row index, or -1 if no valid header row found.
+   */
+  private findHeaderRowIndex(table: unknown[][]): number {
+    const MIN_UNIQUE_VALUES = 2;
+
+    // Calculate per-row widths (non-empty cell counts)
+    const rowWidths = table.map(
+      (row) =>
+        row.filter(
+          (cell) =>
+            cell !== null && cell !== undefined && String(cell).trim() !== "",
+        ).length,
+    );
+
+    const maxWidth = Math.max(...rowWidths);
+    // Header must have at least 40% of the widest row, minimum 3
+    const minHeaderWidth = Math.max(3, Math.floor(maxWidth * 0.4));
+
+    for (let i = 0; i < table.length; i++) {
+      if (rowWidths[i] < minHeaderWidth) continue;
+
+      const row = table[i];
+      const nonEmpty = row.filter(
+        (cell) =>
+          cell !== null && cell !== undefined && String(cell).trim() !== "",
+      );
+
+      // Skip merged title rows: all non-empty cells are identical
+      const uniqueValues = new Set(
+        nonEmpty.map((c) =>
+          c instanceof Date ? this.formatDateValue(c) : String(c).trim(),
+        ),
+      );
+      if (uniqueValues.size < MIN_UNIQUE_VALUES) continue;
+
+      // Skip data rows: predominantly numeric values are data, not headers
+      const numericCount = nonEmpty.filter(
+        (cell) => typeof cell === "number",
+      ).length;
+      if (numericCount / nonEmpty.length > 0.5) continue;
+
+      return i;
+    }
+
+    // No valid header row found — all wide rows are numeric data or titles
+    return -1;
+  }
+
+  /**
+   * Format a Date value as dd/MM/yyyy for use in headers
+   */
+  private formatDateValue(date: Date): string {
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   }
 }

@@ -30,6 +30,7 @@ export default defineAction<SummarizeDocumentParams, unknown>({
 
   async handler(ctx: TypedContext<SummarizeDocumentParams>) {
     const { datasetId, maxChunks = 20 } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const chunkRepo = dataSource.getRepository(TextChunk);
 
     const chunks = await chunkRepo.find({

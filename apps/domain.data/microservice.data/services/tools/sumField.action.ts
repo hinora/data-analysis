@@ -25,6 +25,7 @@ export default defineAction<SumFieldParams, unknown>({
 
   async handler(ctx: TypedContext<SumFieldParams>) {
     const { datasetId, field, groupBy } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
     await assertFieldIsNumeric({

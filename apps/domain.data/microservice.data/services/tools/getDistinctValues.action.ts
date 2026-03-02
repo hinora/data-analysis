@@ -22,6 +22,7 @@ export default defineAction<GetDistinctValuesParams, unknown>({
 
   async handler(ctx: TypedContext<GetDistinctValuesParams>) {
     const { datasetId, field } = ctx.params;
+    await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
     const results = await repo

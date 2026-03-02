@@ -55,10 +55,14 @@ export default defineAction<RetryGenerationParams, RetryGenerationResult>({
     });
 
     await ctx.emit("metadata.generateMetadata", {
-      datasetId: dataset.id,
       sessionId: dataset.sessionId,
-      datasetType: dataset.datasetType,
-      name: dataset.name,
+      datasets: [
+        {
+          datasetId: dataset.id,
+          datasetType: dataset.datasetType,
+          name: dataset.name,
+        },
+      ],
     });
 
     return {
