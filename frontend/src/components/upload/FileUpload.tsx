@@ -28,7 +28,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ sessionId }) => {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const validateFile = (file: File): string | null => {
+  const validateFile = useCallback((file: File): string | null => {
     const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
     if (!ACCEPTED_EXTENSIONS.includes(ext)) {
       return `Unsupported file type: ${ext}. Supported: CSV, PDF, XLSM`;
@@ -37,7 +37,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ sessionId }) => {
       return "File too large. Maximum size: 100MB";
     }
     return null;
-  };
+  }, []);
 
   const handleUpload = useCallback(
     async (file: File) => {
@@ -87,23 +87,24 @@ export const FileUpload: React.FC<FileUploadProps> = ({ sessionId }) => {
 
   return (
     <div>
-      <div
+      <button
+        type="button"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onClick={() => fileInputRef.current?.click()}
-        onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
-        role="button"
-        tabIndex={0}
         style={{
           border: `2px dashed ${isDragging ? "#3b82f6" : "#e2e8f0"}`,
           borderRadius: 8,
           padding: 24,
           textAlign: "center",
           cursor: uploadFile.isPending ? "not-allowed" : "pointer",
-          backgroundColor: isDragging ? "#eff6ff" : "transparent",
+          backgroundColor: isDragging ? "eff6ff" : "transparent",
           transition: "all 0.15s",
           opacity: uploadFile.isPending ? 0.6 : 1,
+          width: "100%",
+          font: "inherit",
+          color: "inherit",
         }}
       >
         <input
@@ -132,7 +133,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ sessionId }) => {
             </div>
           </div>
         )}
-      </div>
+      </button>
 
       {error && (
         <div

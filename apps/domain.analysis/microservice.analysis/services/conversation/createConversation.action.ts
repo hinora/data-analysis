@@ -19,6 +19,26 @@ import {
   getEnabledToolNamesByCategory,
 } from "../../toolConfig";
 
+/** Shape of a dataset returned by dataset.listDatasets (cross-service) */
+interface DatasetInfo {
+  columnMappings?: Array<{
+    camelCase: string;
+    description?: string;
+    detectedType: string;
+    original: string;
+  }>;
+  datasetType: string;
+  fileType: string;
+  id: string;
+  name: string;
+  rowCount: number;
+  structuredMetadata?: { datasetDescription?: string };
+  unstructuredMetadata?: {
+    documentSummary?: string;
+    keyTopics?: string[];
+  };
+}
+
 export interface CreateConversationParams {
   sessionId: string;
   name?: string;
@@ -72,11 +92,18 @@ export default defineAction<CreateConversationParams, CreateConversationResult>(
       }
 
       // Fetch datasets for this session (cross-service call)
-      let datasets: any[] = [];
+      let datasets: DatasetInfo[] = [];
       try {
-        datasets = (await ctx.call("dataset.listDatasets" as any, {
+        datasets = (await (
+          ctx as unknown as {
+            call(
+              action: string,
+              params: Record<string, unknown>,
+            ): Promise<unknown>;
+          }
+        ).call("dataset.listDatasets", {
           sessionId,
-        })) as any[];
+        })) as DatasetInfo[];
       } catch (err) {
         ctx.broker.logger.warn(
           "Failed to fetch datasets for system prompt (data microservice may not be accessible):",
@@ -134,7 +161,7 @@ export default defineAction<CreateConversationParams, CreateConversationResult>(
   },
 );
 
-function buildSystemPrompt(session: any, datasets: any[]): string {
+function buildSystemPrompt(_session: Session, datasets: DatasetInfo[]): string {
   const parts: string[] = [];
   const toolConfig = getDefaultToolEnabledConfig();
   const { structured, unstructured } =
@@ -254,7 +281,7 @@ function buildSystemPrompt(session: any, datasets: any[]): string {
   return joined;
 }
 
-function appendDatasetInfo(parts: string[], ds: any): void {
+function appendDatasetInfo(parts: string[], ds: DatasetInfo): void {
   parts.push(`#### ${ds.name}`);
   parts.push(`- ID: ${ds.id}`);
   parts.push(`- Type: ${ds.datasetType}`);
@@ -278,8 +305,9 @@ function appendDatasetInfo(parts: string[], ds: any): void {
     parts.push(`- Summary: ${ds.unstructuredMetadata.documentSummary}`);
   }
 
-  if (ds.unstructuredMetadata?.keyTopics?.length > 0) {
-    parts.push(`- Topics: ${ds.unstructuredMetadata.keyTopics.join(", ")}`);
+  const topics = ds.unstructuredMetadata?.keyTopics;
+  if (topics && topics.length > 0) {
+    parts.push(`- Topics: ${topics.join(", ")}`);
   }
 
   parts.push("");

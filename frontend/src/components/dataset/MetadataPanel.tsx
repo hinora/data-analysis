@@ -87,8 +87,8 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
 const StructuredMetadataView: React.FC<{
   metadata: Record<string, unknown>;
 }> = ({ metadata }) => {
-  const desc = (metadata as any).datasetDescription;
-  const columns = ((metadata as any).columnDescriptions || []) as Array<{
+  const desc = metadata.datasetDescription as string | undefined;
+  const columns = (metadata.columnDescriptions || []) as Array<{
     columnKey: string;
     columnOriginal: string;
     description: string;
@@ -132,10 +132,19 @@ const StructuredMetadataView: React.FC<{
   );
 };
 
+interface UnstructuredMetadataShape {
+  chunkCount?: number;
+  contentDomain?: string;
+  documentSummary?: string;
+  entities?: Array<{ count: number; name: string; type: string }>;
+  keyTopics?: string[];
+  wordCount?: number;
+}
+
 const UnstructuredMetadataView: React.FC<{
   metadata: Record<string, unknown>;
 }> = ({ metadata }) => {
-  const m = metadata as any;
+  const m = metadata as UnstructuredMetadataShape;
 
   return (
     <div>

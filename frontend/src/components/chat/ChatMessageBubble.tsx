@@ -74,9 +74,9 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
               }}
             >
               <strong>Sources:</strong>
-              {message.citedSources.map((source, i) => (
+              {message.citedSources.map((source) => (
                 <span
-                  key={i}
+                  key={`${source.datasetName}-${source.columnName || ""}`}
                   style={{
                     display: "inline-block",
                     margin: "2px 4px",
@@ -130,16 +130,19 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
                     fontSize: "12px",
                   }}
                 >
-                  {message.toolsUsed?.map((tool, i) => (
-                    <div key={i} style={{ marginBottom: "4px" }}>
+                  {message.toolsUsed?.map((tool) => (
+                    <div
+                      key={`tool-${tool.toolName}`}
+                      style={{ marginBottom: "4px" }}
+                    >
                       <strong>{tool.toolName}</strong>:{" "}
                       {tool.resultSummary?.slice(0, 100)}
                       {(tool.resultSummary?.length || 0) > 100 ? "..." : ""}
                     </div>
                   ))}
-                  {message.reasoningSteps?.map((step, i) => (
+                  {message.reasoningSteps?.map((step) => (
                     <div
-                      key={`r-${i}`}
+                      key={`r-${step.slice(0, 40)}`}
                       style={{
                         color: isUser ? "rgba(255,255,255,0.6)" : "#888",
                       }}

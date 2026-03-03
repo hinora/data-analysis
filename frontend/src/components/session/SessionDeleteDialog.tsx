@@ -33,6 +33,9 @@ export default function SessionDeleteDialog({
         zIndex: 1000,
       }}
       onClick={onCancel}
+      onKeyDown={(e) => e.key === "Escape" && onCancel()}
+      role="dialog"
+      aria-modal="true"
     >
       <div
         style={{
@@ -44,6 +47,8 @@ export default function SessionDeleteDialog({
           boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
         }}
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        role="document"
       >
         <h3
           style={{

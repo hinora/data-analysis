@@ -37,12 +37,10 @@ export class PdfParser implements FileParserAdapter {
 
     // Extract text via pdf-parse
     let pdfText: string;
-    let numPages: number;
     try {
       const parser = new PDFParse({ data: buffer });
       const textResult = await parser.getText();
       pdfText = textResult.text || "";
-      numPages = textResult.pages?.length || 0;
       await parser.destroy();
     } catch (err) {
       errors.push({

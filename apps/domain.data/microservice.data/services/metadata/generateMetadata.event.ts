@@ -18,7 +18,14 @@ import { AILog, AILogPurpose, AILogStatus, AILogType } from "core.lib/database";
 import type { Repository } from "typeorm";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
-import { Dataset, DatasetType, MetadataStatus } from "../../db/dataset.entity";
+import {
+  Dataset,
+  DatasetType,
+  MetadataStatus,
+  type RelationshipSuggestion,
+  type StructuredMetadata,
+  type UnstructuredMetadata,
+} from "../../db/dataset.entity";
 import { TextChunk } from "../../db/text-chunk.entity";
 
 export interface DatasetEntry {
@@ -213,7 +220,7 @@ Respond with a JSON object (no markdown, no code blocks) with exactly this struc
         };
 
   await dataSource.getRepository(Dataset).update(dataset.id, {
-    structuredMetadata: metadata as any,
+    structuredMetadata: metadata as unknown as StructuredMetadata,
   });
 
   // Log AI interaction
@@ -291,7 +298,7 @@ Respond with a JSON object (no markdown, no code blocks) with exactly this struc
         };
 
   await dataSource.getRepository(Dataset).update(dataset.id, {
-    unstructuredMetadata: metadata as any,
+    unstructuredMetadata: metadata as unknown as UnstructuredMetadata,
   });
 
   // Log AI interaction
@@ -435,15 +442,15 @@ async function detectRelationships(
   // Check for shared topics/entities (unstructured datasets)
   if (dataset.unstructuredMetadata) {
     const myTopics = new Set(
-      ((dataset.unstructuredMetadata as any).keyTopics || []).map((t: string) =>
-        t.toLowerCase(),
-      ),
+      (
+        (dataset.unstructuredMetadata as UnstructuredMetadata).keyTopics || []
+      ).map((t: string) => t.toLowerCase()),
     );
 
     for (const sibling of siblings) {
       if (!sibling.unstructuredMetadata) continue;
       const siblingTopics = (
-        (sibling.unstructuredMetadata as any).keyTopics || []
+        (sibling.unstructuredMetadata as UnstructuredMetadata).keyTopics || []
       ).filter((t: string) => myTopics.has(t.toLowerCase()));
 
       if (siblingTopics.length > 0) {
@@ -460,7 +467,7 @@ async function detectRelationships(
 
   if (relationships.length > 0) {
     await datasetRepo.update(dataset.id, {
-      relationships: relationships as any,
+      relationships: relationships as RelationshipSuggestion[],
     });
   }
 }

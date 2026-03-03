@@ -23,7 +23,7 @@ export interface CreateDataSourceOptions {
   /** Database connection URI (e.g., postgres://user:pass@host:5432/dbname) */
   databaseUri: string;
   /** TypeORM entity classes to register */
-  entities: (Function | EntitySchema)[];
+  entities: (EntitySchema | (new (...args: unknown[]) => unknown))[];
   /** Enable pgvector extension (default: false) */
   enableVector?: boolean;
   /** Enable logging (default: false in production) */
@@ -44,7 +44,7 @@ export function createDataSource(options: CreateDataSourceOptions): DataSource {
   const {
     databaseUri,
     entities,
-    enableVector = false,
+    enableVector: _enableVector = false,
     logging = false,
     migrations = [],
     synchronize = process.env.NODE_ENV === "development",

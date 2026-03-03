@@ -75,9 +75,9 @@ Text: ${chunk.content.slice(0, 2000)}`,
             : {};
         chunkResults.push({
           chunkIndex: chunk.orderIndex,
-          sentiment: String((parsed as any).sentiment || ""),
-          score: Number((parsed as any).score || 0),
-          keyPhrases: ((parsed as any).keyPhrases || []) as string[],
+          sentiment: String(parsed.sentiment || ""),
+          score: Number(parsed.score || 0),
+          keyPhrases: (parsed.keyPhrases || []) as string[],
         });
       }
 

@@ -88,15 +88,20 @@ export default defineAction<UploadFileParams, UploadFileResult>({
 
   async handler(ctx: TypedContext<UploadFileParams>) {
     const meta = ctx.meta as Record<string, unknown>;
-    const multipart = (meta as any).$multipart || {};
+    const multipart = (meta.$multipart ?? {}) as Record<string, unknown>;
 
     // In multipart mode, route params may be in $multipart, meta.$params, or meta directly
+    const metaParams = (meta.$params ?? {}) as Record<string, unknown>;
+    const paramsObj =
+      typeof ctx.params === "object" &&
+      ctx.params !== null &&
+      !(ctx.params as unknown as Record<string, unknown>).pipe
+        ? (ctx.params as unknown as Record<string, unknown>)
+        : {};
     const sessionId = (multipart.sessionId ??
-      (meta as any).$params?.sessionId ??
-      (meta as any).sessionId ??
-      (typeof ctx.params === "object" && !(ctx.params as any)?.pipe
-        ? (ctx.params as any).sessionId
-        : undefined)) as string;
+      metaParams.sessionId ??
+      meta.sessionId ??
+      paramsObj.sessionId) as string;
 
     if (!sessionId || !UUID_REGEX.test(sessionId)) {
       throw new Errors.MoleculerClientError(
@@ -126,9 +131,10 @@ export default defineAction<UploadFileParams, UploadFileResult>({
 
     // Read the file data from the stream
     const chunks: Buffer[] = [];
-    if (ctx.params && typeof (ctx.params as any).pipe === "function") {
+    const paramsRecord = ctx.params as unknown as Record<string, unknown>;
+    if (ctx.params && typeof paramsRecord.pipe === "function") {
       // Stream-based upload
-      for await (const chunk of ctx.params as any) {
+      for await (const chunk of ctx.params as unknown as AsyncIterable<Buffer>) {
         chunks.push(Buffer.from(chunk));
       }
     } else if (multipart.data) {

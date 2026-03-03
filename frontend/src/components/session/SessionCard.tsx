@@ -34,17 +34,20 @@ export const SessionCard: React.FC<SessionCardProps> = ({
   const updatedAt = new Date(session.updatedAt).toLocaleString();
 
   return (
-    <div
+    <button
+      type="button"
       onClick={() => onClick(session.id)}
-      onKeyDown={(e) => e.key === "Enter" && onClick(session.id)}
-      role="button"
-      tabIndex={0}
       style={{
         border: "1px solid #e2e8f0",
         borderRadius: 8,
         padding: 16,
         cursor: "pointer",
         transition: "box-shadow 0.15s",
+        width: "100%",
+        textAlign: "left",
+        background: "none",
+        font: "inherit",
+        color: "inherit",
       }}
     >
       <div
@@ -85,6 +88,6 @@ export const SessionCard: React.FC<SessionCardProps> = ({
       <div style={{ marginTop: 4, fontSize: 12, color: "#94a3b8" }}>
         Last activity: {updatedAt}
       </div>
-    </div>
+    </button>
   );
 };

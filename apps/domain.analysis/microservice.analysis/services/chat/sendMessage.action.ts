@@ -165,7 +165,14 @@ export default defineAction<SendMessageParams, SendMessageResult>({
                 fnArgs,
               );
               const toolStart = Date.now();
-              const result = await (ctx as any).call(actionName, fnArgs);
+              const result = await (
+                ctx as unknown as {
+                  call: (
+                    name: string,
+                    params: Record<string, unknown>,
+                  ) => Promise<unknown>;
+                }
+              ).call(actionName, fnArgs);
               ctx.broker.logger.info(`Tool ${fnName} result:`, result);
               const toolDuration = Date.now() - toolStart;
               ctx.broker.logger.info(

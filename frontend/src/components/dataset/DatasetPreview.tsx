@@ -21,7 +21,7 @@ interface DatasetPreviewProps {
 export default function DatasetPreview({
   columns,
   rows,
-  datasetName,
+  datasetName: _datasetName,
   previewCount,
   totalRows,
 }: DatasetPreviewProps) {
@@ -101,32 +101,38 @@ export default function DatasetPreview({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, rowIdx) => (
-              <tr
-                key={rowIdx}
-                style={{
-                  backgroundColor: rowIdx % 2 === 0 ? "#fff" : "#f8fafc",
-                }}
-              >
-                {columns.map((col) => (
-                  <td
-                    key={col.camelCase}
-                    style={{
-                      padding: "6px 10px",
-                      borderBottom: "1px solid #f1f5f9",
-                      maxWidth: 200,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {row[col.camelCase] != null
-                      ? String(row[col.camelCase])
-                      : "—"}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {rows.map((row, rowIdx) => {
+              const rowKey =
+                columns.length > 0
+                  ? `row-${String(row[columns[0].camelCase] ?? rowIdx)}`
+                  : `row-${rowIdx}`;
+              return (
+                <tr
+                  key={rowKey}
+                  style={{
+                    backgroundColor: rowIdx % 2 === 0 ? "#fff" : "#f8fafc",
+                  }}
+                >
+                  {columns.map((col) => (
+                    <td
+                      key={col.camelCase}
+                      style={{
+                        padding: "6px 10px",
+                        borderBottom: "1px solid #f1f5f9",
+                        maxWidth: 200,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {row[col.camelCase] != null
+                        ? String(row[col.camelCase])
+                        : "—"}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

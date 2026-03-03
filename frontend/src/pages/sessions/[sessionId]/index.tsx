@@ -184,15 +184,24 @@ const SessionWorkspacePage: React.FC = () => {
                 margin: 0,
                 fontSize: 22,
                 fontWeight: 700,
-                cursor: "pointer",
               }}
-              onClick={() => {
-                setIsRenaming(true);
-                setNewName(session.name);
-              }}
-              title="Click to rename"
             >
-              {session.name}
+              <button
+                type="button"
+                style={{
+                  all: "unset",
+                  cursor: "pointer",
+                  font: "inherit",
+                  fontWeight: "inherit",
+                }}
+                onClick={() => {
+                  setIsRenaming(true);
+                  setNewName(session.name);
+                }}
+                title="Click to rename"
+              >
+                {session.name}
+              </button>
             </h1>
           )}
           <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
