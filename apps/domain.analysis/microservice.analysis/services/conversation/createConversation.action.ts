@@ -14,6 +14,10 @@ import { dataSource } from "../../db";
 import { ChatMessage, MessageRole } from "../../db/chat-message.entity";
 import { Conversation } from "../../db/conversation.entity";
 import { Session } from "../../db/session.entity";
+import {
+  getDefaultToolEnabledConfig,
+  getEnabledToolNamesByCategory,
+} from "../../toolConfig";
 
 export interface CreateConversationParams {
   sessionId: string;
@@ -132,6 +136,9 @@ export default defineAction<CreateConversationParams, CreateConversationResult>(
 
 function buildSystemPrompt(session: any, datasets: any[]): string {
   const parts: string[] = [];
+  const toolConfig = getDefaultToolEnabledConfig();
+  const { structured, unstructured } =
+    getEnabledToolNamesByCategory(toolConfig);
 
   // Mission statement
   parts.push(
@@ -148,24 +155,33 @@ function buildSystemPrompt(session: any, datasets: any[]): string {
     "Each dataset has a `type` field that is either `structured-table` or `unstructured-text`.",
     "You MUST choose tools based on the dataset type. Using the wrong category of tools will produce errors or nonsensical results.",
     "",
-    "### Structured Data Tools (ONLY for `structured-table` datasets)",
-    "These tools operate on tabular row/column data (CSV, Excel). They query numeric fields, filter rows, aggregate values, etc.",
-    "- sumField, avgField, count, getTopByField, countAndGroup, countDistinctValues, getDistinctValues",
-    "- filterByCondition, getMinMax, correlateFields, aggregate",
-    "- pivotTable, joinDatasets, getPercentile, detectOutliers, sortByField",
-    "",
-    "### Unstructured Text Tools (ONLY for `unstructured-text` datasets)",
-    "These tools operate on text documents (PDF, TXT, DOCX). They use vector embeddings and AI to search, summarize, and extract information from text.",
-    "- semanticSearch, summarizeDocument, extractKeyTopics, extractEntities",
-    "- answerFromContext, compareDocuments, findSimilarChunks",
-    "- timelineExtraction, sentimentAnalysis",
-    "",
+  );
+
+  if (structured.length > 0) {
+    parts.push(
+      "### Structured Data Tools (ONLY for `structured-table` datasets)",
+      "These tools operate on tabular row/column data (CSV, Excel). They query numeric fields, filter rows, aggregate values, etc.",
+      `- ${structured.join(", ")}`,
+      "",
+    );
+  }
+
+  if (unstructured.length > 0) {
+    parts.push(
+      "### Unstructured Text Tools (ONLY for `unstructured-text` datasets)",
+      "These tools operate on text documents (PDF, TXT, DOCX). They use vector embeddings and AI to search, summarize, and extract information from text.",
+      `- ${unstructured.join(", ")}`,
+      "",
+    );
+  }
+
+  parts.push(
     "### How to decide which tools to use:",
     "1. Look at the dataset `type` field listed below.",
     "2. If the dataset type is `structured-table` → use ONLY Structured Data Tools.",
     "3. If the dataset type is `unstructured-text` → use ONLY Unstructured Text Tools.",
-    "4. NEVER use sumField, avgField, count, filterByCondition, getDistinctValues, or other structured tools on an `unstructured-text` dataset — they will fail because text datasets have no tabular rows/columns.",
-    "5. NEVER use semanticSearch, summarizeDocument, extractKeyTopics, answerFromContext, or other text tools on a `structured-table` dataset — they will fail because structured datasets have no text chunks or embeddings.",
+    "4. NEVER use structured tools on an `unstructured-text` dataset — they will fail because text datasets have no tabular rows/columns.",
+    "5. NEVER use text tools on a `structured-table` dataset — they will fail because structured datasets have no text chunks or embeddings.",
     "6. If the user's question involves both structured and unstructured datasets, use the appropriate tool category for each dataset separately, then combine the insights in your answer.",
     "",
   );
