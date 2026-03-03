@@ -8,7 +8,7 @@ import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
-import { assertFieldIsNumeric } from "./numericFieldUtils";
+import { assertFieldIsNumeric, getNumericCastExpr } from "./numericFieldUtils";
 
 export interface GetPercentileParams {
   datasetId: string;
@@ -44,9 +44,11 @@ export default defineAction<GetPercentileParams, unknown>({
       toolName: "getPercentile",
     });
 
+    const numExpr = await getNumericCastExpr({ datasetId, field, repo });
+
     const percentileExprs = percentiles.map(
       (p) =>
-        `PERCENTILE_CONT(${p / 100}) WITHIN GROUP (ORDER BY (data->>'${field}')::numeric) AS "p${p}"`,
+        `PERCENTILE_CONT(${p / 100}) WITHIN GROUP (ORDER BY ${numExpr}) AS "p${p}"`,
     );
 
     const result = await dataSource.query(

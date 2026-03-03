@@ -8,7 +8,7 @@ import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
-import { assertFieldIsNumeric } from "./numericFieldUtils";
+import { assertFieldIsNumeric, getNumericCastExpr } from "./numericFieldUtils";
 
 export interface SumFieldParams {
   datasetId: string;
@@ -35,6 +35,13 @@ export default defineAction<SumFieldParams, unknown>({
       toolName: "sumField",
     });
 
+    const numExpr = await getNumericCastExpr({
+      datasetId,
+      field,
+      repo,
+      tableAlias: "r",
+    });
+
     const qb = repo
       .createQueryBuilder("r")
       .where("r.datasetId = :datasetId", { datasetId });
@@ -42,12 +49,12 @@ export default defineAction<SumFieldParams, unknown>({
     if (groupBy) {
       qb.select([
         `r.data->>'${groupBy}' AS "group"`,
-        `SUM((r.data->>'${field}')::numeric) AS "total"`,
+        `SUM(${numExpr}) AS "total"`,
       ]);
       qb.groupBy(`r.data->>'${groupBy}'`);
       qb.orderBy(`"total"`, "DESC");
     } else {
-      qb.select(`SUM((r.data->>'${field}')::numeric) AS "total"`);
+      qb.select(`SUM(${numExpr}) AS "total"`);
     }
 
     const results = await qb.getRawMany();

@@ -8,7 +8,7 @@ import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
-import { assertFieldIsNumeric } from "./numericFieldUtils";
+import { assertFieldIsNumeric, getNumericCastExpr } from "./numericFieldUtils";
 
 export interface PivotTableParams {
   datasetId: string;
@@ -65,10 +65,17 @@ export default defineAction<PivotTableParams, unknown>({
 
     const cols = columnValues.map((cv) => cv.colVal);
 
+    const numExpr = await getNumericCastExpr({
+      datasetId,
+      field: valueField,
+      repo,
+      tableAlias: "r",
+    });
+
     // Build pivot query with CASE expressions
     const caseParts = cols.map((col, i) => {
       const aggFn = aggregation.toUpperCase();
-      return `${aggFn}(CASE WHEN r.data->>'${columnField}' = '${col.replace(/'/g, "''")}' THEN (r.data->>'${valueField}')::numeric END) AS "col_${i}"`;
+      return `${aggFn}(CASE WHEN r.data->>'${columnField}' = '${col.replace(/'/g, "''")}' THEN ${numExpr} END) AS "col_${i}"`;
     });
 
     const qb = repo

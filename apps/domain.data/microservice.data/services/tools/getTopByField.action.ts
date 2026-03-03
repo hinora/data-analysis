@@ -8,7 +8,7 @@ import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
-import { isFieldNumeric } from "./numericFieldUtils";
+import { getNumericCastExpr, isFieldNumeric } from "./numericFieldUtils";
 
 export interface GetTopByFieldParams {
   datasetId: string;
@@ -44,7 +44,7 @@ export default defineAction<GetTopByFieldParams, unknown>({
 
     const numeric = await isFieldNumeric({ datasetId, field, repo });
     const orderExpr = numeric
-      ? `(r.data->>'${field}')::numeric`
+      ? await getNumericCastExpr({ datasetId, field, repo, tableAlias: "r" })
       : `r.data->>'${field}'`;
 
     const results = await repo

@@ -8,7 +8,7 @@ import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
-import { assertFieldIsNumeric } from "./numericFieldUtils";
+import { assertFieldIsNumeric, getNumericCastExpr } from "./numericFieldUtils";
 
 export interface AvgFieldParams {
   datasetId: string;
@@ -35,6 +35,13 @@ export default defineAction<AvgFieldParams, unknown>({
       toolName: "avgField",
     });
 
+    const numExpr = await getNumericCastExpr({
+      datasetId,
+      field,
+      repo,
+      tableAlias: "r",
+    });
+
     const qb = repo
       .createQueryBuilder("r")
       .where("r.datasetId = :datasetId", { datasetId });
@@ -42,16 +49,13 @@ export default defineAction<AvgFieldParams, unknown>({
     if (groupBy) {
       qb.select([
         `r.data->>'${groupBy}' AS "group"`,
-        `AVG((r.data->>'${field}')::numeric) AS "average"`,
+        `AVG(${numExpr}) AS "average"`,
         `COUNT(*) AS "count"`,
       ]);
       qb.groupBy(`r.data->>'${groupBy}'`);
       qb.orderBy(`"average"`, "DESC");
     } else {
-      qb.select([
-        `AVG((r.data->>'${field}')::numeric) AS "average"`,
-        `COUNT(*) AS "count"`,
-      ]);
+      qb.select([`AVG(${numExpr}) AS "average"`, `COUNT(*) AS "count"`]);
     }
 
     const results = await qb.getRawMany();

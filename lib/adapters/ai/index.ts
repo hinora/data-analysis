@@ -9,6 +9,7 @@ import {
   SUPPORTED_AI_PROVIDERS,
   type SupportedAIProvider,
 } from "../../config/utils";
+import { GeminiAdapter } from "./gemini.adapter";
 import { OllamaAdapter } from "./ollama.adapter";
 import type {
   AIAdapter,
@@ -16,6 +17,7 @@ import type {
   CreateAIAdapterOptions,
 } from "./types";
 
+export { GeminiAdapter } from "./gemini.adapter";
 export { OllamaAdapter } from "./ollama.adapter";
 export type {
   AIAdapter,
@@ -98,10 +100,10 @@ export function createAIAdapter(
       });
 
     case "gemini":
-      // Gemini adapter stub - to be implemented in T079
-      throw new Error(
-        "Gemini adapter not yet implemented. Use AI_PROVIDER=ollama or implement GeminiAdapter.",
-      );
+      return new GeminiAdapter({
+        apiKey: options.apiKey,
+        model: options.model,
+      });
 
     default:
       throw new Error(

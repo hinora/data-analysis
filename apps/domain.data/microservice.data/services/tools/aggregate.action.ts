@@ -8,7 +8,11 @@ import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
-import { assertFieldIsNumeric, isFieldNumeric } from "./numericFieldUtils";
+import {
+  assertFieldIsNumeric,
+  getNumericCastExpr,
+  isFieldNumeric,
+} from "./numericFieldUtils";
 
 interface AggregationDef {
   field: string;
@@ -73,7 +77,12 @@ export default defineAction<AggregateParams, unknown>({
             repo,
             toolName: "aggregate",
           });
-          const numCol = `(r.data->>'${agg.field}')::numeric`;
+          const numCol = await getNumericCastExpr({
+            datasetId,
+            field: agg.field,
+            repo,
+            tableAlias: "r",
+          });
           selectParts.push(
             agg.operation === "sum"
               ? `SUM(${numCol}) AS "${agg.field}_sum"`
@@ -89,7 +98,12 @@ export default defineAction<AggregateParams, unknown>({
             repo,
           });
           const col = numeric
-            ? `(r.data->>'${agg.field}')::numeric`
+            ? await getNumericCastExpr({
+                datasetId,
+                field: agg.field,
+                repo,
+                tableAlias: "r",
+              })
             : `r.data->>'${agg.field}'`;
           selectParts.push(
             agg.operation === "min"

@@ -8,7 +8,7 @@ import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
-import { assertFieldIsNumeric } from "./numericFieldUtils";
+import { assertFieldIsNumeric, getNumericCastExpr } from "./numericFieldUtils";
 
 export interface DetectOutliersParams {
   datasetId: string;
@@ -42,13 +42,15 @@ export default defineAction<DetectOutliersParams, unknown>({
       toolName: "detectOutliers",
     });
 
+    const numExpr = await getNumericCastExpr({ datasetId, field, repo });
+
     if (method === "zscore") {
       // Z-score method
       const stats = await dataSource.query(
         `
         SELECT
-          AVG((data->>'${field}')::numeric) AS mean,
-          STDDEV((data->>'${field}')::numeric) AS stddev
+          AVG(${numExpr}) AS mean,
+          STDDEV(${numExpr}) AS stddev
         FROM data_record
         WHERE "datasetId" = $1 AND data->>'${field}' IS NOT NULL
         `,
@@ -71,8 +73,8 @@ export default defineAction<DetectOutliersParams, unknown>({
         FROM data_record
         WHERE "datasetId" = $1
           AND data->>'${field}' IS NOT NULL
-          AND ABS(((data->>'${field}')::numeric - $2) / $3) > $4
-        ORDER BY ABS(((data->>'${field}')::numeric - $2) / $3) DESC
+          AND ABS((${numExpr} - $2) / $3) > $4
+        ORDER BY ABS((${numExpr} - $2) / $3) DESC
         LIMIT 50
         `,
         [datasetId, mean, stddev, threshold],
@@ -93,8 +95,8 @@ export default defineAction<DetectOutliersParams, unknown>({
     const quartiles = await dataSource.query(
       `
       SELECT
-        PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY (data->>'${field}')::numeric) AS q1,
-        PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY (data->>'${field}')::numeric) AS q3
+        PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY ${numExpr}) AS q1,
+        PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY ${numExpr}) AS q3
       FROM data_record
       WHERE "datasetId" = $1 AND data->>'${field}' IS NOT NULL
       `,
@@ -116,8 +118,8 @@ export default defineAction<DetectOutliersParams, unknown>({
       FROM data_record
       WHERE "datasetId" = $1
         AND data->>'${field}' IS NOT NULL
-        AND ((data->>'${field}')::numeric < $2 OR (data->>'${field}')::numeric > $3)
-      ORDER BY ABS((data->>'${field}')::numeric - ($4 + $5) / 2) DESC
+        AND (${numExpr} < $2 OR ${numExpr} > $3)
+      ORDER BY ABS(${numExpr} - ($4 + $5) / 2) DESC
       LIMIT 50
       `,
       [datasetId, lowerBound, upperBound, q1, q3],

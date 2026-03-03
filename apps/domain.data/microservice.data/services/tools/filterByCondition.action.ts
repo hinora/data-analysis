@@ -8,7 +8,7 @@ import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
-import { isFieldNumeric } from "./numericFieldUtils";
+import { getNumericCastExpr, isFieldNumeric } from "./numericFieldUtils";
 
 interface Condition {
   field: string;
@@ -84,7 +84,14 @@ export default defineAction<FilterByConditionParams, unknown>({
             field: c.field,
             repo,
           });
-          const castField = numeric ? `(${jsonField})::numeric` : jsonField;
+          const castField = numeric
+            ? await getNumericCastExpr({
+                datasetId,
+                field: c.field,
+                repo,
+                tableAlias: "r",
+              })
+            : jsonField;
           const paramVal = numeric ? Number(c.value) : String(c.value);
           const ops = { gt: ">", gte: ">=", lt: "<", lte: "<=" } as const;
           qb.andWhere(`${castField} ${ops[c.operator]} :${paramName}`, {

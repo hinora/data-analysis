@@ -87,6 +87,15 @@ export const useListDatasets = (sessionId: string | undefined) => {
     queryKey: [DATASET_LIST_KEY, sessionId],
     queryFn: listDatasetsFn,
     enabled: !!sessionId,
+    refetchInterval: (query) => {
+      const datasets = query.state.data;
+      if (!datasets) return false;
+      const hasUnfinished = datasets.some(
+        (d) =>
+          d.metadataStatus === "pending" || d.metadataStatus === "in-progress",
+      );
+      return hasUnfinished ? 5000 : false;
+    },
   });
 };
 

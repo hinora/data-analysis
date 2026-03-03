@@ -8,7 +8,7 @@ import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
-import { assertFieldIsNumeric } from "./numericFieldUtils";
+import { assertFieldIsNumeric, getNumericCastExpr } from "./numericFieldUtils";
 
 export interface CorrelateFieldsParams {
   datasetId: string;
@@ -43,19 +43,30 @@ export default defineAction<CorrelateFieldsParams, unknown>({
       }),
     ]);
 
+    const numExpr1 = await getNumericCastExpr({
+      datasetId,
+      field: field1,
+      repo,
+    });
+    const numExpr2 = await getNumericCastExpr({
+      datasetId,
+      field: field2,
+      repo,
+    });
+
     // Use raw SQL for Pearson correlation
     const result = await dataSource.query(
       `
       SELECT
         CORR(
-          (data->>'${field1}')::numeric,
-          (data->>'${field2}')::numeric
+          ${numExpr1},
+          ${numExpr2}
         ) AS correlation,
         COUNT(*) AS "sampleSize",
-        AVG((data->>'${field1}')::numeric) AS "mean1",
-        AVG((data->>'${field2}')::numeric) AS "mean2",
-        STDDEV((data->>'${field1}')::numeric) AS "stddev1",
-        STDDEV((data->>'${field2}')::numeric) AS "stddev2"
+        AVG(${numExpr1}) AS "mean1",
+        AVG(${numExpr2}) AS "mean2",
+        STDDEV(${numExpr1}) AS "stddev1",
+        STDDEV(${numExpr2}) AS "stddev2"
       FROM data_record
       WHERE "datasetId" = $1
         AND data->>'${field1}' IS NOT NULL
