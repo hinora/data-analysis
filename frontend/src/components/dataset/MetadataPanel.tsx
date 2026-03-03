@@ -12,6 +12,8 @@ interface MetadataPanelProps {
   structuredMetadata?: Record<string, unknown> | null;
   unstructuredMetadata?: Record<string, unknown> | null;
   relationships?: unknown[] | null;
+  onRetry?: () => void;
+  isRetrying?: boolean;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -25,6 +27,8 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
   metadataStatus,
   structuredMetadata,
   unstructuredMetadata,
+  onRetry,
+  isRetrying,
 }) => {
   const statusColor = STATUS_COLORS[metadataStatus] || "#94a3b8";
 
@@ -68,9 +72,30 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
       )}
 
       {metadataStatus === "failed" && (
-        <p style={{ color: "#ef4444", fontSize: 13 }}>
-          Metadata generation failed. Use retry to regenerate.
-        </p>
+        <div>
+          <p style={{ color: "#ef4444", fontSize: 13, marginBottom: 8 }}>
+            Metadata generation failed.
+          </p>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={isRetrying}
+              style={{
+                padding: "6px 14px",
+                fontSize: 12,
+                fontWeight: 500,
+                border: "none",
+                borderRadius: 6,
+                backgroundColor: isRetrying ? "#fca5a5" : "#ef4444",
+                color: "#fff",
+                cursor: isRetrying ? "not-allowed" : "pointer",
+              }}
+            >
+              {isRetrying ? "Retrying..." : "Retry Generate Metadata"}
+            </button>
+          )}
+        </div>
       )}
 
       {metadataStatus === "ready" && structuredMetadata && (

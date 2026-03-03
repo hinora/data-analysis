@@ -220,3 +220,23 @@ export const useDeleteDataset = () => {
     },
   });
 };
+
+export const useRetryMetadata = () => {
+  return useMutation({
+    mutationFn: async (datasetId: string) => {
+      const response = await service.post<{
+        success: boolean;
+        datasetId: string;
+      }>(`/metadata/${datasetId}/retry`);
+      return response.data;
+    },
+    onSuccess: (_data, datasetId) => {
+      queryClient.invalidateQueries({
+        queryKey: [DATASET_LIST_KEY],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [DATASET_DETAIL_KEY, datasetId],
+      });
+    },
+  });
+};

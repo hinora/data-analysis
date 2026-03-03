@@ -54,7 +54,7 @@ export default defineAction<RetryGenerationParams, RetryGenerationResult>({
       metadataStatus: MetadataStatus.PENDING,
     });
 
-    await ctx.emit("metadata.generateMetadata", {
+    ctx.emit("metadata.generateMetadata", {
       sessionId: dataset.sessionId,
       datasets: [
         {

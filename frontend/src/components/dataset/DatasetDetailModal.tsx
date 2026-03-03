@@ -11,7 +11,7 @@ import DatasetActions from "@/components/dataset/DatasetActions";
 import DatasetPreview from "@/components/dataset/DatasetPreview";
 import { MetadataPanel } from "@/components/dataset/MetadataPanel";
 import type { Dataset } from "@/hooks/useDataset";
-import { usePreviewDataset } from "@/hooks/useDataset";
+import { usePreviewDataset, useRetryMetadata } from "@/hooks/useDataset";
 
 interface DatasetDetailModalProps {
   dataset: Dataset;
@@ -31,6 +31,7 @@ const DatasetDetailModal: React.FC<DatasetDetailModalProps> = ({
   isDeleting,
 }) => {
   const { data: previewData } = usePreviewDataset(dataset.id);
+  const { mutate: retryMetadata, isPending: isRetrying } = useRetryMetadata();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -141,13 +142,17 @@ const DatasetDetailModal: React.FC<DatasetDetailModalProps> = ({
           )}
 
           {/* Metadata */}
-          {(dataset.structuredMetadata || dataset.unstructuredMetadata) && (
+          {(dataset.structuredMetadata ||
+            dataset.unstructuredMetadata ||
+            dataset.metadataStatus === "failed") && (
             <div style={{ marginTop: 16 }}>
               <MetadataPanel
                 metadataStatus={dataset.metadataStatus}
                 structuredMetadata={dataset.structuredMetadata}
                 unstructuredMetadata={dataset.unstructuredMetadata}
                 relationships={dataset.relationships}
+                onRetry={() => retryMetadata(dataset.id)}
+                isRetrying={isRetrying}
               />
             </div>
           )}
