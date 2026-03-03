@@ -23,6 +23,7 @@ import type {
 
 const DEFAULT_MODEL = "qwen3:8b";
 const DEFAULT_HOST = "http://localhost:11434";
+const DEFAULT_NUM_CTX = 40000;
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
@@ -51,8 +52,10 @@ function stripThinkTags(content: string): string {
 export interface OllamaAdapterOptions {
   /** Host URL (default: http://localhost:11434) */
   host?: string;
-  /** Default model (default: qwen3:14b) */
+  /** Default model (default: qwen3:8b) */
   model?: string;
+  /** Context window size (default: 32768) */
+  numCtx?: number;
 }
 
 /**
@@ -61,10 +64,14 @@ export interface OllamaAdapterOptions {
 export class OllamaAdapter implements AIAdapter {
   private client: Ollama;
   private config: AIProviderConfig;
+  private numCtx: number;
 
   constructor(options: OllamaAdapterOptions = {}) {
     const host = options.host || process.env.OLLAMA_HOST || DEFAULT_HOST;
     const model = options.model || process.env.OLLAMA_MODEL || DEFAULT_MODEL;
+
+    this.numCtx =
+      options.numCtx || Number(process.env.OLLAMA_NUM_CTX) || DEFAULT_NUM_CTX;
 
     this.client = new Ollama({ host });
     this.config = {
@@ -162,8 +169,8 @@ export class OllamaAdapter implements AIAdapter {
         messages,
         model,
         options: {
+          num_ctx: this.numCtx,
           temperature: params.temperature ?? 0.7,
-          num_ctx: 32768,
         },
       });
     });
@@ -237,7 +244,7 @@ export class OllamaAdapter implements AIAdapter {
         messages,
         model,
         options: {
-          num_ctx: 8192 * 2,
+          num_ctx: this.numCtx,
           temperature: params.temperature ?? 0.3,
         },
         stream: false,

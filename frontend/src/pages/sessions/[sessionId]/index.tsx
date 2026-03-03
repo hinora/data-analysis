@@ -9,10 +9,8 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import type React from "react";
 import { useState } from "react";
-import DatasetActions from "@/components/dataset/DatasetActions";
+import DatasetDetailModal from "@/components/dataset/DatasetDetailModal";
 import DatasetList from "@/components/dataset/DatasetList";
-import DatasetPreview from "@/components/dataset/DatasetPreview";
-import { MetadataPanel } from "@/components/dataset/MetadataPanel";
 import ConversationList from "@/components/session/ConversationList";
 import { FileUpload } from "@/components/upload/FileUpload";
 import {
@@ -24,7 +22,6 @@ import {
 import {
   useDeleteDataset,
   useListDatasets,
-  usePreviewDataset,
   useRenameDataset,
 } from "@/hooks/useDataset";
 import {
@@ -52,12 +49,27 @@ const SessionWorkspacePage: React.FC = () => {
 
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState("");
-  const [selectedDatasetId, setSelectedDatasetId] = useState<
-    string | undefined
-  >();
 
-  const { data: previewData } = usePreviewDataset(selectedDatasetId);
+  const selectedDatasetId =
+    typeof router.query.datasetId === "string"
+      ? router.query.datasetId
+      : undefined;
   const selectedDataset = datasets?.find((d) => d.id === selectedDatasetId);
+
+  const setSelectedDatasetId = (datasetId: string | undefined) => {
+    if (datasetId) {
+      router.replace(
+        { pathname: router.pathname, query: { ...router.query, datasetId } },
+        undefined,
+        { shallow: true },
+      );
+    } else {
+      const { datasetId: _, ...rest } = router.query;
+      router.replace({ pathname: router.pathname, query: rest }, undefined, {
+        shallow: true,
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -120,25 +132,48 @@ const SessionWorkspacePage: React.FC = () => {
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleRename();
+                  if (e.key === "Escape") setIsRenaming(false);
+                }}
                 placeholder={session.name}
                 style={{
-                  padding: "4px 8px",
+                  padding: "6px 10px",
                   fontSize: 18,
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 4,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 6,
+                  outline: "none",
                 }}
               />
               <button
                 type="button"
                 onClick={handleRename}
-                style={{ padding: "4px 12px" }}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 6,
+                  border: "none",
+                  backgroundColor: "#0066cc",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
               >
                 Save
               </button>
               <button
                 type="button"
                 onClick={() => setIsRenaming(false)}
-                style={{ padding: "4px 12px" }}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 6,
+                  border: "1px solid #e2e8f0",
+                  backgroundColor: "#fff",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  color: "#475569",
+                }}
               >
                 Cancel
               </button>
@@ -169,7 +204,16 @@ const SessionWorkspacePage: React.FC = () => {
           <button
             type="button"
             onClick={() => router.push("/sessions")}
-            style={{ padding: "6px 12px", cursor: "pointer" }}
+            style={{
+              padding: "6px 14px",
+              cursor: "pointer",
+              borderRadius: 6,
+              border: "1px solid #e2e8f0",
+              backgroundColor: "#fff",
+              fontSize: 13,
+              fontWeight: 500,
+              color: "#475569",
+            }}
           >
             ← Back
           </button>
@@ -178,11 +222,13 @@ const SessionWorkspacePage: React.FC = () => {
             onClick={handleDelete}
             disabled={deleteSession.isPending}
             style={{
-              padding: "6px 12px",
+              padding: "6px 14px",
               backgroundColor: "#ef4444",
               color: "#fff",
               border: "none",
-              borderRadius: 4,
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 500,
               cursor: deleteSession.isPending ? "not-allowed" : "pointer",
             }}
           >
@@ -300,68 +346,21 @@ const SessionWorkspacePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Dataset Detail Panel */}
+      {/* Dataset Detail Modal */}
       {selectedDataset && (
-        <div
-          style={{
-            marginTop: 24,
-            border: "1px solid #e2e8f0",
-            borderRadius: 8,
-            padding: 16,
+        <DatasetDetailModal
+          dataset={selectedDataset}
+          onClose={() => setSelectedDatasetId(undefined)}
+          onRename={async (dsId, name) => {
+            await renameDs.mutateAsync({ id: dsId, name });
           }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 12,
-            }}
-          >
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
-              {selectedDataset.name}
-            </h3>
-            <DatasetActions
-              datasetId={selectedDataset.id}
-              datasetName={selectedDataset.name}
-              onRename={async (dsId, name) => {
-                await renameDs.mutateAsync({ id: dsId, name });
-              }}
-              onDelete={async (dsId) => {
-                await deleteDs.mutateAsync(dsId);
-                setSelectedDatasetId(undefined);
-              }}
-              isRenaming={renameDs.isPending}
-              isDeleting={deleteDs.isPending}
-            />
-          </div>
-
-          {/* Preview table */}
-          {previewData && (
-            <DatasetPreview
-              columns={previewData.columns || []}
-              rows={previewData.rows || []}
-              datasetName={selectedDataset.name}
-              previewCount={
-                previewData.previewCount || previewData.rows?.length || 0
-              }
-              totalRows={selectedDataset.rowCount}
-            />
-          )}
-
-          {/* Metadata */}
-          {(selectedDataset.structuredMetadata ||
-            selectedDataset.unstructuredMetadata) && (
-            <div style={{ marginTop: 16 }}>
-              <MetadataPanel
-                metadataStatus={selectedDataset.metadataStatus}
-                structuredMetadata={selectedDataset.structuredMetadata}
-                unstructuredMetadata={selectedDataset.unstructuredMetadata}
-                relationships={selectedDataset.relationships}
-              />
-            </div>
-          )}
-        </div>
+          onDelete={async (dsId) => {
+            await deleteDs.mutateAsync(dsId);
+            setSelectedDatasetId(undefined);
+          }}
+          isRenaming={renameDs.isPending}
+          isDeleting={deleteDs.isPending}
+        />
       )}
     </div>
   );

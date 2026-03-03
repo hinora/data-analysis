@@ -57,6 +57,17 @@ dataSource
   .catch((err: Error) => console.error(`Error occurred! ${err.message}`));
 ```
 
+## Timezone Handling
+
+All timestamps are stored and processed in **UTC**. Two mechanisms enforce this:
+
+1. **Process timezone** — Each microservice's `app.ts` sets `process.env.TZ = "UTC"` **before** any imports so that `new Date()` and the `pg` driver always serialize dates with a `+00:00` offset.
+2. **PostgreSQL session timezone** — `createDataSource()` passes `extra: { options: "-c timezone=UTC" }` to every connection, ensuring PostgreSQL interprets incoming timestamps as UTC and returns them in UTC.
+
+Without these safeguards, running the Node.js process in a non-UTC timezone (e.g. `Asia/Ho_Chi_Minh`, UTC+7) causes a **double-offset bug**: the `pg` driver sends a UTC value without an explicit timezone indicator, and PostgreSQL re-applies the session offset, shifting the stored time by the local offset.
+
+> **Rule:** Never remove or override `process.env.TZ = "UTC"` in `app.ts`. If you need to display dates in a user's local timezone, convert on the **frontend** side.
+
 ## Database Folder Structure
 
 Each microservice should have a `db` folder with table files:

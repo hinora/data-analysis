@@ -11,6 +11,7 @@ import ChatInput from "../../../components/chat/ChatInput";
 import ChatMessageBubble from "../../../components/chat/ChatMessageBubble";
 import ConversationSidebar from "../../../components/chat/ConversationSidebar";
 import SystemPromptViewer from "../../../components/chat/SystemPromptViewer";
+import ThinkingIndicator from "../../../components/chat/ThinkingIndicator";
 import { useGetHistory, useSendMessage } from "../../../hooks/useChat";
 import {
   useCreateConversation,
@@ -44,12 +45,13 @@ export default function ChatPage() {
     }
   }, [conversations, activeConversationId]);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages or when thinking
   const messageCount = historyData?.messages.length ?? 0;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: messageCount triggers scroll on new messages
+  const isSending = sendMessage.isPending;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: messageCount and isSending trigger scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messageCount]);
+  }, [messageCount, isSending]);
 
   const handleCreateConversation = useCallback(() => {
     if (!sessionId) return;
@@ -174,6 +176,7 @@ export default function ChatPage() {
                     <ChatMessageBubble key={msg.id} message={msg} />
                   ))
                 )}
+                {sendMessage.isPending && <ThinkingIndicator />}
                 <div ref={messagesEndRef} />
               </div>
 

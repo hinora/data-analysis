@@ -52,6 +52,11 @@ export function createDataSource(options: CreateDataSourceOptions): DataSource {
 
   const dsOptions: DataSourceOptions = {
     entities,
+    extra: {
+      // Force all PostgreSQL sessions to use UTC to prevent timezone
+      // double-offset when the Node.js process runs in a non-UTC timezone.
+      options: "-c timezone=UTC",
+    },
     logging,
     migrations,
     synchronize,

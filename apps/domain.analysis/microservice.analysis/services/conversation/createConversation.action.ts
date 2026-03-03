@@ -150,7 +150,7 @@ function buildSystemPrompt(session: any, datasets: any[]): string {
     "",
     "### Structured Data Tools (ONLY for `structured-table` datasets)",
     "These tools operate on tabular row/column data (CSV, Excel). They query numeric fields, filter rows, aggregate values, etc.",
-    "- sumField, avgField, count, getTopByField, countAndGroup, getDistinctValues",
+    "- sumField, avgField, count, getTopByField, countAndGroup, countDistinctValues, getDistinctValues",
     "- filterByCondition, getMinMax, correlateFields, aggregate",
     "- pivotTable, joinDatasets, getPercentile, detectOutliers, sortByField",
     "",
@@ -178,7 +178,9 @@ function buildSystemPrompt(session: any, datasets: any[]): string {
     "- BEFORE filtering by any field value, you MUST first use getDistinctValues tool to check what values actually exist in the database.",
     "- For data in multiple datasets, you can base your analysis on multiple datasets to answer the question. You should explicitly note which datasets you are using and how they relate to each other.",
     "- Never mention the tool name you are using to the user.",
-    "",
+    "- NEVER use getDistinctValues on numeric/number fields — it is only meaningful for categorical or text fields (e.g. status, category, country). For numeric fields, use countDistinctValues, getMinMax, getPercentile, or aggregate instead.",
+    "- When calling getDistinctValues, always provide a reasonable limit (e.g. 50) to avoid returning too many values for high-cardinality fields.",
+    "- Use countDistinctValues first to check how many distinct values a field has before calling getDistinctValues, especially for fields with potentially high cardinality.",
   );
 
   // Dataset context
@@ -217,9 +219,9 @@ function buildSystemPrompt(session: any, datasets: any[]): string {
 
   // Truncate to ~15000 chars to stay within reasonable token limits
   const joined = parts.join("\n");
-  if (joined.length > 15000) {
-    return `${joined.slice(0, 15000)}\n\n[System prompt truncated due to length]`;
-  }
+  // if (joined.length > 15000) {
+  //   return `${joined.slice(0, 15000)}\n\n[System prompt truncated due to length]`;
+  // }
 
   return joined;
 }

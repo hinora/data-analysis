@@ -1,6 +1,11 @@
 /**
  * Analysis Microservice
  */
+
+// Force UTC so that Date serialisation and pg driver timestamps are
+// always in UTC, preventing double-offset issues in non-UTC environments.
+process.env.TZ = "UTC";
+
 import "dotenv/config";
 import { createApp, run } from "core.lib/broker";
 import { validateAIProvider } from "core.lib/config";

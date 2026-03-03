@@ -40,12 +40,13 @@ const MAX_TOOL_ITERATIONS = 10;
 // Map tool names to Moleculer service actions
 const TOOL_TO_ACTION: Record<string, string> = {
   aggregate: "tools.aggregate",
-  sumField: "tools.sumField",
   avgField: "tools.avgField",
   count: "tools.count",
-  getTopByField: "tools.getTopByField",
+  countDistinctValues: "tools.countDistinctValues",
   countAndGroup: "tools.countAndGroup",
   getDistinctValues: "tools.getDistinctValues",
+  getTopByField: "tools.getTopByField",
+  sumField: "tools.sumField",
   filterByCondition: "tools.filterByCondition",
   getMinMax: "tools.getMinMax",
   correlateFields: "tools.correlateFields",
@@ -447,14 +448,41 @@ function buildToolDefinitions(): ToolDefinition[] {
     {
       type: "function",
       function: {
-        name: "getDistinctValues",
+        name: "countDistinctValues",
         description:
-          "[STRUCTURED DATA ONLY] Get distinct values with counts for a field in a structured-table dataset. Do NOT use on unstructured-text datasets.",
+          "[STRUCTURED DATA ONLY] Count how many distinct values exist for a field without returning the values themselves. Works on ANY field type (numeric or categorical). Use this to check cardinality before deciding whether to call getDistinctValues. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
             datasetId: { type: "string", description: "Dataset UUID" },
-            field: { type: "string", description: "Column key" },
+            field: {
+              type: "string",
+              description: "Column key (any type)",
+            },
+          },
+          required: ["datasetId", "field"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "getDistinctValues",
+        description:
+          "[STRUCTURED DATA ONLY] Get distinct values with counts for a CATEGORICAL field in a structured-table dataset. Do NOT use on numeric/number fields (use countDistinctValues, getMinMax, or aggregate instead). Do NOT use on unstructured-text datasets.",
+        parameters: {
+          type: "object",
+          properties: {
+            datasetId: { type: "string", description: "Dataset UUID" },
+            field: {
+              type: "string",
+              description: "Column key (categorical/text only, NOT numeric)",
+            },
+            limit: {
+              type: "number",
+              description:
+                "Maximum number of distinct values to return (default: 50)",
+            },
           },
           required: ["datasetId", "field"],
         },
