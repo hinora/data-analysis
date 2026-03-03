@@ -15,8 +15,8 @@ export interface GetDistinctValuesParams {
   limit?: number;
 }
 
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
+const DEFAULT_LIMIT = 2000;
+const MAX_LIMIT = 2000;
 
 export default defineAction<GetDistinctValuesParams, unknown>({
   params: {
