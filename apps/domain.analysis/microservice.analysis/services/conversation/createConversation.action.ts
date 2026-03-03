@@ -197,6 +197,18 @@ function buildSystemPrompt(session: any, datasets: any[]): string {
     "- NEVER use getDistinctValues on numeric/number fields — it is only meaningful for categorical or text fields (e.g. status, category, country). For numeric fields, use countDistinctValues, getMinMax, getPercentile, or aggregate instead.",
     "- When calling getDistinctValues, always provide a reasonable limit (e.g. 50) to avoid returning too many values for high-cardinality fields.",
     "- Use countDistinctValues first to check how many distinct values a field has before calling getDistinctValues, especially for fields with potentially high cardinality.",
+    "",
+  );
+
+  // Result size management rules
+  parts.push(
+    "## CRITICAL: Result Size Management",
+    "- Aggregation tools (aggregate, sumField, avgField, countAndGroup) enforce a hard cap of 200 grouped rows per call. Results include `totalGroups` count and `truncated` boolean.",
+    "- When grouping by high-cardinality fields (many distinct values), ALWAYS use `limit` and `orderBy` to get the most relevant subset (e.g. top 20 by sum).",
+    "- Before grouping by a field, use `countDistinctValues` to check cardinality. If the field has more than 50 distinct values, provide a small limit (e.g. 10-50) and sort by the most relevant metric.",
+    "- For aggregate tool: use `orderBy` with `{ field, direction }` to sort results by an aggregated field (e.g. sort by sum descending to get top contributors).",
+    "- If the response says `truncated: true`, inform the user that results were limited and offer to drill down further (e.g. with filters or a different groupBy).",
+    "- NEVER request all grouped results for high-cardinality fields — this wastes context and slows down analysis. Instead, ask targeted questions: 'top 10 by revenue', 'bottom 5 by count', etc.",
   );
 
   // Dataset context

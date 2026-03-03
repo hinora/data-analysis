@@ -9,19 +9,29 @@ import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
 
+const MAX_GROUP_ROWS = 200;
+
 export interface CountAndGroupParams {
   datasetId: string;
   fields: string[];
+  limit?: number;
 }
 
 export default defineAction<CountAndGroupParams, unknown>({
   params: {
     datasetId: { type: "uuid" },
     fields: { type: "array", items: "string", min: 1 },
+    limit: {
+      type: "number",
+      optional: true,
+      integer: true,
+      min: 1,
+      max: MAX_GROUP_ROWS,
+    },
   },
 
   async handler(ctx: TypedContext<CountAndGroupParams>) {
-    const { datasetId, fields } = ctx.params;
+    const { datasetId, fields, limit } = ctx.params;
     await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
@@ -30,7 +40,7 @@ export default defineAction<CountAndGroupParams, unknown>({
 
     const groupParts = fields.map((f) => `r.data->>'${f}'`);
 
-    const results = await repo
+    const allResults = await repo
       .createQueryBuilder("r")
       .select(selectParts)
       .where("r.datasetId = :datasetId", { datasetId })
@@ -38,6 +48,13 @@ export default defineAction<CountAndGroupParams, unknown>({
       .orderBy(`"count"`, "DESC")
       .getRawMany();
 
-    return { results, totalGroups: results.length };
+    const effectiveLimit = Math.min(limit ?? MAX_GROUP_ROWS, MAX_GROUP_ROWS);
+    const totalGroups = allResults.length;
+    const truncated = totalGroups > effectiveLimit;
+    const results = truncated
+      ? allResults.slice(0, effectiveLimit)
+      : allResults;
+
+    return { results, totalGroups, truncated };
   },
 });

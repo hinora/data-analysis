@@ -26,7 +26,12 @@ export const defaultConfig: AppConfig = {
 
   // ============ Networking ============
   /** Transporter configuration (NATS, Redis, MQTT, etc.) */
-  transporter: process.env.TRANSPORTER || "TCP",
+  transporter: process.env.TRANSPORTER || {
+    type: "TCP",
+    options: {
+      maxPacketSize: 10 * 1024 * 1024, // 10 MB
+    },
+  },
 
   /** Request timeout in ms (0 = disabled) */
   requestTimeout: Number(process.env.REQUEST_TIMEOUT) || 10000,

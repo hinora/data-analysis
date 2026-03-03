@@ -134,11 +134,12 @@ The system prompt explicitly groups datasets by type and tells the AI:
 
 | Tool                | Action                     | Description                                        |
 |---------------------|----------------------------|----------------------------------------------------|
-| `aggregate`         | `tools.aggregate`          | Multi-field aggregation pipeline                   |
-| `avgField`          | `tools.avgField`           | Average a numeric field with optional groupBy      |
+| `aggregate`         | `tools.aggregate`          | Multi-field aggregation pipeline (limit/orderBy support, max 200 rows) |
+| `avgField`          | `tools.avgField`           | Average a numeric field with optional groupBy (max 200 grouped rows) |
 | `correlateFields`   | `tools.correlateFields`    | Pearson correlation between two numeric fields     |
 | `count`             | `tools.count`              | Count records with optional filters                |
-| `countAndGroup`     | `tools.countAndGroup`      | Count records grouped by field(s)                  |
+| `countAndGroup`     | `tools.countAndGroup`      | Count records grouped by field(s) (max 200 groups) |
+| `countDistinctValues` | `tools.countDistinctValues` | Count how many distinct values exist for a field |
 | `detectOutliers`    | `tools.detectOutliers`     | Identify records beyond 2 standard deviations      |
 | `filterByCondition` | `tools.filterByCondition`  | Filter by conditions (equals, range, contains, in) |
 | `getDistinctValues` | `tools.getDistinctValues`  | Get distinct values with counts                    |
@@ -148,7 +149,27 @@ The system prompt explicitly groups datasets by type and tells the AI:
 | `joinDatasets`      | `tools.joinDatasets`       | Join two datasets on a shared field                |
 | `pivotTable`        | `tools.pivotTable`         | Cross-tabulation by two categorical fields         |
 | `sortByField`       | `tools.sortByField`        | Sort records by field(s) with limit                |
-| `sumField`          | `tools.sumField`           | Sum a numeric field with optional groupBy          |
+| `sumField`          | `tools.sumField`           | Sum a numeric field with optional groupBy (max 200 grouped rows) |
+
+### Result Size Limits for Grouping Tools
+
+Aggregation tools that produce grouped results enforce a **hard cap of 200 rows** to prevent overwhelming the AI context window. This applies to:
+
+- **`aggregate`** — supports `limit` (default 200) and `orderBy: { field, direction }` for sorting
+- **`sumField`** — supports `limit` (default 200) when `groupBy` is used; sorted by total DESC
+- **`avgField`** — supports `limit` (default 200) when `groupBy` is used; sorted by average DESC
+- **`countAndGroup`** — supports `limit` (default 200); sorted by count DESC
+
+All return `{ results, totalGroups, truncated }` metadata so the AI can inform the user when results are partial.
+
+```mermaid
+flowchart TD
+    A[AI calls aggregate with groupBy] --> B{totalGroups > limit?}
+    B -->|Yes| C[Return top N rows + truncated: true]
+    B -->|No| D[Return all rows + truncated: false]
+    C --> E[AI tells user: results limited, offer drill-down]
+    D --> F[AI presents complete results]
+```
 
 #### Unstructured Text Tools (for `unstructured-text` datasets only)
 

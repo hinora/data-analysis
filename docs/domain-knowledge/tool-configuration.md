@@ -66,6 +66,13 @@ countDistinctValues, detectOutliers, filterByCondition, getDistinctValues,
 getMinMax, getPercentile, getTopByField, joinDatasets, pivotTable,
 sortByField, sumField
 
+> **Note:** The `count` tool supports both simple key-value equality filters
+> (`filters`) and rich condition-based filtering (`conditions`) with operators:
+> `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains` (case-insensitive
+> substring match), and `in` (value in list). This allows the AI to count
+> records matching complex criteria (e.g. names containing a keyword) without
+> needing to fall back to `filterByCondition` + manual counting.
+
 ### Unstructured Text Tools (`unstructured`)
 
 Operate on `unstructured-text` datasets (PDF, TXT, DOCX via vector embeddings):
