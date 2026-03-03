@@ -862,16 +862,16 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
       function: {
         name: "summarizeDocument",
         description:
-          "[UNSTRUCTURED TEXT ONLY] Generate an AI summary of an unstructured-text dataset. Do NOT use on structured-table datasets.",
+          "[UNSTRUCTURED TEXT ONLY] Generate an AI summary of an unstructured-text dataset using map-reduce. Handles documents of any size by splitting into batches, summarizing each, then merging. Do NOT use on structured-table datasets.",
         parameters: {
           type: "object",
           properties: {
-            datasetId: { type: "string", description: "Dataset UUID" },
-            maxChunks: {
+            concurrency: {
               type: "number",
               description:
-                "Maximum number of text chunks to include (default: 20, max: 50)",
+                "How many AI calls run in parallel (default: 1 = sequential, max: 10). Increase for faster summarization of large documents when the AI backend supports concurrent requests.",
             },
+            datasetId: { type: "string", description: "Dataset UUID" },
           },
           required: ["datasetId"],
         },

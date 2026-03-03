@@ -112,6 +112,7 @@ export class OllamaAdapter implements AIAdapter {
         model,
         options: {
           temperature: params.temperature ?? 0.7,
+          num_ctx: this.numCtx,
         },
       });
     });

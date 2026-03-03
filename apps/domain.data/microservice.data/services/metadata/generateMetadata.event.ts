@@ -157,7 +157,7 @@ async function generateStructuredMetadata(
   // Get sample rows (first 20) for the AI to analyse
   const sampleRows = await recordRepo.find({
     where: { datasetId: dataset.id },
-    take: 20,
+    take: 10,
   });
 
   const columnMappings = dataset.columnMappings || [];
@@ -262,7 +262,7 @@ async function generateUnstructuredMetadata(
   const combinedText = chunks.map((c) => c.content).join("\n\n");
   const wordCount = combinedText.split(/\s+/).filter(Boolean).length;
 
-  const prompt = `Analyse this unstructured text document and generate metadata.
+  const prompt = `Analyse this unstructured text document and generate metadata. The language should be english.
 
 Document: "${dataset.name}"
 Chunks: ${chunks.length} (of ${dataset.rowCount} total)
@@ -324,8 +324,8 @@ Respond with a JSON object (no markdown, no code blocks) with exactly this struc
 
 /**
  * Generate vector embeddings for all text chunks in an unstructured dataset.
- * Processes chunks in batches to avoid overwhelming the AI adapter.
- * Stores embeddings as JSON string arrays in the TextChunk.embedding column.
+ * Uses paginated DB queries to limit memory usage, then processes each page
+ * in embedding batches. Stores embeddings as JSON string arrays in TextChunk.embedding.
  */
 async function generateTextChunkEmbeddings(
   dataset: Dataset,
@@ -335,60 +335,100 @@ async function generateTextChunkEmbeddings(
 ) {
   const chunkRepo = dataSource.getRepository(TextChunk);
 
-  const chunks = await chunkRepo.find({
+  // Count total chunks first to drive pagination
+  const totalChunks = await chunkRepo.count({
     where: { datasetId: dataset.id },
-    order: { orderIndex: "ASC" },
   });
 
-  if (chunks.length === 0) return;
+  if (totalChunks === 0) {
+    ctx.broker.logger.info(
+      `No text chunks found for dataset ${dataset.id}, skipping embedding generation`,
+    );
+    return;
+  }
 
-  const BATCH_SIZE = 20;
+  const PAGE_SIZE = 100;
+  const EMBEDDING_BATCH_SIZE = 20;
   let totalDurationMs = 0;
   let embeddedCount = 0;
+  let globalBatchIndex = 0;
 
-  for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-    const batch = chunks.slice(i, i + BATCH_SIZE);
-    const texts = batch.map((c) => c.content);
+  ctx.broker.logger.info(
+    `Starting embedding generation for dataset ${dataset.id}: ${totalChunks} total chunks (page size: ${PAGE_SIZE})`,
+  );
 
-    const startTime = Date.now();
-    const result = await ai.generateEmbeddings({ input: texts });
-    const latencyMs = Date.now() - startTime;
-    totalDurationMs += latencyMs;
+  for (let page = 0; page * PAGE_SIZE < totalChunks; page++) {
+    const skip = page * PAGE_SIZE;
 
-    // Update each chunk with its embedding
-    for (let j = 0; j < batch.length; j++) {
-      const embedding = result.embeddings[j];
-      if (embedding) {
-        await chunkRepo.update(batch[j].id, {
-          embedding: JSON.stringify(embedding),
-        });
-        embeddedCount++;
+    ctx.broker.logger.info(
+      `Loading chunk page ${page + 1} (chunks ${skip + 1}–${Math.min(skip + PAGE_SIZE, totalChunks)} of ${totalChunks}) for dataset ${dataset.id}`,
+    );
+
+    const chunks = await chunkRepo.find({
+      where: { datasetId: dataset.id },
+      order: { orderIndex: "ASC" },
+      skip,
+      take: PAGE_SIZE,
+    });
+
+    // Process each page in embedding batches
+    for (let i = 0; i < chunks.length; i += EMBEDDING_BATCH_SIZE) {
+      const batch = chunks.slice(i, i + EMBEDDING_BATCH_SIZE);
+      const texts = batch.map((c) => c.content);
+      globalBatchIndex++;
+
+      const chunkStartIndex = skip + i + 1;
+      const chunkEndIndex = skip + i + batch.length;
+
+      ctx.broker.logger.info(
+        `Processing embedding batch ${globalBatchIndex} — chunks ${chunkStartIndex}–${chunkEndIndex} of ${totalChunks} (dataset ${dataset.id})`,
+      );
+
+      const startTime = Date.now();
+      const result = await ai.generateEmbeddings({ input: texts });
+      const latencyMs = Date.now() - startTime;
+      totalDurationMs += latencyMs;
+
+      // Update each chunk with its embedding
+      for (let j = 0; j < batch.length; j++) {
+        const embedding = result.embeddings[j];
+        if (embedding) {
+          await chunkRepo.update(batch[j].id, {
+            embedding: JSON.stringify(embedding),
+          });
+          embeddedCount++;
+        }
       }
+
+      ctx.broker.logger.info(
+        `Embedding batch ${globalBatchIndex} complete — ${result.embeddings.length} embeddings generated in ${latencyMs}ms (dataset ${dataset.id})`,
+      );
+
+      // Log each batch
+      await aiLogRepo.save(
+        aiLogRepo.create({
+          type: AILogType.METADATA,
+          sessionId: dataset.sessionId,
+          datasetId: dataset.id,
+          purpose: AILogPurpose.EMBEDDING_GENERATION,
+          promptSent: `Embedding batch ${globalBatchIndex}: chunks ${chunkStartIndex}–${chunkEndIndex} (${texts.length} chunks)`,
+          responseReceived: `Generated ${result.embeddings.length} embeddings (${result.dimensions}d)`,
+          model: result.model,
+          provider: process.env.AI_PROVIDER || "ollama",
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+          latencyMs,
+          status: AILogStatus.SUCCESS,
+        }),
+      );
     }
 
-    // Log each batch
-    await aiLogRepo.save(
-      aiLogRepo.create({
-        type: AILogType.METADATA,
-        sessionId: dataset.sessionId,
-        datasetId: dataset.id,
-        purpose: AILogPurpose.EMBEDDING_GENERATION,
-        promptSent: `Embedding batch ${Math.floor(i / BATCH_SIZE) + 1}: ${texts.length} chunks`,
-        responseReceived: `Generated ${result.embeddings.length} embeddings (${result.dimensions}d)`,
-        model: result.model,
-        provider: process.env.AI_PROVIDER || "ollama",
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-        latencyMs,
-        status: AILogStatus.SUCCESS,
-      }),
-    );
+    // Allow GC to reclaim the page before loading the next one
   }
 
   ctx.broker.logger.info(
-    `Generated embeddings for ${embeddedCount}/${chunks.length} text chunks ` +
-      `in dataset ${dataset.id} (${totalDurationMs}ms)`,
+    `Embedding generation complete for dataset ${dataset.id}: ${embeddedCount}/${totalChunks} chunks embedded in ${totalDurationMs}ms`,
   );
 }
 

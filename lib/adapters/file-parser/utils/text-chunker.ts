@@ -1,18 +1,30 @@
 /**
  * Text Chunker
  *
- * Recursive character splitter for creating text chunks suitable for
- * vector embeddings. Targets ~800 chars per chunk with 200-char overlap.
+ * Uses LangChain's RecursiveCharacterTextSplitter for creating text chunks
+ * suitable for vector embeddings. This ensures chunks split at natural
+ * boundaries (paragraphs → sentences → words) without cutting mid-sentence.
  *
- * Separator priority: paragraph → newline → sentence → word
+ * Includes text normalization to join soft-wrapped lines from PDF extraction
+ * so that single newlines within paragraphs don't cause mid-sentence splits.
+ *
+ * Separator priority: paragraph → sentence-ending punctuation → comma → word
  */
 
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import type { ParsedTextChunk } from "../types";
 
 /** Default chunk configuration */
 const DEFAULT_CHUNK_SIZE = 800;
 const DEFAULT_OVERLAP = 200;
-const SEPARATORS = ["\n\n", "\n", ". ", " "];
+
+/**
+ * Separators tuned for natural language documents.
+ * Note: single `\n` is intentionally omitted — PDF text often has
+ * soft line-wraps mid-sentence. We normalize those to spaces before splitting.
+ * Only `\n\n` (paragraph breaks) and sentence punctuation are used.
+ */
+const SEPARATORS = ["\n\n", ". ", ".\n", "? ", "! ", "; ", ", ", " ", ""];
 
 export interface ChunkOptions {
   /** Target chunk size in characters (default: 800) */
@@ -26,159 +38,135 @@ export interface ChunkOptions {
 }
 
 /**
- * Split text into chunks using recursive character splitting
+ * Normalize text extracted from PDFs by joining soft-wrapped lines.
+ *
+ * PDF extractors insert `\n` at the column boundary of the original layout,
+ * producing line breaks mid-sentence. This function joins those continuation
+ * lines while preserving real paragraph breaks (`\n\n`), section headers,
+ * and list items.
+ *
+ * Preserved as separate lines:
+ * - Blank lines / paragraph breaks (`\n\n`)
+ * - Lines that end with sentence-ending punctuation (`.`, `!`, `?`)
+ * - Lines that end with `:` (headers / labels)
+ * - Short lines (≤50 chars — likely headings or metadata)
+ * - Lines followed by bullets, numbered lists, or ALL-CAPS headings
+ * - Page markers like `-- 1 of 3 --`
+ *
+ * Everything else is joined with a space (soft-wrap continuation).
+ */
+export function normalizeExtractedText(text: string): string {
+  // Normalize page markers like "-- 1 of 3 --" into paragraph breaks
+  const cleaned = text.replace(/\n*--\s*\d+\s*of\s*\d+\s*--\n*/g, "\n\n");
+
+  // Split into paragraphs (separated by blank lines), then process each
+  const paragraphs = cleaned.split(/\n{2,}/);
+  const processedParagraphs: string[] = [];
+
+  for (const paragraph of paragraphs) {
+    const trimmed = paragraph.trim();
+    if (trimmed.length === 0) continue;
+
+    const lines = trimmed.split("\n");
+    if (lines.length <= 1) {
+      processedParagraphs.push(trimmed);
+      continue;
+    }
+
+    const joinedLines: string[] = [lines[0].trim()];
+
+    for (let i = 1; i < lines.length; i++) {
+      const prevLine = joinedLines[joinedLines.length - 1];
+      const currentLine = lines[i].trim();
+      if (currentLine.length === 0) continue;
+
+      const shouldKeepBreak = isNaturalBreak(prevLine, currentLine);
+
+      if (shouldKeepBreak) {
+        joinedLines.push(currentLine);
+      } else {
+        // Join continuation line with previous
+        joinedLines[joinedLines.length - 1] = `${prevLine} ${currentLine}`;
+      }
+    }
+
+    processedParagraphs.push(joinedLines.join("\n"));
+  }
+
+  return processedParagraphs.join("\n\n").trim();
+}
+
+/**
+ * Determine if the break between two lines is a natural (intentional) break
+ * that should be preserved, vs. a soft-wrap that should be joined.
+ */
+function isNaturalBreak(prevLine: string, nextLine: string): boolean {
+  const trimmedPrev = prevLine.trimEnd();
+  const trimmedNext = nextLine.trimStart();
+
+  // Previous line ends with sentence-ending punctuation → natural break
+  if (/[.!?]$/.test(trimmedPrev)) return true;
+
+  // Previous line ends with colon (header/label pattern)
+  if (trimmedPrev.endsWith(":")) return true;
+
+  // Previous line is short (likely a heading or metadata)
+  if (trimmedPrev.length <= 50) return true;
+
+  // Next line starts with a bullet, dash, or numbered list
+  if (/^[-•*►]/.test(trimmedNext)) return true;
+  if (/^\d+[.)]\s/.test(trimmedNext)) return true;
+
+  // Next line starts with ALL-CAPS word (section heading)
+  if (/^[A-Z]{2,}\b/.test(trimmedNext)) return true;
+
+  // Next line is a label (e.g., "Role:", "Team size:", "Responsibilities:")
+  if (/^[A-Za-z\s]+:/.test(trimmedNext) && trimmedNext.indexOf(":") < 30)
+    return true;
+
+  // Next line starts with a URL
+  if (/^https?:\/\//.test(trimmedNext)) return true;
+
+  // Otherwise it's a soft-wrap continuation → join
+  return false;
+}
+
+/**
+ * Split text into chunks using LangChain's RecursiveCharacterTextSplitter.
+ *
+ * 1. Normalizes the text to join soft-wrapped lines from PDF extraction.
+ * 2. Splits using sentence-aware separators so chunks end at natural
+ *    boundaries instead of cutting mid-sentence.
  *
  * @param text - The text to split
  * @param options - Chunk configuration options
  * @returns Array of text chunks with metadata
  */
-export function chunkText(
+export async function chunkText(
   text: string,
   options: ChunkOptions = {},
-): ParsedTextChunk[] {
+): Promise<ParsedTextChunk[]> {
   const chunkSize = options.chunkSize ?? DEFAULT_CHUNK_SIZE;
   const overlap = options.overlap ?? DEFAULT_OVERLAP;
   const startIndex = options.startIndex ?? 0;
 
   if (!text || text.trim().length === 0) return [];
 
-  const rawChunks = recursiveSplit(text, chunkSize, overlap, SEPARATORS);
-  return rawChunks.map((content, idx) => ({
-    content,
-    orderIndex: startIndex + idx,
-    sourcePage: options.sourcePage,
-  }));
-}
+  const normalizedText = normalizeExtractedText(text);
 
-/**
- * Recursively split text using separator priority
- */
-function recursiveSplit(
-  text: string,
-  chunkSize: number,
-  overlap: number,
-  separators: string[],
-): string[] {
-  if (text.length <= chunkSize) {
-    return [text.trim()].filter((t) => t.length > 0);
-  }
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkOverlap: overlap,
+    chunkSize,
+    separators: SEPARATORS,
+  });
 
-  // Try each separator in priority order
-  for (const sep of separators) {
-    const parts = text.split(sep);
-    if (parts.length <= 1) continue;
+  const rawChunks = await splitter.splitText(normalizedText);
 
-    return mergeChunks(parts, sep, chunkSize, overlap);
-  }
-
-  // Fallback: hard split at chunkSize
-  return hardSplit(text, chunkSize, overlap);
-}
-
-/**
- * Merge split parts back into chunks of target size
- */
-function mergeChunks(
-  parts: string[],
-  separator: string,
-  chunkSize: number,
-  overlap: number,
-): string[] {
-  const chunks: string[] = [];
-  let currentChunk = "";
-
-  for (const part of parts) {
-    const candidate = currentChunk
-      ? `${currentChunk}${separator}${part}`
-      : part;
-
-    if (candidate.length <= chunkSize) {
-      currentChunk = candidate;
-    } else {
-      if (currentChunk.trim()) {
-        chunks.push(currentChunk.trim());
-      }
-      // Start new chunk with overlap from previous, snapping to word boundary
-      if (overlap > 0 && currentChunk.length > 0) {
-        const overlapText = snapToWordBoundary(currentChunk, overlap);
-        currentChunk = `${overlapText}${separator}${part}`;
-      } else {
-        currentChunk = part;
-      }
-
-      // If single part exceeds chunk size, force-add it
-      if (currentChunk.length > chunkSize * 2) {
-        const forced = hardSplit(currentChunk, chunkSize, overlap);
-        chunks.push(...forced.slice(0, -1));
-        currentChunk = forced[forced.length - 1] || "";
-      }
-    }
-  }
-
-  if (currentChunk.trim()) {
-    chunks.push(currentChunk.trim());
-  }
-
-  return chunks.filter((c) => c.length > 0);
-}
-
-/**
- * Hard split text at word boundary when no separator works.
- * Finds the nearest space before the chunk boundary to avoid splitting mid-word.
- */
-function hardSplit(text: string, chunkSize: number, overlap: number): string[] {
-  const chunks: string[] = [];
-  let start = 0;
-
-  while (start < text.length) {
-    let end = Math.min(start + chunkSize, text.length);
-
-    // If we're not at the end, find the last space to avoid splitting mid-word
-    if (end < text.length) {
-      const lastSpace = text.lastIndexOf(" ", end);
-      if (lastSpace > start) {
-        end = lastSpace;
-      }
-    }
-
-    const chunk = text.slice(start, end).trim();
-    if (chunk.length > 0) {
-      chunks.push(chunk);
-    }
-
-    // Compute overlap start, snapping to a word boundary
-    const overlapStart = end - overlap;
-    if (overlapStart <= start) {
-      start = end;
-    } else {
-      const spaceAfterOverlap = text.indexOf(" ", overlapStart);
-      start =
-        spaceAfterOverlap > overlapStart && spaceAfterOverlap < end
-          ? spaceAfterOverlap + 1
-          : overlapStart;
-    }
-
-    if (start >= text.length) break;
-    // Prevent infinite loop
-    if (end === text.length) break;
-  }
-
-  return chunks;
-}
-
-/**
- * Extract overlap text from the end of a string, snapping to a word boundary.
- * Takes approximately `overlap` characters from the end without splitting a word.
- */
-function snapToWordBoundary(text: string, overlap: number): string {
-  if (text.length <= overlap) return text;
-
-  const cutPoint = text.length - overlap;
-  // Find the next space after the cut point so we start on a whole word
-  const spaceIndex = text.indexOf(" ", cutPoint);
-  if (spaceIndex !== -1 && spaceIndex < text.length) {
-    return text.slice(spaceIndex + 1);
-  }
-  // No space found — just take the tail (single long word edge case)
-  return text.slice(cutPoint);
+  return rawChunks
+    .map((content, idx) => ({
+      content: content.trim(),
+      orderIndex: startIndex + idx,
+      sourcePage: options.sourcePage,
+    }))
+    .filter((chunk) => chunk.content.length > 0);
 }

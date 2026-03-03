@@ -93,7 +93,7 @@ export class PdfParser implements FileParserAdapter {
     }
 
     // Create unstructured text dataset from the full text
-    const textChunks = chunkText(pdfText, {
+    const textChunks = await chunkText(pdfText, {
       chunkSize: 800,
       overlap: 200,
     });

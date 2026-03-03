@@ -277,17 +277,27 @@ export default defineAction<UploadFileParams, UploadFileResult>({
         parsedDataset.textChunks &&
         parsedDataset.textChunks.length > 0
       ) {
-        const chunks = parsedDataset.textChunks.map((chunk, index) =>
-          textChunkRepo.create({
-            datasetId: savedDataset.id,
-            sessionId,
-            content: chunk.content,
-            sourcePage: chunk.sourcePage || null,
-            sourceSection: chunk.sourceSection || null,
-            orderIndex: index,
-          }),
-        );
-        await textChunkRepo.save(chunks);
+        // Bulk insert in batches of 500 to avoid exceeding PostgreSQL's
+        // parameter limit (large PDFs can produce thousands of chunks)
+        const chunkBatchSize = 500;
+        for (
+          let i = 0;
+          i < parsedDataset.textChunks.length;
+          i += chunkBatchSize
+        ) {
+          const batch = parsedDataset.textChunks.slice(i, i + chunkBatchSize);
+          const records = batch.map((chunk, batchIndex) =>
+            textChunkRepo.create({
+              datasetId: savedDataset.id,
+              sessionId,
+              content: chunk.content,
+              sourcePage: chunk.sourcePage || null,
+              sourceSection: chunk.sourceSection || null,
+              orderIndex: i + batchIndex,
+            }),
+          );
+          await textChunkRepo.save(records);
+        }
       }
 
       createdDatasets.push({
