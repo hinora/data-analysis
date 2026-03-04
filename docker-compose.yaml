@@ -1,0 +1,20 @@
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:1.65.0
+    container_name: jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      # Jaeger UI
+      - "16686:16686"
+      # Jaeger Thrift compact (used by jaeger-client UDP)
+      - "6831:6831/udp"
+      # Jaeger Thrift binary
+      - "6832:6832/udp"
+      # Jaeger Thrift HTTP
+      - "14268:14268"
+      # OTLP gRPC
+      - "4317:4317"
+      # OTLP HTTP
+      - "4318:4318"
+    restart: unless-stopped

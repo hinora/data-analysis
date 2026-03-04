@@ -13,7 +13,9 @@
     "generate:types:all": "ts-node lib/codegen/generate-all.ts",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "jaeger:start": "docker compose up -d jaeger",
+    "jaeger:stop": "docker compose down jaeger"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -22,6 +24,7 @@
     "agenda": "^5.0.0",
     "axios": "^1.9.0",
     "dotenv": "^17.2.3",
+    "jaeger-client": "^3.19.0",
     "lodash": "^4.17.23",
     "moleculer": "^0.14.35",
     "moleculer-repl": "^0.7.4",

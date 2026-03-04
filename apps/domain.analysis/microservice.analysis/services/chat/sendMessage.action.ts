@@ -248,6 +248,19 @@ export default defineAction<SendMessageParams, SendMessageResult>({
         // No tool calls — this is the final response
         finalContent = response.content || "";
 
+        // If content is empty, the model may have only produced <think> tokens.
+        // Retry once by nudging the model to produce a visible answer.
+        if (!finalContent && iteration < MAX_TOOL_ITERATIONS) {
+          ctx.broker.logger.warn(
+            `AI returned empty content on iteration ${iteration}, retrying...`,
+          );
+          messages.push({
+            role: "user",
+            content: "Please provide your final analysis.",
+          });
+          continue;
+        }
+
         // Try to extract confidence score from the response
         const confidenceMatch = finalContent.match(
           /confidence[:\s]*([0-9]*\.?[0-9]+)/i,

@@ -99,10 +99,24 @@ export const defaultConfig: AppConfig = {
     enabled: process.env.METRICS_ENABLED === "true",
   },
 
-  /** Enable tracing */
+  /** Enable tracing (Jaeger by default) */
   tracing: {
-    enabled: process.env.TRACING_ENABLED === "true",
-    exporter: "Console",
+    enabled: true,
+    exporter: {
+      type: "Jaeger",
+      options: {
+        endpoint:
+          process.env.JAEGER_ENDPOINT || "http://localhost:14268/api/traces",
+        host: process.env.JAEGER_HOST || "127.0.0.1",
+        port: Number(process.env.JAEGER_PORT) || 6832,
+        sampler: {
+          type: "Const",
+          options: {},
+        },
+        tracerOptions: {},
+        defaultTags: null,
+      },
+    },
     events: true,
     stackTrace: true,
   },
@@ -126,7 +140,23 @@ export const developmentConfig: Partial<AppConfig> = {
   metrics: true,
   tracing: {
     enabled: true,
-    exporter: "Console",
+    exporter: {
+      type: "Jaeger",
+      options: {
+        endpoint:
+          process.env.JAEGER_ENDPOINT || "http://localhost:14268/api/traces",
+        host: process.env.JAEGER_HOST || "127.0.0.1",
+        port: Number(process.env.JAEGER_PORT) || 6832,
+        sampler: {
+          type: "Const",
+          options: {},
+        },
+        tracerOptions: {},
+        defaultTags: null,
+      },
+    },
+    events: true,
+    stackTrace: true,
   },
 };
 
@@ -138,7 +168,26 @@ export const stagingConfig: Partial<AppConfig> = {
   logLevel: "info",
   hotReload: false,
   metrics: true,
-  tracing: true,
+  tracing: {
+    enabled: true,
+    exporter: {
+      type: "Jaeger",
+      options: {
+        endpoint:
+          process.env.JAEGER_ENDPOINT || "http://localhost:14268/api/traces",
+        host: process.env.JAEGER_HOST || "127.0.0.1",
+        port: Number(process.env.JAEGER_PORT) || 6832,
+        sampler: {
+          type: "Const",
+          options: {},
+        },
+        tracerOptions: {},
+        defaultTags: null,
+      },
+    },
+    events: true,
+    stackTrace: true,
+  },
 };
 
 /**
@@ -149,7 +198,26 @@ export const productionConfig: Partial<AppConfig> = {
   logLevel: "warn",
   hotReload: false,
   metrics: true,
-  tracing: true,
+  tracing: {
+    enabled: true,
+    exporter: {
+      type: "Jaeger",
+      options: {
+        endpoint:
+          process.env.JAEGER_ENDPOINT || "http://localhost:14268/api/traces",
+        host: process.env.JAEGER_HOST || "127.0.0.1",
+        port: Number(process.env.JAEGER_PORT) || 6832,
+        sampler: {
+          type: "Const",
+          options: {},
+        },
+        tracerOptions: {},
+        defaultTags: null,
+      },
+    },
+    events: true,
+    stackTrace: true,
+  },
   requestTimeout: 30000,
   retryPolicy: {
     enabled: true,

@@ -235,6 +235,22 @@ messages.push({
 
 **Why this matters:** If tool results are sent as `role: "assistant"` without the original tool-call request, the model loses context about what it asked for and returns empty responses.
 
+### Empty Content Retry
+
+Reasoning models (e.g., Qwen3) may occasionally spend all completion tokens on `<think>` reasoning without producing any visible content. After `stripThinkTags()` removes the reasoning block, the response content is empty — even though the model consumed tokens.
+
+When the orchestration loop receives a response with **no tool calls and no content**, it retries once by appending a nudge message:
+
+```typescript
+if (!finalContent && iteration < MAX_TOOL_ITERATIONS) {
+  messages.push({ role: "user", content: "Please provide your final analysis." });
+  continue;
+}
+```
+
+This gives the model a second chance to produce a user-facing answer. If the retry also returns empty, the fallback message fires:
+> "I was unable to generate a response. Please try rephrasing your question."
+
 ### Think Tag Stripping
 
 Reasoning models like Qwen3 wrap internal chain-of-thought in `<think>...</think>` tags. The Ollama adapter (`lib/adapters/ai/ollama.adapter.ts`) automatically strips these tags from all responses (`chatWithTools`, `generateText`) using `stripThinkTags()` so they never leak into user-facing content.
