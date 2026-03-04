@@ -70,17 +70,29 @@ async function runWithConcurrency<T>(req: {
 async function summarizeBatch(req: {
   ai: AIAdapter;
   batchIndex: number;
+  ctx: TypedContext<SummarizeDocumentParams>;
   text: string;
   totalBatches: number;
 }): Promise<string> {
-  const { ai, batchIndex, text, totalBatches } = req;
+  const { ai, batchIndex, ctx, text, totalBatches } = req;
+  const logger = ctx.broker.logger;
 
   const batchContext =
     totalBatches > 1 ? ` (Part ${batchIndex + 1} of ${totalBatches})` : "";
 
+  const truncatedLength = Math.min(text.length, MAX_CHARS_PER_BATCH);
+  logger.debug(
+    `[summarizeDocument] summarizeBatch ${batchIndex + 1}/${totalBatches} — input: ${text.length} chars, truncated to: ${truncatedLength} chars`,
+  );
+
+  const start = Date.now();
   const result = await ai.generateText({
     prompt: `Provide a comprehensive summary of the following document content${batchContext}. Include key points, main themes, and important details.\n\n${text.slice(0, MAX_CHARS_PER_BATCH)}`,
   });
+
+  logger.debug(
+    `[summarizeDocument] summarizeBatch ${batchIndex + 1}/${totalBatches} — completed in ${Date.now() - start}ms, output: ${result.content.length} chars`,
+  );
 
   return result.content;
 }
@@ -92,11 +104,20 @@ async function summarizeBatch(req: {
 async function reduceSummaries(req: {
   ai: AIAdapter;
   concurrency: number;
+  ctx: TypedContext<SummarizeDocumentParams>;
   summaries: string[];
 }): Promise<string> {
-  const { ai, concurrency, summaries } = req;
+  const { ai, concurrency, ctx, summaries } = req;
+  const logger = ctx.broker.logger;
+
+  logger.debug(
+    `[summarizeDocument] reduceSummaries — ${summaries.length} summaries to reduce, concurrency: ${concurrency}`,
+  );
 
   if (summaries.length === 1) {
+    logger.debug(
+      "[summarizeDocument] reduceSummaries — single summary, returning as-is",
+    );
     return summaries[0];
   }
 
@@ -104,10 +125,18 @@ async function reduceSummaries(req: {
     .map((s, i) => `--- Part ${i + 1} ---\n${s}`)
     .join("\n\n");
 
+  logger.debug(
+    `[summarizeDocument] reduceSummaries — combined length: ${combined.length} chars (limit: ${MAX_CHARS_PER_BATCH})`,
+  );
+
   if (combined.length <= MAX_CHARS_PER_BATCH) {
+    const start = Date.now();
     const result = await ai.generateText({
       prompt: `The following are summaries of different parts of a document. Combine them into a single comprehensive summary that captures all key points, main themes, and important details. Remove redundancy and create a cohesive narrative.\n\n${combined}`,
     });
+    logger.debug(
+      `[summarizeDocument] reduceSummaries — final reduce completed in ${Date.now() - start}ms, output: ${result.content.length} chars`,
+    );
     return result.content;
   }
 
@@ -117,6 +146,10 @@ async function reduceSummaries(req: {
     size: BATCH_SIZE,
   });
 
+  logger.info(
+    `[summarizeDocument] reduceSummaries — combined too long, splitting into ${summaryBatches.length} sub-batches for recursive reduce`,
+  );
+
   const tasks = summaryBatches.map((batch, index) => () => {
     const batchText = batch
       .map((s, i) => `--- Part ${i + 1} ---\n${s}`)
@@ -124,13 +157,22 @@ async function reduceSummaries(req: {
     return summarizeBatch({
       ai,
       batchIndex: index,
+      ctx,
       text: batchText,
       totalBatches: summaryBatches.length,
     });
   });
 
   const reducedSummaries = await runWithConcurrency({ concurrency, tasks });
-  return reduceSummaries({ ai, concurrency, summaries: reducedSummaries });
+  logger.debug(
+    `[summarizeDocument] reduceSummaries — recursive reduce: ${summaries.length} → ${reducedSummaries.length} summaries`,
+  );
+  return reduceSummaries({
+    ai,
+    concurrency,
+    ctx,
+    summaries: reducedSummaries,
+  });
 }
 
 export default defineAction<SummarizeDocumentParams, unknown>({
@@ -148,7 +190,16 @@ export default defineAction<SummarizeDocumentParams, unknown>({
 
   async handler(ctx: TypedContext<SummarizeDocumentParams>) {
     const { concurrency = 1, datasetId } = ctx.params;
+    const handlerStart = Date.now();
+    const logger = ctx.broker.logger;
+
+    logger.info(
+      `[summarizeDocument] START — datasetId: ${datasetId}, concurrency: ${concurrency}`,
+    );
+
     await ctx.call("dataset.getDataset", { id: datasetId });
+    logger.debug("[summarizeDocument] dataset validated");
+
     const chunkRepo = dataSource.getRepository(TextChunk);
 
     const chunks = await chunkRepo.find({
@@ -156,7 +207,14 @@ export default defineAction<SummarizeDocumentParams, unknown>({
       order: { orderIndex: "ASC" },
     });
 
+    logger.info(
+      `[summarizeDocument] loaded ${chunks.length} chunks from database`,
+    );
+
     if (chunks.length === 0) {
+      logger.warn(
+        "[summarizeDocument] no chunks found — returning empty summary",
+      );
       return { chunks: 0, summary: "No text content found for this dataset." };
     }
 
@@ -165,12 +223,21 @@ export default defineAction<SummarizeDocumentParams, unknown>({
     // Single-batch fast path: no map-reduce needed
     if (chunks.length <= BATCH_SIZE) {
       const combinedText = chunks.map((c) => c.content).join("\n\n");
+      logger.info(
+        `[summarizeDocument] single-batch fast path — ${chunks.length} chunks, ${combinedText.length} chars`,
+      );
+
       const summary = await summarizeBatch({
         ai,
         batchIndex: 0,
+        ctx,
         text: combinedText,
         totalBatches: 1,
       });
+
+      logger.info(
+        `[summarizeDocument] DONE (single-batch) — ${Date.now() - handlerStart}ms total`,
+      );
 
       return {
         batchesUsed: 1,
@@ -183,29 +250,53 @@ export default defineAction<SummarizeDocumentParams, unknown>({
     // Map phase: split chunks into batches, summarize each
     const chunkBatches = splitIntoBatches({ items: chunks, size: BATCH_SIZE });
 
+    logger.info(
+      `[summarizeDocument] map phase — ${chunkBatches.length} batches (batch size: ${BATCH_SIZE}), concurrency: ${concurrency}`,
+    );
+
     const mapTasks = chunkBatches.map((batch, index) => () => {
       const batchText = batch.map((c) => c.content).join("\n\n");
+      logger.debug(
+        `[summarizeDocument] map batch ${index + 1}/${chunkBatches.length} — ${batch.length} chunks, ${batchText.length} chars`,
+      );
       return summarizeBatch({
         ai,
         batchIndex: index,
+        ctx,
         text: batchText,
         totalBatches: chunkBatches.length,
       });
     });
 
+    const mapStart = Date.now();
     const batchSummaries = await runWithConcurrency({
       concurrency,
       tasks: mapTasks,
     });
 
+    logger.info(
+      `[summarizeDocument] map phase complete — ${batchSummaries.length} summaries in ${Date.now() - mapStart}ms`,
+    );
+
     // Reduce phase: combine batch summaries into final summary
+    logger.info("[summarizeDocument] reduce phase — combining batch summaries");
+    const reduceStart = Date.now();
     const summary = await reduceSummaries({
       ai,
       concurrency,
+      ctx,
       summaries: batchSummaries,
     });
 
+    logger.info(
+      `[summarizeDocument] reduce phase complete — ${Date.now() - reduceStart}ms`,
+    );
+
     const totalLength = chunks.reduce((acc, c) => acc + c.content.length, 0);
+
+    logger.info(
+      `[summarizeDocument] DONE — ${chunks.length} chunks, ${chunkBatches.length} batches, ${totalLength} chars total, ${Date.now() - handlerStart}ms elapsed`,
+    );
 
     return {
       batchesUsed: chunkBatches.length,
