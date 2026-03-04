@@ -27,6 +27,15 @@ import {
   type UnstructuredMetadata,
 } from "../../db/dataset.entity";
 import { TextChunk } from "../../db/text-chunk.entity";
+import {
+  extractMetadataBatch,
+  MAX_CHARS_PER_BATCH,
+  mergePartialMetadata,
+  type PartialUnstructuredMetadata,
+  reduceTextSummaries,
+  runWithConcurrency,
+  splitIntoBatchesByChars,
+} from "../../lib/map-reduce";
 
 export interface DatasetEntry {
   datasetId: string;
@@ -248,77 +257,167 @@ async function generateUnstructuredMetadata(
   dataset: Dataset,
   ai: ReturnType<typeof createAIAdapter>,
   aiLogRepo: Repository<AILog>,
-  _ctx: TypedContext<GenerateMetadataPayload>,
+  ctx: TypedContext<GenerateMetadataPayload>,
 ) {
   const chunkRepo = dataSource.getRepository(TextChunk);
+  const logger = ctx.broker.logger;
 
-  // Get all chunks (or first 50 for very large documents)
-  const chunks = await chunkRepo.find({
+  // Count total chunks and compute word count via paginated scan
+  const totalChunks = await chunkRepo.count({
     where: { datasetId: dataset.id },
-    order: { orderIndex: "ASC" },
-    take: 50,
   });
 
-  const combinedText = chunks.map((c) => c.content).join("\n\n");
-  const wordCount = combinedText.split(/\s+/).filter(Boolean).length;
+  if (totalChunks === 0) {
+    logger.info(
+      `[generateUnstructuredMetadata] No chunks found for dataset ${dataset.id}`,
+    );
+    await dataSource.getRepository(Dataset).update(dataset.id, {
+      unstructuredMetadata: {
+        chunkCount: 0,
+        contentDomain: "unknown",
+        documentSummary: "No text content found.",
+        entities: [],
+        keyTopics: [],
+        wordCount: 0,
+      },
+    });
+    return;
+  }
 
-  const prompt = `Analyse this unstructured text document and generate metadata. The language should be english.
+  const PAGE_SIZE = 100;
+  let wordCount = 0;
+  const allChunkTexts: string[] = [];
 
-Document: "${dataset.name}"
-Chunks: ${chunks.length} (of ${dataset.rowCount} total)
-Text excerpt (first ~3000 chars):
-${combinedText.slice(0, 3000)}
+  // Paginated scan: collect all chunk texts and count words
+  for (let page = 0; page * PAGE_SIZE < totalChunks; page++) {
+    const chunks = await chunkRepo.find({
+      where: { datasetId: dataset.id },
+      order: { orderIndex: "ASC" },
+      skip: page * PAGE_SIZE,
+      take: PAGE_SIZE,
+    });
+    for (const chunk of chunks) {
+      allChunkTexts.push(chunk.content);
+      wordCount += chunk.content.split(/\s+/).filter(Boolean).length;
+    }
+  }
 
-Respond with a JSON object (no markdown, no code blocks) with exactly this structure:
-{
-  "documentSummary": "A concise summary of the document",
-  "keyTopics": ["topic1", "topic2", "topic3"],
-  "contentDomain": "e.g. financial, legal, scientific, general",
-  "entities": [
-    {"name": "Entity Name", "type": "person|organisation|location|date|monetary", "count": 1}
-  ],
-  "wordCount": ${wordCount},
-  "chunkCount": ${chunks.length}
-}`;
+  logger.info(
+    `[generateUnstructuredMetadata] dataset ${dataset.id}: ${totalChunks} chunks, ${wordCount} words`,
+  );
 
-  const startTime = Date.now();
-  const response = await ai.generateJSON({ prompt });
-  const latencyMs = Date.now() - startTime;
+  const overallStartTime = Date.now();
 
-  const metadata: Record<string, unknown> =
-    response.data && typeof response.data === "object"
-      ? (response.data as Record<string, unknown>)
-      : {
-          documentSummary: response.rawResponse,
-          keyTopics: [],
-          contentDomain: "unknown",
-          entities: [],
-          wordCount,
-          chunkCount: chunks.length,
-        };
+  // --- Map phase: extract partial metadata from each batch ---
+  const textBatches = splitIntoBatchesByChars({
+    getLength: (t) => t.length,
+    items: allChunkTexts,
+    maxChars: MAX_CHARS_PER_BATCH,
+  });
+
+  logger.info(
+    `[generateUnstructuredMetadata] map phase — ${textBatches.length} batches (max ${MAX_CHARS_PER_BATCH} chars/batch)`,
+  );
+
+  const mapTasks = textBatches.map(
+    (batch, index) => (): Promise<PartialUnstructuredMetadata> => {
+      const batchText = batch.join("\n\n");
+      return extractMetadataBatch({
+        ai,
+        batchIndex: index,
+        logger,
+        text: batchText,
+        totalBatches: textBatches.length,
+      });
+    },
+  );
+
+  const partialResults = await runWithConcurrency({
+    concurrency: 1,
+    tasks: mapTasks,
+  });
+
+  // Log map phase AI interactions
+  for (let i = 0; i < partialResults.length; i++) {
+    await aiLogRepo.save(
+      aiLogRepo.create({
+        type: AILogType.METADATA,
+        sessionId: dataset.sessionId,
+        datasetId: dataset.id,
+        purpose: AILogPurpose.UNSTRUCTURED_METADATA,
+        promptSent: `Metadata extraction batch ${i + 1}/${partialResults.length}`,
+        responseReceived: JSON.stringify(partialResults[i]),
+        model:
+          ai.getConfig?.()?.defaultModel ||
+          process.env.OLLAMA_MODEL ||
+          "unknown",
+        provider: process.env.AI_PROVIDER || "ollama",
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        latencyMs: 0,
+        status: AILogStatus.SUCCESS,
+      }),
+    );
+  }
+
+  // --- Reduce phase: merge partial metadata ---
+  const merged = mergePartialMetadata(partialResults);
+
+  // Reduce the merged summaries into a single cohesive summary
+  const batchSummaries = partialResults
+    .map((p) => p.documentSummary)
+    .filter(Boolean);
+
+  let finalSummary: string;
+  if (batchSummaries.length <= 1) {
+    finalSummary = batchSummaries[0] || "";
+  } else {
+    finalSummary = await reduceTextSummaries({
+      ai,
+      concurrency: 1,
+      logger,
+      summaries: batchSummaries,
+    });
+  }
+
+  const latencyMs = Date.now() - overallStartTime;
+
+  const metadata: UnstructuredMetadata = {
+    chunkCount: totalChunks,
+    contentDomain: merged.contentDomain,
+    documentSummary: finalSummary,
+    entities: merged.entities,
+    keyTopics: merged.keyTopics,
+    wordCount,
+  };
 
   await dataSource.getRepository(Dataset).update(dataset.id, {
-    unstructuredMetadata: metadata as unknown as UnstructuredMetadata,
+    unstructuredMetadata: metadata,
   });
 
-  // Log AI interaction
+  // Log final reduce result
   await aiLogRepo.save(
     aiLogRepo.create({
       type: AILogType.METADATA,
       sessionId: dataset.sessionId,
       datasetId: dataset.id,
       purpose: AILogPurpose.UNSTRUCTURED_METADATA,
-      promptSent: prompt,
-      responseReceived: response.rawResponse,
+      promptSent: `Map-reduce metadata generation: ${textBatches.length} batches, ${totalChunks} chunks`,
+      responseReceived: JSON.stringify(metadata),
       model:
         ai.getConfig?.()?.defaultModel || process.env.OLLAMA_MODEL || "unknown",
       provider: process.env.AI_PROVIDER || "ollama",
-      promptTokens: response.promptTokens || 0,
-      completionTokens: response.completionTokens || 0,
-      totalTokens: response.totalTokens || 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
       latencyMs,
       status: AILogStatus.SUCCESS,
     }),
+  );
+
+  logger.info(
+    `[generateUnstructuredMetadata] complete for dataset ${dataset.id}: ${totalChunks} chunks, ${textBatches.length} batches, ${latencyMs}ms`,
   );
 }
 

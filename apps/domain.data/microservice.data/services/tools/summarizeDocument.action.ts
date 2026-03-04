@@ -8,194 +8,22 @@
  */
 
 import type { TypedContext } from "core.lib/__generated__";
-import type { AIAdapter } from "core.lib/adapters/ai";
 import { createAIAdapter } from "core.lib/adapters/ai";
 import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { TextChunk } from "../../db/text-chunk.entity";
-
-const MAX_CHARS_PER_BATCH = 12000;
+import {
+  MAX_CHARS_PER_BATCH,
+  reduceTextSummaries,
+  runWithConcurrency,
+  splitIntoBatchesByChars,
+  summarizeTextBatch,
+} from "../../lib/map-reduce";
 
 export interface SummarizeDocumentParams {
   /** How many AI calls can run in parallel (1 = sequential) */
   concurrency?: number;
   datasetId: string;
-}
-
-/**
- * Split items into batches where each batch's total character length
- * does not exceed the given limit.
- */
-function splitIntoBatchesByChars<T>(req: {
-  getLength: (item: T) => number;
-  items: T[];
-  maxChars: number;
-}): T[][] {
-  const { getLength, items, maxChars } = req;
-  const batches: T[][] = [];
-  let currentBatch: T[] = [];
-  let currentLength = 0;
-
-  for (const item of items) {
-    const itemLength = getLength(item);
-
-    if (currentBatch.length > 0 && currentLength + itemLength > maxChars) {
-      batches.push(currentBatch);
-      currentBatch = [item];
-      currentLength = itemLength;
-    } else {
-      currentBatch.push(item);
-      currentLength += itemLength;
-    }
-  }
-
-  if (currentBatch.length > 0) {
-    batches.push(currentBatch);
-  }
-
-  return batches;
-}
-
-/**
- * Run async tasks with a concurrency limit.
- * When concurrency is 1, tasks run sequentially.
- * When concurrency >= tasks.length, all run in parallel.
- */
-async function runWithConcurrency<T>(req: {
-  concurrency: number;
-  tasks: (() => Promise<T>)[];
-}): Promise<T[]> {
-  const { concurrency, tasks } = req;
-
-  if (concurrency >= tasks.length) {
-    return Promise.all(tasks.map((task) => task()));
-  }
-
-  const results: T[] = new Array(tasks.length);
-  let nextIndex = 0;
-
-  async function worker(): Promise<void> {
-    while (nextIndex < tasks.length) {
-      const index = nextIndex++;
-      results[index] = await tasks[index]();
-    }
-  }
-
-  const workers = Array.from({ length: concurrency }, () => worker());
-  await Promise.all(workers);
-  return results;
-}
-
-/**
- * Summarize a single batch of text content.
- */
-async function summarizeBatch(req: {
-  ai: AIAdapter;
-  batchIndex: number;
-  ctx: TypedContext<SummarizeDocumentParams>;
-  text: string;
-  totalBatches: number;
-}): Promise<string> {
-  const { ai, batchIndex, ctx, text, totalBatches } = req;
-  const logger = ctx.broker.logger;
-
-  const batchContext =
-    totalBatches > 1 ? ` (Part ${batchIndex + 1} of ${totalBatches})` : "";
-
-  const truncatedLength = Math.min(text.length, MAX_CHARS_PER_BATCH);
-  logger.info(
-    `[summarizeDocument] summarizeBatch ${batchIndex + 1}/${totalBatches} — input: ${text.length} chars, truncated to: ${truncatedLength} chars`,
-  );
-
-  const start = Date.now();
-  const result = await ai.generateText({
-    prompt: `Provide a comprehensive summary of the following document content${batchContext}. Include key points, main themes, and important details.\n\n${text.slice(0, MAX_CHARS_PER_BATCH)}`,
-  });
-
-  logger.info(
-    `[summarizeDocument] summarizeBatch ${batchIndex + 1}/${totalBatches} — completed in ${Date.now() - start}ms, output: ${result.content.length} chars`,
-  );
-
-  return result.content;
-}
-
-/**
- * Reduce multiple summaries into a single cohesive summary.
- * Applies recursively if intermediate summaries are still too numerous.
- */
-async function reduceSummaries(req: {
-  ai: AIAdapter;
-  concurrency: number;
-  ctx: TypedContext<SummarizeDocumentParams>;
-  summaries: string[];
-}): Promise<string> {
-  const { ai, concurrency, ctx, summaries } = req;
-  const logger = ctx.broker.logger;
-
-  logger.info(
-    `[summarizeDocument] reduceSummaries — ${summaries.length} summaries to reduce, concurrency: ${concurrency}`,
-  );
-
-  if (summaries.length === 1) {
-    logger.info(
-      "[summarizeDocument] reduceSummaries — single summary, returning as-is",
-    );
-    return summaries[0];
-  }
-
-  const combined = summaries
-    .map((s, i) => `--- Part ${i + 1} ---\n${s}`)
-    .join("\n\n");
-
-  logger.info(
-    `[summarizeDocument] reduceSummaries — combined length: ${combined.length} chars (limit: ${MAX_CHARS_PER_BATCH})`,
-  );
-
-  if (combined.length <= MAX_CHARS_PER_BATCH) {
-    const start = Date.now();
-    const result = await ai.generateText({
-      prompt: `The following are summaries of different parts of a document. Combine them into a single comprehensive summary that captures all key points, main themes, and important details. Remove redundancy and create a cohesive narrative.\n\n${combined}`,
-    });
-    logger.info(
-      `[summarizeDocument] reduceSummaries — final reduce completed in ${Date.now() - start}ms, output: ${result.content.length} chars`,
-    );
-    return result.content;
-  }
-
-  // Summaries themselves are too long — batch and recursively reduce
-  const summaryBatches = splitIntoBatchesByChars({
-    getLength: (s) => s.length,
-    items: summaries,
-    maxChars: MAX_CHARS_PER_BATCH,
-  });
-
-  logger.info(
-    `[summarizeDocument] reduceSummaries — combined too long, splitting into ${summaryBatches.length} sub-batches for recursive reduce`,
-  );
-
-  const tasks = summaryBatches.map((batch, index) => () => {
-    const batchText = batch
-      .map((s, i) => `--- Part ${i + 1} ---\n${s}`)
-      .join("\n\n");
-    return summarizeBatch({
-      ai,
-      batchIndex: index,
-      ctx,
-      text: batchText,
-      totalBatches: summaryBatches.length,
-    });
-  });
-
-  const reducedSummaries = await runWithConcurrency({ concurrency, tasks });
-  logger.info(
-    `[summarizeDocument] reduceSummaries — recursive reduce: ${summaries.length} → ${reducedSummaries.length} summaries`,
-  );
-  return reduceSummaries({
-    ai,
-    concurrency,
-    ctx,
-    summaries: reducedSummaries,
-  });
 }
 
 export default defineAction<SummarizeDocumentParams, unknown>({
@@ -250,10 +78,10 @@ export default defineAction<SummarizeDocumentParams, unknown>({
         `[summarizeDocument] single-batch fast path — ${chunks.length} chunks, ${combinedText.length} chars`,
       );
 
-      const summary = await summarizeBatch({
+      const summary = await summarizeTextBatch({
         ai,
         batchIndex: 0,
-        ctx,
+        logger,
         text: combinedText,
         totalBatches: 1,
       });
@@ -286,10 +114,10 @@ export default defineAction<SummarizeDocumentParams, unknown>({
       logger.info(
         `[summarizeDocument] map batch ${index + 1}/${chunkBatches.length} — ${batch.length} chunks, ${batchText.length} chars`,
       );
-      return summarizeBatch({
+      return summarizeTextBatch({
         ai,
         batchIndex: index,
-        ctx,
+        logger,
         text: batchText,
         totalBatches: chunkBatches.length,
       });
@@ -308,10 +136,10 @@ export default defineAction<SummarizeDocumentParams, unknown>({
     // Reduce phase: combine batch summaries into final summary
     logger.info("[summarizeDocument] reduce phase — combining batch summaries");
     const reduceStart = Date.now();
-    const summary = await reduceSummaries({
+    const summary = await reduceTextSummaries({
       ai,
       concurrency,
-      ctx,
+      logger,
       summaries: batchSummaries,
     });
 
