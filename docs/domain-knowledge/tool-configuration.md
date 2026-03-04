@@ -3,7 +3,7 @@
 The AI tool-calling system uses a centralised, configurable registry so that
 individual tools can be enabled or disabled in one place. Both the **tool
 definitions** (sent to the LLM during the orchestration loop) and the
-**system prompt** (generated when a conversation is created) derive their
+**system prompt** (generated dynamically before each chat message) derive their
 tool lists from the same configuration.
 
 ## Architecture
@@ -16,7 +16,7 @@ graph TD
     B -->|getEnabledToolNamesByCategory| E[structured / unstructured lists]
     C --> F[sendMessage.action.ts — orchestration loop]
     D --> F
-    E --> G[createConversation.action.ts — system prompt]
+    E --> G[services/chat/buildDynamicSystemPrompt.action.ts — dynamic system prompt]
 ```
 
 ## Key File
@@ -50,10 +50,10 @@ toolEnabledConfig.pivotTable = false;
 const TOOL_TO_ACTION = getEnabledToolActions(toolEnabledConfig);
 ```
 
-The same pattern applies in `createConversation.action.ts` for the system
-prompt. Because both files call `getDefaultToolEnabledConfig()` and apply
-overrides, they stay in sync automatically when the overrides are shared or
-centralised.
+The same pattern applies in `services/chat/buildDynamicSystemPrompt.action.ts`
+for the dynamic system prompt. Because both files call
+`getDefaultToolEnabledConfig()` and apply overrides, they stay in sync
+automatically when the overrides are shared or centralised.
 
 ## Tool Categories
 
@@ -88,3 +88,69 @@ timelineExtraction
    `definition` (OpenAI function-calling schema).
 3. Implement the corresponding action in `microservice.data/services/tools/`.
 4. Run `npm run generate:types:all` then `npm run lint:fix`.
+
+## Large Dataset Handling (compareDocuments)
+
+`tools.compareDocuments` now processes full datasets instead of sampling only a
+small fixed number of chunks.
+
+### Flow
+
+```mermaid
+flowchart TD
+        A[compareDocuments.action] --> B[scanTextChunkPages page scan]
+        B --> C[splitIntoBatchesByChars]
+        C --> D[summarizeTextBatch map phase]
+        D --> E[reduceTextSummaries reduce phase]
+        E --> F[Final cross-document comparison JSON]
+```
+
+### Notes
+
+- Chunk reading is paginated (`DEFAULT_TEXT_CHUNK_PAGE_SIZE = 100`) via
+    `lib/text-chunk-pagination.ts`.
+- Each page is summarized in batches, then all batch summaries are recursively
+    reduced to one summary per dataset.
+- Final comparison runs on the two reduced summaries, so the tool scales to
+    much larger corpora while keeping prompt size bounded.
+- Optional `summaryConcurrency` controls parallel summarization and defaults to
+    `1` for safe, predictable load.
+
+## Large Dataset Handling (other unstructured tools)
+
+The following tools now use the same paginated full-dataset pattern instead of
+fixed chunk sampling:
+
+- `tools.extractEntities`
+- `tools.extractKeyTopics`
+- `tools.timelineExtraction`
+- `tools.sentimentAnalysis`
+
+### Shared processing pattern
+
+```mermaid
+flowchart TD
+        A[Tool action] --> B[scanTextChunkPages]
+        B --> C[splitIntoBatchesByChars]
+        C --> D[AI extraction per batch]
+        D --> E[Merge or reduce final result]
+```
+
+### Tool-specific behavior
+
+- `extractEntities`: merges entities across all batches using
+    `type + normalized name`, aggregates counts, keeps strongest context.
+- `extractKeyTopics`: merges topic candidates across all batches and performs a
+    final consolidation pass to return top `maxTopics`.
+- `timelineExtraction`: extracts events per batch, de-duplicates candidates,
+    then performs a final chronological consolidation pass.
+- `sentimentAnalysis`:
+    - `granularity=document`: analyzes all text batches and aggregates score,
+        themes, and tones.
+    - `granularity=chunk`: analyzes every chunk (paginated) and returns per-chunk
+        sentiment plus corpus-level aggregate score.
+
+### Concurrency controls
+
+Each of these actions now accepts optional `concurrency` (default `1`, min `1`,
+max `10`) to tune throughput vs. AI provider load.

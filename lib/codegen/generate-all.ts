@@ -121,7 +121,7 @@ function main() {
     console.log(`   - ${ms.name}`);
   });
 
-  console.log(`\n  =`.repeat(50));
+  console.log(`\n${"=".repeat(50)}`);
   console.log("Generating action types...");
   console.log("=".repeat(50));
 
@@ -137,7 +137,7 @@ function main() {
   }
 
   // Generate global types
-  console.log(`\n  =`.repeat(50));
+  console.log(`\n${"=".repeat(50)}`);
   console.log("Generating global types...");
   console.log("=".repeat(50));
 
@@ -154,7 +154,7 @@ function main() {
     console.error("❌ Failed to generate global types");
   }
 
-  console.log(`\n  =`.repeat(50));
+  console.log(`\n${"=".repeat(50)}`);
   console.log(`✅ Success: ${successCount}`);
   if (failCount > 0) {
     console.log(`❌ Failed: ${failCount}`);

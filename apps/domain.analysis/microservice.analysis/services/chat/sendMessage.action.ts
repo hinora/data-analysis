@@ -72,6 +72,11 @@ export default defineAction<SendMessageParams, SendMessageResult>({
     }
 
     const sessionId = conversation.sessionId;
+    const { systemPrompt } = await ctx.call("chat.buildDynamicSystemPrompt", {
+      sessionId,
+    });
+
+    await convRepo.update({ id: conversationId }, { systemPrompt });
 
     // Save user message
     const userMessage = msgRepo.create({
@@ -88,11 +93,19 @@ export default defineAction<SendMessageParams, SendMessageResult>({
       order: { createdAt: "ASC" },
     });
 
-    // Build message array for AI
-    const messages: AIMessageWithTools[] = history.map((m) => ({
-      role: m.role as "system" | "user" | "assistant",
-      content: m.content,
-    }));
+    // Build message array for AI with dynamically generated system prompt
+    const messages: AIMessageWithTools[] = [
+      {
+        role: "system",
+        content: systemPrompt,
+      },
+      ...history
+        .filter((message) => message.role !== MessageRole.SYSTEM)
+        .map((message) => ({
+          role: message.role as "user" | "assistant",
+          content: message.content,
+        })),
+    ];
 
     // Build tool definitions (filtered by enabled config)
     const tools = getEnabledToolDefinitions(toolEnabledConfig);

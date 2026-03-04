@@ -28,7 +28,7 @@ erDiagram
 
 | Role        | Description                                                    |
 |-------------|----------------------------------------------------------------|
-| `system`    | System prompt, created when conversation is initialized        |
+| `system`    | Runtime system prompt injected in memory before each AI call   |
 | `user`      | User's question or instruction                                 |
 | `assistant` | AI response with optional confidence, citations, tools, reasoning |
 
@@ -70,17 +70,31 @@ Core chat action that orchestrates AI tool-calling in a loop.
 
 **Returns:** Full assistant message: `{ id, conversationId, role, content, confidenceScore, citedSources, toolsUsed, reasoningSteps, createdAt }`
 
+### Internal Action: buildDynamicSystemPrompt
+
+`chat.buildDynamicSystemPrompt` is an internal action (no REST endpoint) that builds the latest system prompt from session datasets.
+
+**Params:**
+- `sessionId` (uuid, required)
+
+**Returns:** `{ systemPrompt: string }`
+
 ## AI Tool-Calling Orchestration
 
 ```mermaid
 sequenceDiagram
     participant Client
     participant ChatSvc as chat service
+    participant DatasetSvc as dataset service (cross-service)
     participant AI as AI Adapter (Ollama/Gemini)
     participant Tools as tools.* actions (data microservice)
     participant DB as Database
 
     Client->>ChatSvc: POST /chat/messages { conversationId, content }
+    ChatSvc->>DatasetSvc: ctx.call("dataset.listDatasets", { sessionId })
+    DatasetSvc-->>ChatSvc: datasets[]
+    ChatSvc->>ChatSvc: Build dynamic system prompt
+    ChatSvc->>DB: Update conversation.systemPrompt snapshot
     ChatSvc->>DB: Save user message
     ChatSvc->>DB: Load conversation history
     

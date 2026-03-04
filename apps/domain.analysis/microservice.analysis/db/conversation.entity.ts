@@ -1,8 +1,8 @@
 /**
  * Conversation TypeORM Entity
  *
- * A single chat thread within a session. The system prompt is
- * constructed at creation time from session state and never updated.
+ * A single chat thread within a session. The system prompt is refreshed
+ * by chat.sendMessage before each AI request.
  */
 
 import {

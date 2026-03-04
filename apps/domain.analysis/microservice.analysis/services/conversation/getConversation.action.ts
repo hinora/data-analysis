@@ -8,7 +8,6 @@ import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
-import { ChatMessage, MessageRole } from "../../db/chat-message.entity";
 import { Conversation } from "../../db/conversation.entity";
 
 export interface GetConversationParams {
@@ -25,7 +24,6 @@ export default defineAction<GetConversationParams, unknown>({
   async handler(ctx: TypedContext<GetConversationParams>) {
     const { id } = ctx.params;
     const convRepo = dataSource.getRepository(Conversation);
-    const msgRepo = dataSource.getRepository(ChatMessage);
 
     const conversation = await convRepo.findOneBy({ id });
     if (!conversation) {
@@ -37,15 +35,15 @@ export default defineAction<GetConversationParams, unknown>({
       );
     }
 
-    // Get system prompt from first message
-    const systemMessage = await msgRepo.findOne({
-      where: { conversationId: id, role: MessageRole.SYSTEM },
-      order: { createdAt: "ASC" },
+    const { systemPrompt } = await ctx.call("chat.buildDynamicSystemPrompt", {
+      sessionId: conversation.sessionId,
     });
+
+    await convRepo.update({ id }, { systemPrompt });
 
     return {
       ...conversation,
-      systemPrompt: systemMessage?.content || conversation.systemPrompt,
+      systemPrompt,
     };
   },
 });

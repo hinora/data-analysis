@@ -2,7 +2,7 @@
 
 ## Overview
 
-A **Conversation** is a single chat thread within a session. When created, a system prompt is automatically constructed from the session's datasets (schemas, column mappings, AI metadata, tool definitions) and stored as the first `ChatMessage`.
+A **Conversation** is a single chat thread within a session. The system prompt is generated dynamically by the chat flow (`chat.sendMessage`) before each AI call so prompt logic can evolve without recreating conversations.
 
 ## Data Model
 
@@ -23,8 +23,8 @@ erDiagram
 ```
 
 - `sessionId` — foreign key to `Session`, cascades on delete
-- `systemPrompt` — constructed at creation time from session state, never updated
-- `messageCount` — denormalized counter, incremented when messages are added
+- `systemPrompt` — latest generated prompt snapshot (refreshed in `chat.sendMessage`)
+- `messageCount` — denormalized counter of persisted chat messages (user + assistant)
 
 ## REST Endpoints
 
@@ -48,15 +48,11 @@ Auto-generates a name like `Conversation — Feb 28, 14:30` when no name is prov
 sequenceDiagram
     participant Client
     participant ConversationSvc as conversation service
-    participant DatasetSvc as dataset service (cross-service)
     participant SessionSvc as session service
 
     Client->>ConversationSvc: POST /conversations { sessionId, name? }
     ConversationSvc->>ConversationSvc: Verify session exists
-    ConversationSvc->>DatasetSvc: ctx.call("dataset.listDatasets", { sessionId })
-    DatasetSvc-->>ConversationSvc: datasets[]
-    ConversationSvc->>ConversationSvc: Build system prompt from datasets
-    ConversationSvc->>ConversationSvc: Save Conversation + system ChatMessage
+    ConversationSvc->>ConversationSvc: Save empty Conversation metadata
     ConversationSvc->>SessionSvc: ctx.call("session.updateSessionStatus", { trigger: "conversation-created" })
     ConversationSvc-->>Client: Conversation object
 ```
@@ -75,7 +71,7 @@ The system prompt includes:
 3. **Dataset context** — for each dataset: name, type, format, row count, column mappings (camelCase, original name, detected type), AI metadata (description, summary, topics)
 4. **Available tools** — structured data tools (aggregate, sum, avg, count, etc.) and unstructured text tools (semantic search, summarize, extract entities, etc.)
 
-Prompt is truncated to ~15,000 characters if too long.
+This prompt is built in `chat.sendMessage` before every message handling cycle (not at `conversation.createConversation` time), so dataset/tool changes are picked up automatically.
 
 ### List Conversations
 
@@ -91,7 +87,7 @@ Returns conversations for a given session, sorted by `createdAt DESC`.
 **Params:**
 - `id` (uuid, required)
 
-**Returns:** Full conversation including `systemPrompt`. Throws `404 CONVERSATION_NOT_FOUND` if not found.
+**Returns:** Full conversation including a freshly generated `systemPrompt` (rebuilt from latest datasets at read time). Throws `404 CONVERSATION_NOT_FOUND` if not found.
 
 ### Delete Conversation
 
