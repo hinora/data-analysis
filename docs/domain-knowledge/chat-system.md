@@ -180,7 +180,7 @@ flowchart TD
 | `extractEntities`    | `tools.extractEntities`      | Extract people, orgs, dates, locations, monetary     |
 | `extractKeyTopics`   | `tools.extractKeyTopics`     | Identify main topics and themes                      |
 | `findSimilarChunks`  | `tools.findSimilarChunks`    | Find semantically similar text passages              |
-| `semanticSearch`     | `tools.semanticSearch`       | Vector similarity search across text chunks (sessionId and/or datasetId) |
+| `semanticSearch`     | `tools.semanticSearch`       | Hybrid search: vector similarity + keyword matching across text chunks |
 | `sentimentAnalysis`  | `tools.sentimentAnalysis`    | Determine sentiment of text passages                 |
 | `summarizeDocument`  | `tools.summarizeDocument`    | Generate a summary of a text dataset                 |
 | `timelineExtraction` | `tools.timelineExtraction`   | Extract and order date-referenced events             |
