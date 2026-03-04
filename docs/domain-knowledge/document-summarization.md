@@ -2,23 +2,23 @@
 
 ## Overview
 
-The `tools.summarizeDocument` action generates an AI summary of a text dataset. It uses a **map-reduce** strategy to handle documents of any size, removing the previous 20-chunk limitation.
+The `tools.summarizeDocument` action generates an AI summary of a text dataset. It uses a **map-reduce** strategy to handle documents of any size. Batching is **character-aware** — batches are formed by accumulating items until the total character count would exceed `MAX_CHARS_PER_BATCH` (12,000), ensuring no content is truncated.
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    A[All TextChunks for dataset] --> B{chunks <= 20?}
+    A[All TextChunks for dataset] --> B{"combined text ≤ 12k chars?"}
     B -- Yes --> C[Single AI call]
-    B -- No --> D[Split into batches of 20]
+    B -- No --> D["Split into batches by char limit (≤ 12k chars each)"]
     D --> E1[Batch 1 → AI summary]
     D --> E2[Batch 2 → AI summary]
     D --> EN[Batch N → AI summary]
-    E1 --> F{Combined summaries fit in context?}
+    E1 --> F{Combined summaries fit in 12k chars?}
     E2 --> F
     EN --> F
     F -- Yes --> G[Final reduce: merge into one summary]
-    F -- No --> H[Recursive reduce: batch summaries again]
+    F -- No --> H["Recursive reduce: re-batch summaries by char limit"]
     H --> F
     G --> I[Return final summary]
     C --> I
@@ -41,19 +41,23 @@ The `concurrency` parameter controls how many AI calls execute simultaneously du
 
 ## Algorithm
 
+### Character-Aware Batching
+
+Both the map and reduce phases use `splitIntoBatchesByChars` instead of a fixed count. The function accumulates items into a batch until adding the next item would exceed `MAX_CHARS_PER_BATCH`. This guarantees each batch stays within the AI context limit and eliminates content truncation.
+
 ### Map Phase
 1. Fetch **all** `TextChunk` records for the dataset (no limit), ordered by `orderIndex`
-2. Split chunks into batches of 20
-3. For each batch, concatenate chunk content and send to `ai.generateText()` (capped at 12,000 characters per batch)
+2. Split chunks into batches by character length (each batch ≤ 12,000 chars of content)
+3. For each batch, concatenate chunk content and send to `ai.generateText()`
 4. Run batches respecting the `concurrency` limit
 
 ### Reduce Phase
 1. Collect all batch summaries
 2. If combined summaries fit within 12,000 characters, make a single final AI call to merge them
-3. If not, recursively batch the summaries and reduce again until a single summary remains
+3. If not, split summaries into character-aware sub-batches and recursively reduce until a single summary remains
 
 ### Fast Path
-If the document has ≤ 20 chunks, a single AI call is made directly — no map-reduce overhead.
+If the total combined text of all chunks is ≤ 12,000 characters, a single AI call is made directly — no map-reduce overhead.
 
 ## Response
 
@@ -70,5 +74,4 @@ If the document has ≤ 20 chunks, a single AI call is made directly — no map-
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
-| `BATCH_SIZE` | 20 | Chunks per map batch |
-| `MAX_CHARS_PER_BATCH` | 12000 | Character limit sent to AI per call |
+| `MAX_CHARS_PER_BATCH` | 12000 | Character limit per batch (map and reduce) |

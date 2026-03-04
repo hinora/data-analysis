@@ -14,7 +14,6 @@ import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { TextChunk } from "../../db/text-chunk.entity";
 
-const BATCH_SIZE = 20;
 const MAX_CHARS_PER_BATCH = 12000;
 
 export interface SummarizeDocumentParams {
@@ -24,13 +23,36 @@ export interface SummarizeDocumentParams {
 }
 
 /**
- * Split an array into batches of a given size.
+ * Split items into batches where each batch's total character length
+ * does not exceed the given limit.
  */
-function splitIntoBatches<T>(req: { items: T[]; size: number }): T[][] {
+function splitIntoBatchesByChars<T>(req: {
+  getLength: (item: T) => number;
+  items: T[];
+  maxChars: number;
+}): T[][] {
+  const { getLength, items, maxChars } = req;
   const batches: T[][] = [];
-  for (let i = 0; i < req.items.length; i += req.size) {
-    batches.push(req.items.slice(i, i + req.size));
+  let currentBatch: T[] = [];
+  let currentLength = 0;
+
+  for (const item of items) {
+    const itemLength = getLength(item);
+
+    if (currentBatch.length > 0 && currentLength + itemLength > maxChars) {
+      batches.push(currentBatch);
+      currentBatch = [item];
+      currentLength = itemLength;
+    } else {
+      currentBatch.push(item);
+      currentLength += itemLength;
+    }
   }
+
+  if (currentBatch.length > 0) {
+    batches.push(currentBatch);
+  }
+
   return batches;
 }
 
@@ -81,7 +103,7 @@ async function summarizeBatch(req: {
     totalBatches > 1 ? ` (Part ${batchIndex + 1} of ${totalBatches})` : "";
 
   const truncatedLength = Math.min(text.length, MAX_CHARS_PER_BATCH);
-  logger.debug(
+  logger.info(
     `[summarizeDocument] summarizeBatch ${batchIndex + 1}/${totalBatches} — input: ${text.length} chars, truncated to: ${truncatedLength} chars`,
   );
 
@@ -90,7 +112,7 @@ async function summarizeBatch(req: {
     prompt: `Provide a comprehensive summary of the following document content${batchContext}. Include key points, main themes, and important details.\n\n${text.slice(0, MAX_CHARS_PER_BATCH)}`,
   });
 
-  logger.debug(
+  logger.info(
     `[summarizeDocument] summarizeBatch ${batchIndex + 1}/${totalBatches} — completed in ${Date.now() - start}ms, output: ${result.content.length} chars`,
   );
 
@@ -110,12 +132,12 @@ async function reduceSummaries(req: {
   const { ai, concurrency, ctx, summaries } = req;
   const logger = ctx.broker.logger;
 
-  logger.debug(
+  logger.info(
     `[summarizeDocument] reduceSummaries — ${summaries.length} summaries to reduce, concurrency: ${concurrency}`,
   );
 
   if (summaries.length === 1) {
-    logger.debug(
+    logger.info(
       "[summarizeDocument] reduceSummaries — single summary, returning as-is",
     );
     return summaries[0];
@@ -125,7 +147,7 @@ async function reduceSummaries(req: {
     .map((s, i) => `--- Part ${i + 1} ---\n${s}`)
     .join("\n\n");
 
-  logger.debug(
+  logger.info(
     `[summarizeDocument] reduceSummaries — combined length: ${combined.length} chars (limit: ${MAX_CHARS_PER_BATCH})`,
   );
 
@@ -134,16 +156,17 @@ async function reduceSummaries(req: {
     const result = await ai.generateText({
       prompt: `The following are summaries of different parts of a document. Combine them into a single comprehensive summary that captures all key points, main themes, and important details. Remove redundancy and create a cohesive narrative.\n\n${combined}`,
     });
-    logger.debug(
+    logger.info(
       `[summarizeDocument] reduceSummaries — final reduce completed in ${Date.now() - start}ms, output: ${result.content.length} chars`,
     );
     return result.content;
   }
 
   // Summaries themselves are too long — batch and recursively reduce
-  const summaryBatches = splitIntoBatches({
+  const summaryBatches = splitIntoBatchesByChars({
+    getLength: (s) => s.length,
     items: summaries,
-    size: BATCH_SIZE,
+    maxChars: MAX_CHARS_PER_BATCH,
   });
 
   logger.info(
@@ -164,7 +187,7 @@ async function reduceSummaries(req: {
   });
 
   const reducedSummaries = await runWithConcurrency({ concurrency, tasks });
-  logger.debug(
+  logger.info(
     `[summarizeDocument] reduceSummaries — recursive reduce: ${summaries.length} → ${reducedSummaries.length} summaries`,
   );
   return reduceSummaries({
@@ -198,7 +221,7 @@ export default defineAction<SummarizeDocumentParams, unknown>({
     );
 
     await ctx.call("dataset.getDataset", { id: datasetId });
-    logger.debug("[summarizeDocument] dataset validated");
+    logger.info("[summarizeDocument] dataset validated");
 
     const chunkRepo = dataSource.getRepository(TextChunk);
 
@@ -221,8 +244,8 @@ export default defineAction<SummarizeDocumentParams, unknown>({
     const ai = createAIAdapter();
 
     // Single-batch fast path: no map-reduce needed
-    if (chunks.length <= BATCH_SIZE) {
-      const combinedText = chunks.map((c) => c.content).join("\n\n");
+    const combinedText = chunks.map((c) => c.content).join("\n\n");
+    if (combinedText.length <= MAX_CHARS_PER_BATCH) {
       logger.info(
         `[summarizeDocument] single-batch fast path — ${chunks.length} chunks, ${combinedText.length} chars`,
       );
@@ -248,15 +271,19 @@ export default defineAction<SummarizeDocumentParams, unknown>({
     }
 
     // Map phase: split chunks into batches, summarize each
-    const chunkBatches = splitIntoBatches({ items: chunks, size: BATCH_SIZE });
+    const chunkBatches = splitIntoBatchesByChars({
+      getLength: (chunk) => chunk.content.length,
+      items: chunks,
+      maxChars: MAX_CHARS_PER_BATCH,
+    });
 
     logger.info(
-      `[summarizeDocument] map phase — ${chunkBatches.length} batches (batch size: ${BATCH_SIZE}), concurrency: ${concurrency}`,
+      `[summarizeDocument] map phase — ${chunkBatches.length} batches (max ${MAX_CHARS_PER_BATCH} chars/batch), concurrency: ${concurrency}`,
     );
 
     const mapTasks = chunkBatches.map((batch, index) => () => {
       const batchText = batch.map((c) => c.content).join("\n\n");
-      logger.debug(
+      logger.info(
         `[summarizeDocument] map batch ${index + 1}/${chunkBatches.length} — ${batch.length} chunks, ${batchText.length} chars`,
       );
       return summarizeBatch({
