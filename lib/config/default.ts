@@ -102,6 +102,9 @@ export const defaultConfig: AppConfig = {
   /** Enable tracing */
   tracing: {
     enabled: process.env.TRACING_ENABLED === "true",
+    exporter: "Console",
+    events: true,
+    stackTrace: true,
   },
 
   // ============ Hot Reload ============
