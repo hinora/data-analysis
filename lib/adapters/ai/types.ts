@@ -254,6 +254,13 @@ export type AIMessageWithToolRole = "assistant" | "system" | "tool" | "user";
  * Message that can include tool calls (from assistant) or tool results
  */
 export interface AIMessageWithTools {
+  /**
+   * Opaque provider-specific parts from the model response.
+   * When present on an assistant message the adapter should replay these
+   * verbatim instead of reconstructing parts from `content` / `toolCalls`.
+   * Used by Gemini to preserve `thoughtSignature` across multi-turn tool calls.
+   */
+  _rawAssistantParts?: unknown[];
   content: string;
   role: AIMessageWithToolRole;
   toolCallId?: string;
@@ -296,6 +303,12 @@ export interface ChatWithToolsResponse {
   model: string;
   /** Prompt tokens used */
   promptTokens: number;
+  /**
+   * Opaque provider-specific parts from the model response.
+   * Should be stored on the assistant message and passed back so the adapter
+   * can replay them verbatim (e.g. Gemini thought signatures).
+   */
+  _rawAssistantParts?: unknown[];
   /** Internal reasoning / chain-of-thought extracted from the model (e.g. <think> tags) */
   reasoning: string | null;
   /** Tool calls requested by the AI (empty if final answer) */

@@ -18,7 +18,7 @@
     "jaeger:stop": "docker compose down jaeger"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^1.44.0",
     "@langchain/core": "^1.1.29",
     "@langchain/textsplitters": "^1.0.1",
     "agenda": "^5.0.0",

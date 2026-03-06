@@ -251,6 +251,7 @@ async function processStream(
       // ── Tool calls ────────────────────────────────────────────────
       if (response.toolCalls && response.toolCalls.length > 0) {
         messages.push({
+          _rawAssistantParts: response._rawAssistantParts,
           content: response.content || "",
           role: "assistant",
           toolCalls: response.toolCalls,

@@ -1,18 +1,14 @@
 /**
  * Gemini AI Adapter
  *
- * Implementation of AIAdapter for Google Gemini API.
- * Default model: gemini-2.0-flash
+ * Implementation of AIAdapter for Google Gemini API using the @google/genai SDK.
+ * Default model: gemini-2.5-flash
+ * Supports reasoning/thinking via thinkingConfig (Gemini 2.5+ models).
  * Per constitution: max 3 retries with exponential backoff on failure.
  */
 
-import {
-  type Content,
-  type FunctionDeclarationSchema,
-  GoogleGenerativeAI,
-  type Part,
-  SchemaType,
-} from "@google/generative-ai";
+import type { Content, Part } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import type {
   AIAdapter,
   AIProviderConfig,
@@ -27,7 +23,7 @@ import type {
   ToolCall,
 } from "./types";
 
-const DEFAULT_MODEL = "gemini-2.0-flash";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-004";
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
@@ -35,27 +31,27 @@ const BASE_DELAY_MS = 1000;
 export interface GeminiAdapterOptions {
   /** API key for Gemini */
   apiKey?: string;
-  /** Default model (default: gemini-2.0-flash) */
+  /** Default model (default: gemini-2.5-flash) */
   model?: string;
 }
 
 /**
- * Map JSON Schema type strings to Gemini SchemaType enum values.
+ * Map JSON Schema type strings to Gemini Type enum values.
  */
-function mapSchemaType(type: string): SchemaType {
-  const typeMap: Record<string, SchemaType> = {
-    array: SchemaType.ARRAY,
-    boolean: SchemaType.BOOLEAN,
-    integer: SchemaType.INTEGER,
-    number: SchemaType.NUMBER,
-    object: SchemaType.OBJECT,
-    string: SchemaType.STRING,
+function mapSchemaType(type: string): Type {
+  const typeMap: Record<string, Type> = {
+    array: Type.ARRAY,
+    boolean: Type.BOOLEAN,
+    integer: Type.INTEGER,
+    number: Type.NUMBER,
+    object: Type.OBJECT,
+    string: Type.STRING,
   };
-  return typeMap[type] || SchemaType.STRING;
+  return typeMap[type] || Type.STRING;
 }
 
 /**
- * Convert a ToolPropertySchema-like structure to Gemini's FunctionDeclarationSchema.
+ * Convert a ToolPropertySchema-like structure to Gemini's Schema format.
  * Recursively transforms nested objects and arrays with `type` as an enum.
  */
 function toGeminiSchema(schema: {
@@ -65,10 +61,10 @@ function toGeminiSchema(schema: {
   properties?: Record<string, unknown>;
   required?: string[];
   type: string;
-}): FunctionDeclarationSchema {
-  const result = {
+}): Record<string, unknown> {
+  const result: Record<string, unknown> = {
     type: mapSchemaType(schema.type),
-  } as Record<string, unknown>;
+  };
 
   if (schema.description) {
     result.description = schema.description;
@@ -83,7 +79,7 @@ function toGeminiSchema(schema: {
   }
 
   if (schema.properties) {
-    const props: Record<string, FunctionDeclarationSchema> = {};
+    const props: Record<string, Record<string, unknown>> = {};
     for (const [key, value] of Object.entries(schema.properties)) {
       if (value && typeof value === "object" && "type" in value) {
         props[key] = toGeminiSchema(
@@ -118,16 +114,17 @@ function toGeminiSchema(schema: {
     );
   }
 
-  return result as unknown as FunctionDeclarationSchema;
+  return result;
 }
 
 /**
  * Gemini AI Adapter
  *
  * Implements the AIAdapter interface for Google Gemini API.
+ * Uses the @google/genai SDK with thinking/reasoning support for Gemini 2.5+ models.
  */
 export class GeminiAdapter implements AIAdapter {
-  private client: GoogleGenerativeAI;
+  private client: GoogleGenAI;
   private config: AIProviderConfig;
 
   constructor(options: GeminiAdapterOptions = {}) {
@@ -140,7 +137,7 @@ export class GeminiAdapter implements AIAdapter {
       );
     }
 
-    this.client = new GoogleGenerativeAI(apiKey);
+    this.client = new GoogleGenAI({ apiKey });
     this.config = {
       apiKey,
       defaultModel: model,
@@ -148,54 +145,211 @@ export class GeminiAdapter implements AIAdapter {
     };
   }
 
-  async generateText(params: GenerateTextParams): Promise<GenerateTextResult> {
+  async chatWithTools(
+    params: ChatWithToolsParams,
+  ): Promise<ChatWithToolsResponse> {
     const startTime = Date.now();
     const model = params.model || this.config.defaultModel;
 
-    // Build contents array
+    // Extract system instruction from messages
+    let systemInstruction: string | undefined;
     const contents: Content[] = [];
 
-    // System prompt is handled via systemInstruction, not as a content entry
-    if (params.messages) {
-      for (const msg of params.messages) {
-        if (msg.role === "system") continue; // Handled separately
+    for (const msg of params.messages) {
+      if (msg.role === "system") {
+        // Accumulate system messages
+        systemInstruction = systemInstruction
+          ? `${systemInstruction}\n\n${msg.content}`
+          : msg.content;
+        continue;
+      }
+
+      if (msg.role === "assistant") {
+        // Prefer raw parts when available — they preserve thoughtSignature
+        // fields required by Gemini for multi-turn tool-calling with thinking.
+        if (msg._rawAssistantParts && Array.isArray(msg._rawAssistantParts)) {
+          contents.push({
+            parts: msg._rawAssistantParts as Part[],
+            role: "model",
+          });
+        } else {
+          const parts: Part[] = [];
+
+          if (msg.content) {
+            parts.push({ text: msg.content });
+          }
+
+          if (msg.toolCalls && msg.toolCalls.length > 0) {
+            for (const tc of msg.toolCalls) {
+              parts.push({
+                functionCall: {
+                  args: tc.function.arguments,
+                  name: tc.function.name,
+                },
+              });
+            }
+          }
+
+          if (parts.length > 0) {
+            contents.push({ parts, role: "model" });
+          }
+        }
+        continue;
+      }
+
+      if (msg.role === "tool") {
+        // Gemini expects functionResponse parts for tool results
         contents.push({
-          parts: [{ text: msg.content }],
-          role: msg.role === "assistant" ? "model" : "user",
+          parts: [
+            {
+              functionResponse: {
+                name: msg.toolName || "unknown",
+                response: { result: msg.content },
+              },
+            },
+          ],
+          role: "user",
+        });
+        continue;
+      }
+
+      // User messages
+      contents.push({
+        parts: [{ text: msg.content }],
+        role: "user",
+      });
+    }
+
+    // Convert tool definitions to Gemini format
+    const tools =
+      params.tools.length > 0
+        ? [
+            {
+              functionDeclarations: params.tools.map((tool) => ({
+                description: tool.function.description,
+                name: tool.function.name,
+                parameters: toGeminiSchema(tool.function.parameters),
+              })),
+            },
+          ]
+        : undefined;
+
+    // ── Streaming mode: stream tokens so reasoning can be forwarded live ──
+    if (params.onReasoning) {
+      return this.chatWithToolsStreaming(
+        contents,
+        tools,
+        model,
+        params.temperature ?? 0.3,
+        systemInstruction,
+        params.onReasoning,
+        startTime,
+      );
+    }
+
+    // ── Non-streaming mode (default) ──
+    const response = await this.executeWithRetry(async () => {
+      return this.client.models.generateContent({
+        config: {
+          temperature: params.temperature ?? 0.3,
+          thinkingConfig: { includeThoughts: true },
+          ...(systemInstruction ? { systemInstruction } : {}),
+          ...(tools ? { tools } : {}),
+        },
+        contents,
+        model,
+      });
+    });
+
+    const durationMs = Date.now() - startTime;
+    const usage = response.usageMetadata;
+
+    // Extract tool calls, text content, and reasoning from response parts
+    const toolCalls: ToolCall[] = [];
+    let textContent = "";
+    let reasoning: string | null = null;
+
+    const candidate = response.candidates?.[0];
+    if (candidate?.content?.parts) {
+      for (const part of candidate.content.parts) {
+        if (part.functionCall) {
+          toolCalls.push({
+            function: {
+              arguments: (part.functionCall.args || {}) as Record<
+                string,
+                unknown
+              >,
+              name: part.functionCall.name || "",
+            },
+          });
+        }
+        if (part.text) {
+          if (part.thought) {
+            // Thought/reasoning part
+            reasoning = reasoning ? `${reasoning}\n${part.text}` : part.text;
+          } else {
+            textContent += part.text;
+          }
+        }
+      }
+    }
+
+    // Also check convenience accessor for function calls
+    if (toolCalls.length === 0 && response.functionCalls) {
+      for (const fc of response.functionCalls) {
+        toolCalls.push({
+          function: {
+            arguments: (fc.args || {}) as Record<string, unknown>,
+            name: fc.name || "",
+          },
         });
       }
     }
 
-    contents.push({ parts: [{ text: params.prompt }], role: "user" });
-
-    const systemInstruction =
-      params.systemPrompt ||
-      params.messages?.find((m) => m.role === "system")?.content;
-
-    const response = await this.executeWithRetry(async () => {
-      const genModel = this.client.getGenerativeModel({
-        generationConfig: {
-          temperature: params.temperature ?? 0.7,
-        },
-        model,
-        ...(systemInstruction ? { systemInstruction } : {}),
-      });
-
-      return genModel.generateContent({ contents });
-    });
-
-    const durationMs = Date.now() - startTime;
-    const result = response.response;
-    const content = result.text();
-    const usage = result.usageMetadata;
+    // Capture raw parts so callers can pass them back verbatim in multi-turn
+    // conversations (preserves thoughtSignature for Gemini thinking models).
+    const rawParts = candidate?.content?.parts;
 
     return {
+      _rawAssistantParts: rawParts ? (rawParts as unknown[]) : undefined,
       completionTokens: usage?.candidatesTokenCount || 0,
-      content,
+      content: textContent,
       durationMs,
       model,
       promptTokens: usage?.promptTokenCount || 0,
+      reasoning,
+      toolCalls,
       totalTokens: usage?.totalTokenCount || 0,
+    };
+  }
+
+  async generateEmbeddings(
+    params: GenerateEmbeddingsParams,
+  ): Promise<GenerateEmbeddingsResult> {
+    const startTime = Date.now();
+    const model = params.model || DEFAULT_EMBEDDING_MODEL;
+
+    const response = await this.executeWithRetry(async () => {
+      return this.client.models.embedContent({
+        contents: params.input.map((text) => ({
+          parts: [{ text }],
+          role: "user",
+        })),
+        model,
+      });
+    });
+
+    const embeddings: number[][] = (response.embeddings || []).map(
+      (e) => e.values || [],
+    );
+    const durationMs = Date.now() - startTime;
+    const dimensions = embeddings.length > 0 ? embeddings[0].length : 0;
+
+    return {
+      dimensions,
+      durationMs,
+      embeddings,
+      model,
     };
   }
 
@@ -226,22 +380,20 @@ export class GeminiAdapter implements AIAdapter {
       params.messages?.find((m) => m.role === "system")?.content;
 
     const response = await this.executeWithRetry(async () => {
-      const genModel = this.client.getGenerativeModel({
-        generationConfig: {
+      return this.client.models.generateContent({
+        config: {
           responseMimeType: "application/json",
           temperature: params.temperature ?? 0.7,
+          ...(systemInstruction ? { systemInstruction } : {}),
         },
+        contents,
         model,
-        ...(systemInstruction ? { systemInstruction } : {}),
       });
-
-      return genModel.generateContent({ contents });
     });
 
     const durationMs = Date.now() - startTime;
-    const result = response.response;
-    const rawResponse = result.text();
-    const usage = result.usageMetadata;
+    const rawResponse = response.text || "";
+    const usage = response.usageMetadata;
 
     let data: T;
     try {
@@ -263,167 +415,52 @@ export class GeminiAdapter implements AIAdapter {
     };
   }
 
-  async chatWithTools(
-    params: ChatWithToolsParams,
-  ): Promise<ChatWithToolsResponse> {
+  async generateText(params: GenerateTextParams): Promise<GenerateTextResult> {
     const startTime = Date.now();
     const model = params.model || this.config.defaultModel;
 
-    // Extract system instruction from messages
-    let systemInstruction: string | undefined;
+    // Build contents array
     const contents: Content[] = [];
 
-    for (const msg of params.messages) {
-      if (msg.role === "system") {
-        // Accumulate system messages
-        systemInstruction = systemInstruction
-          ? `${systemInstruction}\n\n${msg.content}`
-          : msg.content;
-        continue;
-      }
-
-      if (msg.role === "assistant") {
-        const parts: Part[] = [];
-
-        // Add text content if present
-        if (msg.content) {
-          parts.push({ text: msg.content });
-        }
-
-        // Add function calls if present
-        if (msg.toolCalls && msg.toolCalls.length > 0) {
-          for (const tc of msg.toolCalls) {
-            parts.push({
-              functionCall: {
-                args: tc.function.arguments,
-                name: tc.function.name,
-              },
-            });
-          }
-        }
-
-        if (parts.length > 0) {
-          contents.push({ parts, role: "model" });
-        }
-        continue;
-      }
-
-      if (msg.role === "tool") {
-        // Gemini expects functionResponse parts for tool results
+    // System prompt is handled via systemInstruction, not as a content entry
+    if (params.messages) {
+      for (const msg of params.messages) {
+        if (msg.role === "system") continue; // Handled separately
         contents.push({
-          parts: [
-            {
-              functionResponse: {
-                name: msg.toolName || "unknown",
-                response: { result: msg.content },
-              },
-            },
-          ],
-          role: "function" as "user",
+          parts: [{ text: msg.content }],
+          role: msg.role === "assistant" ? "model" : "user",
         });
-        continue;
       }
-
-      // User messages
-      contents.push({
-        parts: [{ text: msg.content }],
-        role: "user",
-      });
     }
 
-    // Convert tool definitions to Gemini format
-    const tools =
-      params.tools.length > 0
-        ? [
-            {
-              functionDeclarations: params.tools.map((tool) => ({
-                description: tool.function.description,
-                name: tool.function.name,
-                parameters: toGeminiSchema(tool.function.parameters),
-              })),
-            },
-          ]
-        : undefined;
+    contents.push({ parts: [{ text: params.prompt }], role: "user" });
+
+    const systemInstruction =
+      params.systemPrompt ||
+      params.messages?.find((m) => m.role === "system")?.content;
 
     const response = await this.executeWithRetry(async () => {
-      const genModel = this.client.getGenerativeModel({
-        generationConfig: {
-          temperature: params.temperature ?? 0.3,
+      return this.client.models.generateContent({
+        config: {
+          temperature: params.temperature ?? 0.7,
+          ...(systemInstruction ? { systemInstruction } : {}),
         },
+        contents,
         model,
-        ...(systemInstruction ? { systemInstruction } : {}),
-        ...(tools ? { tools } : {}),
       });
-
-      return genModel.generateContent({ contents });
     });
 
     const durationMs = Date.now() - startTime;
-    const result = response.response;
-    const usage = result.usageMetadata;
-
-    // Extract tool calls and text content from response parts
-    const toolCalls: ToolCall[] = [];
-    let textContent = "";
-
-    const candidate = result.candidates?.[0];
-    if (candidate?.content?.parts) {
-      for (const part of candidate.content.parts) {
-        if ("functionCall" in part && part.functionCall) {
-          toolCalls.push({
-            function: {
-              arguments: (part.functionCall.args || {}) as Record<
-                string,
-                unknown
-              >,
-              name: part.functionCall.name,
-            },
-          });
-        }
-        if ("text" in part && part.text) {
-          textContent += part.text;
-        }
-      }
-    }
+    const content = response.text || "";
+    const usage = response.usageMetadata;
 
     return {
       completionTokens: usage?.candidatesTokenCount || 0,
-      content: textContent,
+      content,
       durationMs,
       model,
       promptTokens: usage?.promptTokenCount || 0,
-      reasoning: null,
-      toolCalls,
       totalTokens: usage?.totalTokenCount || 0,
-    };
-  }
-
-  async generateEmbeddings(
-    params: GenerateEmbeddingsParams,
-  ): Promise<GenerateEmbeddingsResult> {
-    const startTime = Date.now();
-    const model = params.model || DEFAULT_EMBEDDING_MODEL;
-
-    const embeddings: number[][] = [];
-
-    // Gemini embedding API processes one input at a time
-    for (const input of params.input) {
-      const response = await this.executeWithRetry(async () => {
-        const embeddingModel = this.client.getGenerativeModel({ model });
-        return embeddingModel.embedContent(input);
-      });
-
-      embeddings.push(response.embedding.values);
-    }
-
-    const durationMs = Date.now() - startTime;
-    const dimensions = embeddings.length > 0 ? embeddings[0].length : 0;
-
-    return {
-      dimensions,
-      durationMs,
-      embeddings,
-      model,
     };
   }
 
@@ -433,17 +470,123 @@ export class GeminiAdapter implements AIAdapter {
 
   async isAvailable(): Promise<boolean> {
     try {
-      // Verify connectivity by listing models
-      const model = this.client.getGenerativeModel({
+      await this.client.models.generateContent({
+        contents: "ping",
         model: this.config.defaultModel,
-      });
-      await model.generateContent({
-        contents: [{ parts: [{ text: "ping" }], role: "user" }],
       });
       return true;
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Streaming implementation of chatWithTools.
+   * Reads parts with `thought: true` and forwards reasoning chunks
+   * to the callback in real-time.
+   */
+  private async chatWithToolsStreaming(
+    contents: Content[],
+    tools: { functionDeclarations: Record<string, unknown>[] }[] | undefined,
+    model: string,
+    temperature: number,
+    systemInstruction: string | undefined,
+    onReasoning: (chunk: string) => void,
+    startTime: number,
+  ): Promise<ChatWithToolsResponse> {
+    const stream = await this.executeWithRetry(async () => {
+      return this.client.models.generateContentStream({
+        config: {
+          temperature,
+          thinkingConfig: { includeThoughts: true },
+          ...(systemInstruction ? { systemInstruction } : {}),
+          ...(tools ? { tools } : {}),
+        },
+        contents,
+        model,
+      });
+    });
+
+    let fullContent = "";
+    let completionTokens = 0;
+    let promptTokens = 0;
+    let totalTokens = 0;
+    const toolCalls: ToolCall[] = [];
+    // Accumulate ALL raw parts so we can return them for thought-signature preservation
+    const allRawParts: Part[] = [];
+    // Buffer reasoning text so we can flush complete lines to the callback
+    let reasoningLineBuffer = "";
+
+    for await (const chunk of stream) {
+      // Update token counts from the last chunk that has usage metadata
+      if (chunk.usageMetadata) {
+        completionTokens =
+          chunk.usageMetadata.candidatesTokenCount || completionTokens;
+        promptTokens = chunk.usageMetadata.promptTokenCount || promptTokens;
+        totalTokens = chunk.usageMetadata.totalTokenCount || totalTokens;
+      }
+
+      const candidate = chunk.candidates?.[0];
+      if (!candidate?.content?.parts) continue;
+
+      for (const part of candidate.content.parts) {
+        // Keep every raw part so thought signatures are preserved
+        allRawParts.push(part);
+
+        // ── Function calls ──
+        if (part.functionCall) {
+          toolCalls.push({
+            function: {
+              arguments: (part.functionCall.args || {}) as Record<
+                string,
+                unknown
+              >,
+              name: part.functionCall.name || "",
+            },
+          });
+        }
+
+        if (part.text) {
+          if (part.thought) {
+            // ── Thinking tokens ──
+            reasoningLineBuffer += part.text;
+            // Flush complete lines to the callback in real-time
+            let nlIdx = reasoningLineBuffer.indexOf("\n");
+            while (nlIdx !== -1) {
+              const line = reasoningLineBuffer.slice(0, nlIdx).trim();
+              if (line) {
+                onReasoning(line);
+              }
+              reasoningLineBuffer = reasoningLineBuffer.slice(nlIdx + 1);
+              nlIdx = reasoningLineBuffer.indexOf("\n");
+            }
+          } else {
+            // ── Content tokens ──
+            fullContent += part.text;
+          }
+        }
+      }
+    }
+
+    // Flush any remaining reasoning buffer
+    if (reasoningLineBuffer.trim()) {
+      onReasoning(reasoningLineBuffer.trim());
+    }
+
+    const durationMs = Date.now() - startTime;
+
+    return {
+      _rawAssistantParts:
+        allRawParts.length > 0 ? (allRawParts as unknown[]) : undefined,
+      completionTokens,
+      content: fullContent.trim(),
+      durationMs,
+      model,
+      promptTokens,
+      reasoning: null, // Already forwarded via callback
+      toolCalls,
+      totalTokens,
+    };
   }
 
   /**

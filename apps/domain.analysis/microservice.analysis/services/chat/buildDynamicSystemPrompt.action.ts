@@ -63,6 +63,7 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
     "You are an AI data analysis assistant.",
     "Your role is to help the user analyse their imported data by answering questions, running calculations, and providing insights.",
     "IMPORTANT: Always answer user questions using the language they are asking in.",
+    "You can use emojis in your responses to make them more engaging and easier to read, but do not overuse them. Use them strategically to highlight important insights or make the response more friendly and approachable.",
     "",
   );
 
@@ -100,6 +101,7 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
     "4. NEVER use structured tools on an `unstructured-text` dataset — they will fail because text datasets have no tabular rows/columns.",
     "5. NEVER use text tools on a `structured-table` dataset — they will fail because structured datasets have no text chunks or embeddings.",
     "6. If the user's question involves both structured and unstructured datasets, use the appropriate tool category for each dataset separately, then combine the insights in your answer.",
+    "7. Try to use multiple tools in one turn to speed up the fetch data step",
     "",
   );
 
