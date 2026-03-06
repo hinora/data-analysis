@@ -437,11 +437,23 @@ paths:
 
     post:
       tags: [Chat]
-      summary: Send a message and get AI response
+      summary: Send a message and get AI response (SSE stream)
       description: |
         Saves the user message, runs AI tool-calling orchestration loop
-        (up to 10 iterations), saves the assistant response with metadata
-        (confidence, citations, tools used, reasoning steps), and logs to AILog.
+        (up to 10 iterations), and returns a Server-Sent Events stream
+        that emits real-time progress events: status updates, reasoning steps,
+        tool call activity, content deltas, and a final "done" event with the
+        saved assistant message (including confidence, citations, tools used,
+        reasoning steps). Also logs to AILog.
+
+        **SSE event types:**
+        - `status`  — progress label (e.g. "Building context…")
+        - `reasoning` — a single reasoning step string
+        - `tool_start` — tool call initiated (name + params)
+        - `tool_end` — tool call completed/failed (duration, preview)
+        - `content_delta` — streamed assistant text chunk
+        - `done` — final saved ChatMessage (stream closes after this)
+        - `error` — unrecoverable error (stream closes after this)
       operationId: sendChatMessage
       requestBody:
         required: true
@@ -460,13 +472,15 @@ paths:
                   maxLength: 10000
       responses:
         "200":
-          description: AI assistant response
+          description: SSE event stream
           content:
-            application/json:
+            text/event-stream:
               schema:
-                $ref: "#/components/schemas/ChatMessage"
-        "404":
-          $ref: "#/components/responses/NotFound"
+                type: string
+                description: |
+                  Newline-delimited SSE frames. Each frame has an `event:` line
+                  and a `data:` line containing a JSON object with a `type`
+                  field matching the event name.
 
 components:
   parameters:

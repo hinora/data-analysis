@@ -1,10 +1,11 @@
 /**
  * useChat Hook
  *
- * React Query hooks for chat messaging (sendMessage, getHistory).
+ * React Query hooks for chat history retrieval.
+ * Message sending is handled by useStreamChat (SSE streaming).
  */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { service } from "../utils/request";
 
 export const CHAT_HISTORY_KEY = "chat-history";
@@ -62,72 +63,5 @@ export function useGetHistory(
     },
     enabled: !!conversationId,
     refetchInterval: false,
-  });
-}
-
-export function useSendMessage() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      conversationId,
-      content,
-    }: {
-      conversationId: string;
-      content: string;
-    }) => {
-      const { data } = await service.post<ChatMessage>(`/chat/messages`, {
-        conversationId,
-        content,
-      });
-      return data;
-    },
-    onMutate: ({ conversationId, content }) => {
-      // Optimistically add the user message to the chat history
-      const optimisticMessage: ChatMessage = {
-        id: `optimistic-${Date.now()}`,
-        conversationId,
-        role: "user",
-        content,
-        confidenceScore: null,
-        citedSources: null,
-        toolsUsed: null,
-        reasoningSteps: null,
-        createdAt: new Date().toISOString(),
-      };
-
-      // Snapshot all matching history caches so we can roll back on error
-      const previousQueries = queryClient.getQueriesData<ChatHistoryResponse>({
-        queryKey: [CHAT_HISTORY_KEY, conversationId],
-      });
-
-      // Append the optimistic message to every matching cache entry
-      queryClient.setQueriesData<ChatHistoryResponse>(
-        { queryKey: [CHAT_HISTORY_KEY, conversationId] },
-        (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            messages: [...old.messages, optimisticMessage],
-            total: old.total + 1,
-          };
-        },
-      );
-
-      return { previousQueries };
-    },
-    onError: (_err, _variables, context) => {
-      // Roll back to the previous cache state
-      if (context?.previousQueries) {
-        for (const [queryKey, data] of context.previousQueries) {
-          queryClient.setQueryData(queryKey, data);
-        }
-      }
-    },
-    onSettled: (_data, _error, variables) => {
-      // Always refetch to get the real server state (including AI response)
-      queryClient.invalidateQueries({
-        queryKey: [CHAT_HISTORY_KEY, variables.conversationId],
-      });
-    },
   });
 }

@@ -27,11 +27,10 @@ async function main() {
     SELECT data_type FROM information_schema.columns
     WHERE table_name = 'textChunks' AND column_name = 'embedding'
   `);
-  if (
-    columnType.length > 0 &&
-    columnType[0].data_type !== "USER-DEFINED"
-  ) {
-    console.log(`⏳ Migrating embedding column from ${columnType[0].data_type} to vector(768)...`);
+  if (columnType.length > 0 && columnType[0].data_type !== "USER-DEFINED") {
+    console.log(
+      `⏳ Migrating embedding column from ${columnType[0].data_type} to vector(768)...`,
+    );
     await dataSource.query(`
       ALTER TABLE "textChunks"
       ALTER COLUMN embedding TYPE vector(768)

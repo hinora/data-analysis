@@ -270,6 +270,12 @@ export interface ChatWithToolsParams {
   messages: AIMessageWithTools[];
   /** Model to use */
   model?: string;
+  /**
+   * Optional callback invoked with reasoning chunks as the model generates them.
+   * When provided, the adapter should use streaming mode so that chain-of-thought
+   * content inside `<think>` tags is forwarded incrementally.
+   */
+  onReasoning?: (chunk: string) => void;
   /** Temperature for randomness (0-1) */
   temperature?: number;
   /** Available tools for the AI to call */
@@ -290,6 +296,8 @@ export interface ChatWithToolsResponse {
   model: string;
   /** Prompt tokens used */
   promptTokens: number;
+  /** Internal reasoning / chain-of-thought extracted from the model (e.g. <think> tags) */
+  reasoning: string | null;
   /** Tool calls requested by the AI (empty if final answer) */
   toolCalls: ToolCall[];
   /** Total tokens used */

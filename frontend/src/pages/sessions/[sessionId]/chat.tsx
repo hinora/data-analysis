@@ -10,13 +10,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ChatInput from "../../../components/chat/ChatInput";
 import ChatMessageBubble from "../../../components/chat/ChatMessageBubble";
 import ConversationSidebar from "../../../components/chat/ConversationSidebar";
+import StreamingThinkingIndicator from "../../../components/chat/StreamingThinkingIndicator";
 import SystemPromptViewer from "../../../components/chat/SystemPromptViewer";
-import ThinkingIndicator from "../../../components/chat/ThinkingIndicator";
-import { useGetHistory, useSendMessage } from "../../../hooks/useChat";
+import { type ChatMessage, useGetHistory } from "../../../hooks/useChat";
 import {
   useCreateConversation,
   useListConversations,
 } from "../../../hooks/useConversation";
+import { useStreamMessage } from "../../../hooks/useStreamChat";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -34,9 +35,9 @@ export default function ChatPage() {
     { excludeSystem: false },
   );
 
-  // Mutations
+  // Mutations & streaming
   const createConversation = useCreateConversation();
-  const sendMessage = useSendMessage();
+  const { sendMessage, streamState } = useStreamMessage();
 
   // Auto-select first conversation
   useEffect(() => {
@@ -45,13 +46,18 @@ export default function ChatPage() {
     }
   }, [conversations, activeConversationId]);
 
-  // Auto-scroll to bottom on new messages or when thinking
+  // Auto-scroll to bottom on new messages or when streaming
   const messageCount = historyData?.messages.length ?? 0;
-  const isSending = sendMessage.isPending;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: messageCount and isSending trigger scroll
+  const isStreaming = streamState.isStreaming;
+  const streamEventCount =
+    streamState.reasoningSteps.length +
+    streamState.tools.length +
+    (streamState.content ? 1 : 0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: messageCount, isStreaming, and streamEventCount trigger scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messageCount, isSending]);
+  }, [messageCount, isStreaming, streamEventCount]);
+  console.log("messageCount", messageCount, "isStreaming", isStreaming, "streamEventCount", streamEventCount);
 
   const handleCreateConversation = useCallback(() => {
     if (!sessionId) return;
@@ -68,7 +74,7 @@ export default function ChatPage() {
   const handleSendMessage = useCallback(
     (content: string) => {
       if (!activeConversationId) return;
-      sendMessage.mutate({ conversationId: activeConversationId, content });
+      sendMessage({ conversationId: activeConversationId, content });
     },
     [activeConversationId, sendMessage],
   );
@@ -176,15 +182,32 @@ export default function ChatPage() {
                     <ChatMessageBubble key={msg.id} message={msg} />
                   ))
                 )}
-                {sendMessage.isPending && <ThinkingIndicator />}
+                {/* Optimistic user message shown during streaming */}
+                {isStreaming && streamState.pendingUserMessage && (
+                  <ChatMessageBubble
+                    message={
+                      {
+                        id: "optimistic-stream",
+                        conversationId: activeConversationId ?? "",
+                        role: "user",
+                        content: streamState.pendingUserMessage,
+                        confidenceScore: null,
+                        citedSources: null,
+                        toolsUsed: null,
+                        reasoningSteps: null,
+                        createdAt: new Date().toISOString(),
+                      } satisfies ChatMessage
+                    }
+                  />
+                )}
+                {isStreaming && (
+                  <StreamingThinkingIndicator state={streamState} />
+                )}
                 <div ref={messagesEndRef} />
               </div>
 
               {/* Input */}
-              <ChatInput
-                onSend={handleSendMessage}
-                isLoading={sendMessage.isPending}
-              />
+              <ChatInput onSend={handleSendMessage} isLoading={isStreaming} />
             </>
           ) : (
             <div

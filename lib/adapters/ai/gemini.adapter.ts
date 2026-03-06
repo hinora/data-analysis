@@ -392,6 +392,7 @@ export class GeminiAdapter implements AIAdapter {
       durationMs,
       model,
       promptTokens: usage?.promptTokenCount || 0,
+      reasoning: null,
       toolCalls,
       totalTokens: usage?.totalTokenCount || 0,
     };

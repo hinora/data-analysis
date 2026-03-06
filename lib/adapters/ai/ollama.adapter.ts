@@ -6,6 +6,7 @@
  * Per constitution: max 3 retries with exponential backoff
  */
 
+import type { Tool as OllamaTool } from "ollama";
 import { Ollama } from "ollama";
 import type {
   AIAdapter,
@@ -36,17 +37,43 @@ const BASE_DELAY_MS = 1000;
  * 2. Orphaned close: `reasoning</think>actual response` (Ollama may strip the opening tag)
  * 3. Unclosed open: `actual response<think>reasoning...` (rare, defensive)
  */
+/**
+ * Extract think-tag reasoning and clean content from model output.
+ * Qwen3 and similar reasoning models wrap internal reasoning in `<think>...</think>` tags.
+ *
+ * Returns both the extracted reasoning text and the cleaned content.
+ */
+function extractThinkContent(content: string): {
+  cleaned: string;
+  reasoning: string | null;
+} {
+  let reasoning: string | null = null;
+
+  // 1. Standard paired tags — extract reasoning
+  const thinkMatch = content.match(/<think>([\s\S]*?)<\/think>/i);
+  if (thinkMatch) {
+    reasoning = thinkMatch[1].trim() || null;
+  }
+
+  // 2. Orphaned </think> without opening — extract everything before it
+  if (!reasoning) {
+    const orphanMatch = content.match(/^([\s\S]*?)<\/think>/i);
+    if (orphanMatch) {
+      reasoning = orphanMatch[1].trim() || null;
+    }
+  }
+
+  // Strip all think tags from content
+  let cleaned = content.replace(/<think>[\s\S]*?<\/think>/gi, "");
+  cleaned = cleaned.replace(/^[\s\S]*?<\/think>/gi, "");
+  cleaned = cleaned.replace(/<think>[\s\S]*$/gi, "");
+
+  return { cleaned: cleaned.trim(), reasoning };
+}
+
+/** Strip think-tag reasoning from model output (backward compat). */
 function stripThinkTags(content: string): string {
-  // 1. Standard paired tags
-  let result = content.replace(/<think>[\s\S]*?<\/think>/gi, "");
-
-  // 2. Orphaned </think> without opening — strip everything before and including it
-  result = result.replace(/^[\s\S]*?<\/think>/gi, "");
-
-  // 3. Unclosed <think> — strip from tag to end
-  result = result.replace(/<think>[\s\S]*$/gi, "");
-
-  return result.trim();
+  return extractThinkContent(content).cleaned;
 }
 
 export interface OllamaAdapterOptions {
@@ -230,16 +257,30 @@ export class OllamaAdapter implements AIAdapter {
     });
 
     // Convert tool definitions to Ollama format
-    const tools = params.tools.map((tool) => ({
+    // Cast parameters to satisfy the Ollama SDK Tool type constraint
+    const tools: OllamaTool[] = params.tools.map((tool) => ({
       function: {
         description: tool.function.description,
         name: tool.function.name,
-        parameters: tool.function.parameters,
+        parameters: tool.function
+          .parameters as OllamaTool["function"]["parameters"],
       },
       type: "function" as const,
     }));
 
-    // console.log("Ollama chatWithTools request:", { messages });
+    // ── Streaming mode: stream tokens so reasoning can be forwarded live ──
+    if (params.onReasoning) {
+      return this.chatWithToolsStreaming(
+        messages,
+        tools,
+        model,
+        params.temperature ?? 0.3,
+        params.onReasoning,
+        startTime,
+      );
+    }
+
+    // ── Non-streaming mode (default) ──
     const response = await this.executeWithRetry(async () => {
       return this.client.chat({
         messages,
@@ -252,8 +293,6 @@ export class OllamaAdapter implements AIAdapter {
         tools,
       });
     });
-
-    // console.log("Ollama response with tools:", response);
 
     const durationMs = Date.now() - startTime;
     const completionTokens = response.eval_count || 0;
@@ -271,12 +310,174 @@ export class OllamaAdapter implements AIAdapter {
       }),
     );
 
+    const { cleaned, reasoning } = extractThinkContent(
+      response.message.content || "",
+    );
+
     return {
       completionTokens,
-      content: stripThinkTags(response.message.content || ""),
+      content: cleaned,
       durationMs,
       model,
       promptTokens,
+      reasoning,
+      toolCalls,
+      totalTokens: promptTokens + completionTokens,
+    };
+  }
+
+  /**
+   * Streaming implementation of chatWithTools.
+   * Reads tokens one-by-one, detects `<think>` tags, and forwards reasoning
+   * chunks to the callback in real-time.
+   */
+  private async chatWithToolsStreaming(
+    messages: {
+      content: string;
+      role: "assistant" | "system" | "tool" | "user";
+      tool_calls?: {
+        function: { arguments: Record<string, unknown>; name: string };
+      }[];
+      tool_name?: string;
+    }[],
+    tools: OllamaTool[],
+    model: string,
+    temperature: number,
+    onReasoning: (chunk: string) => void,
+    startTime: number,
+  ): Promise<ChatWithToolsResponse> {
+    const stream = await this.executeWithRetry(async () => {
+      return this.client.chat({
+        messages,
+        model,
+        options: {
+          num_ctx: this.numCtx,
+          temperature,
+        },
+        stream: true,
+        tools,
+      });
+    });
+
+    // Accumulate the full response content while parsing <think> tags in real-time
+    let fullContent = "";
+    let insideThink = false;
+    // Buffer for detecting the <think> or </think> tag across chunk boundaries
+    let tagBuffer = "";
+    let completionTokens = 0;
+    let promptTokens = 0;
+    let lastToolCalls: {
+      function: { arguments: Record<string, unknown>; name: string };
+    }[] = [];
+    // Buffer reasoning text so we can flush it line-by-line
+    let reasoningLineBuffer = "";
+
+    for await (const chunk of stream) {
+      const token = chunk.message?.content || "";
+      completionTokens = chunk.eval_count || completionTokens;
+      promptTokens = chunk.prompt_eval_count || promptTokens;
+
+      if (chunk.message?.tool_calls && chunk.message.tool_calls.length > 0) {
+        lastToolCalls = chunk.message.tool_calls;
+      }
+
+      // Process each character to track <think>/</think> boundaries
+      for (const ch of token) {
+        if (tagBuffer.length > 0 || ch === "<") {
+          tagBuffer += ch;
+
+          // Check if we've accumulated a full opening tag
+          if (!insideThink && tagBuffer.toLowerCase() === "<think>") {
+            insideThink = true;
+            tagBuffer = "";
+            continue;
+          }
+
+          // Check if we've accumulated a full closing tag
+          if (insideThink && tagBuffer.toLowerCase() === "</think>") {
+            // Flush any remaining reasoning text
+            if (reasoningLineBuffer.trim()) {
+              onReasoning(reasoningLineBuffer.trim());
+              reasoningLineBuffer = "";
+            }
+            insideThink = false;
+            tagBuffer = "";
+            continue;
+          }
+
+          // If the buffer can't possibly be a valid tag prefix, flush it
+          const openPrefix = "<think>".slice(0, tagBuffer.length);
+          const closePrefix = "</think>".slice(0, tagBuffer.length);
+          const couldBeOpen =
+            tagBuffer.toLowerCase() === openPrefix && !insideThink;
+          const couldBeClose =
+            tagBuffer.toLowerCase() === closePrefix && insideThink;
+
+          if (!couldBeOpen && !couldBeClose) {
+            // Not a tag — flush buffer to the appropriate destination
+            if (insideThink) {
+              reasoningLineBuffer += tagBuffer;
+              // Flush complete lines
+              let nlIdx = reasoningLineBuffer.indexOf("\n");
+              while (nlIdx !== -1) {
+                const line = reasoningLineBuffer.slice(0, nlIdx).trim();
+                if (line) {
+                  onReasoning(line);
+                }
+                reasoningLineBuffer = reasoningLineBuffer.slice(nlIdx + 1);
+                nlIdx = reasoningLineBuffer.indexOf("\n");
+              }
+            } else {
+              fullContent += tagBuffer;
+            }
+            tagBuffer = "";
+          }
+        } else if (insideThink) {
+          reasoningLineBuffer += ch;
+          // Flush complete lines
+          let nlIdx = reasoningLineBuffer.indexOf("\n");
+          while (nlIdx !== -1) {
+            const line = reasoningLineBuffer.slice(0, nlIdx).trim();
+            if (line) {
+              onReasoning(line);
+            }
+            reasoningLineBuffer = reasoningLineBuffer.slice(nlIdx + 1);
+            nlIdx = reasoningLineBuffer.indexOf("\n");
+          }
+        } else {
+          fullContent += ch;
+        }
+      }
+    }
+
+    // Flush any remaining buffers
+    if (tagBuffer) {
+      if (insideThink) {
+        reasoningLineBuffer += tagBuffer;
+      } else {
+        fullContent += tagBuffer;
+      }
+    }
+    if (reasoningLineBuffer.trim()) {
+      onReasoning(reasoningLineBuffer.trim());
+    }
+
+    const durationMs = Date.now() - startTime;
+
+    const toolCalls: ToolCall[] = lastToolCalls.map((tc) => ({
+      function: {
+        arguments: tc.function.arguments,
+        name: tc.function.name,
+      },
+    }));
+
+    return {
+      completionTokens,
+      content: fullContent.trim(),
+      durationMs,
+      model,
+      promptTokens,
+      reasoning: null, // Already forwarded via callback
       toolCalls,
       totalTokens: promptTokens + completionTokens,
     };
