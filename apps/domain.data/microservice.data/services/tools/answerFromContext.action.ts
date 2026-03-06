@@ -61,7 +61,7 @@ export default defineAction<AnswerFromContextParams, unknown>({
         tc."sourcePage",
         tc."sourceSection",
         d.name AS "datasetName",
-        tc.embedding::vector <=> $1::vector AS distance
+        tc.embedding <=> $1::vector AS distance
       FROM "textChunks" tc
       JOIN "datasets" d ON d.id = tc."datasetId"
       WHERE tc."sessionId" = $2
@@ -74,7 +74,7 @@ export default defineAction<AnswerFromContextParams, unknown>({
       params.push(datasetId);
     }
 
-    sql += ` ORDER BY tc.embedding::vector <=> $1::vector LIMIT ${topK}`;
+    sql += ` ORDER BY tc.embedding <=> $1::vector LIMIT ${topK}`;
 
     const chunks = await dataSource.query(sql, params);
 

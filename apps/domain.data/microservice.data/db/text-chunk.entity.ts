@@ -5,8 +5,8 @@
  * with vector embedding for semantic search via pgvector.
  *
  * Note: The embedding column uses pgvector's vector(768) type.
- * The HNSW index for vector search is created manually via migration
- * or raw SQL since TypeORM doesn't natively support pgvector index syntax.
+ * The HNSW index (idx_textChunks_embedding_hnsw) is created at startup
+ * in app.ts via raw SQL since TypeORM doesn't natively support pgvector index syntax.
  */
 
 import {
@@ -57,8 +57,8 @@ export class TextChunk {
 
   /**
    * 768-dimensional vector embedding (nomic-embed-text) via pgvector.
-   * Stored as a string representation for TypeORM compatibility;
-   * pgvector handles the actual vector type in PostgreSQL.
+   * Stored as pgvector's native vector(768) type for efficient HNSW indexing.
+   * Defined as `text` for TypeORM compatibility; app.ts alters to vector(768) at startup.
    */
   @Column({ nullable: true, type: "text" })
   embedding: string | null;

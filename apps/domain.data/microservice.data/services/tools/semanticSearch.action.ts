@@ -128,12 +128,12 @@ export default defineAction<SemanticSearchParams, unknown>({
         tc."sourcePage",
         tc."sourceSection",
         tc."orderIndex",
-        tc.embedding::vector <=> $1::vector AS distance,
+        tc.embedding <=> $1::vector AS distance,
         d.name AS "datasetName"
       FROM "textChunks" tc
       JOIN "datasets" d ON d.id = tc."datasetId"
       WHERE tc.embedding IS NOT NULL${vectorFilterSql}
-      ORDER BY tc.embedding::vector <=> $1::vector
+      ORDER BY tc.embedding <=> $1::vector
       LIMIT ${vectorLimit}
     `;
 
@@ -163,7 +163,7 @@ export default defineAction<SemanticSearchParams, unknown>({
         tc."sourcePage",
         tc."sourceSection",
         tc."orderIndex",
-        tc.embedding::vector <=> $1::vector AS distance,
+        tc.embedding <=> $1::vector AS distance,
         d.name AS "datasetName"
       FROM "textChunks" tc
       JOIN "datasets" d ON d.id = tc."datasetId"

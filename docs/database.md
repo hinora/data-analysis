@@ -10,17 +10,15 @@ Each microservice connects to its own dedicated PostgreSQL database. The `core.l
 
 ### 1. Prerequisites
 
-- **PostgreSQL 16+** with pgvector extension
-- Recommended Docker image: `pgvector/pgvector:pg16`
+- **PostgreSQL 17+** with pgvector extension
+- Docker image: `pgvector/pgvector:pg17`
 
 ```bash
-# Start PostgreSQL with pgvector via Docker
-docker run -d \
-  --name pgvector \
-  -e POSTGRES_PASSWORD=postgres \
-  -p 5432:5432 \
-  pgvector/pgvector:pg16
+# Start all infrastructure services (PostgreSQL + Jaeger) via Docker Compose
+docker compose up -d
 ```
+
+This starts PostgreSQL with pgvector and automatically creates both `analysis_db` and `data_db` databases via the init script at `docker/init-databases.sql`.
 
 ### 2. Environment Variables
 
@@ -299,12 +297,17 @@ const results = await dataSource.query(
 
 ### HNSW Index for Performance
 
+The HNSW index is **automatically created at startup** by `microservice.data/app.ts`. No manual migration is needed:
+
 ```sql
+-- Created automatically via CREATE INDEX IF NOT EXISTS
 CREATE INDEX idx_textChunks_embedding_hnsw
   ON "textChunks"
   USING hnsw (embedding vector_cosine_ops)
   WITH (m = 16, ef_construction = 64);
 ```
+
+The startup script also auto-migrates the `embedding` column from `text` to native `vector(768)` if needed.
 
 ## Using Tables in Actions
 

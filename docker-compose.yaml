@@ -1,4 +1,18 @@
 services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
+    restart: unless-stopped
+
   jaeger:
     image: jaegertracing/all-in-one:1.65.0
     container_name: jaeger
@@ -18,3 +32,6 @@ services:
       # OTLP HTTP
       - "4318:4318"
     restart: unless-stopped
+
+volumes:
+  postgres_data:
