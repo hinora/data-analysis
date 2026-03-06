@@ -310,13 +310,24 @@ export class OllamaAdapter implements AIAdapter {
       }),
     );
 
-    const { cleaned, reasoning } = extractThinkContent(
-      response.message.content || "",
-    );
+    // The Ollama SDK (>=0.5) separates thinking into `message.thinking`.
+    // Fall back to parsing <think> tags from content for older models.
+    const sdkThinking =
+      (response.message as unknown as Record<string, unknown>)?.thinking ?? "";
+    let content = response.message.content || "";
+    let reasoning: string | null = null;
+
+    if (typeof sdkThinking === "string" && sdkThinking.trim()) {
+      reasoning = sdkThinking.trim();
+    } else {
+      const extracted = extractThinkContent(content);
+      content = extracted.cleaned;
+      reasoning = extracted.reasoning;
+    }
 
     return {
       completionTokens,
-      content: cleaned,
+      content: content.trim(),
       durationMs,
       model,
       promptTokens,
@@ -328,8 +339,8 @@ export class OllamaAdapter implements AIAdapter {
 
   /**
    * Streaming implementation of chatWithTools.
-   * Reads tokens one-by-one, detects `<think>` tags, and forwards reasoning
-   * chunks to the callback in real-time.
+   * Reads the SDK-separated `message.thinking` field and forwards reasoning
+   * chunks to the callback line-by-line in real-time.
    */
   private async chatWithToolsStreaming(
     messages: {
@@ -359,21 +370,19 @@ export class OllamaAdapter implements AIAdapter {
       });
     });
 
-    // Accumulate the full response content while parsing <think> tags in real-time
+    // Accumulate the full response content.
+    // The Ollama SDK (>=0.5) separates thinking into `message.thinking`
+    // so we read that field directly instead of parsing <think> tags from content.
     let fullContent = "";
-    let insideThink = false;
-    // Buffer for detecting the <think> or </think> tag across chunk boundaries
-    let tagBuffer = "";
     let completionTokens = 0;
     let promptTokens = 0;
     let lastToolCalls: {
       function: { arguments: Record<string, unknown>; name: string };
     }[] = [];
-    // Buffer reasoning text so we can flush it line-by-line
+    // Buffer reasoning text so we can flush complete lines to the callback
     let reasoningLineBuffer = "";
 
     for await (const chunk of stream) {
-      const token = chunk.message?.content || "";
       completionTokens = chunk.eval_count || completionTokens;
       promptTokens = chunk.prompt_eval_count || promptTokens;
 
@@ -381,83 +390,32 @@ export class OllamaAdapter implements AIAdapter {
         lastToolCalls = chunk.message.tool_calls;
       }
 
-      // Process each character to track <think>/</think> boundaries
-      for (const ch of token) {
-        if (tagBuffer.length > 0 || ch === "<") {
-          tagBuffer += ch;
-
-          // Check if we've accumulated a full opening tag
-          if (!insideThink && tagBuffer.toLowerCase() === "<think>") {
-            insideThink = true;
-            tagBuffer = "";
-            continue;
+      // ── Thinking tokens (SDK-separated field) ──
+      const thinking =
+        (chunk.message as unknown as Record<string, unknown> | undefined)
+          ?.thinking ?? "";
+      if (typeof thinking === "string" && thinking) {
+        reasoningLineBuffer += thinking;
+        // Flush complete lines to the callback in real-time
+        let nlIdx = reasoningLineBuffer.indexOf("\n");
+        while (nlIdx !== -1) {
+          const line = reasoningLineBuffer.slice(0, nlIdx).trim();
+          if (line) {
+            onReasoning(line);
           }
-
-          // Check if we've accumulated a full closing tag
-          if (insideThink && tagBuffer.toLowerCase() === "</think>") {
-            // Flush any remaining reasoning text
-            if (reasoningLineBuffer.trim()) {
-              onReasoning(reasoningLineBuffer.trim());
-              reasoningLineBuffer = "";
-            }
-            insideThink = false;
-            tagBuffer = "";
-            continue;
-          }
-
-          // If the buffer can't possibly be a valid tag prefix, flush it
-          const openPrefix = "<think>".slice(0, tagBuffer.length);
-          const closePrefix = "</think>".slice(0, tagBuffer.length);
-          const couldBeOpen =
-            tagBuffer.toLowerCase() === openPrefix && !insideThink;
-          const couldBeClose =
-            tagBuffer.toLowerCase() === closePrefix && insideThink;
-
-          if (!couldBeOpen && !couldBeClose) {
-            // Not a tag — flush buffer to the appropriate destination
-            if (insideThink) {
-              reasoningLineBuffer += tagBuffer;
-              // Flush complete lines
-              let nlIdx = reasoningLineBuffer.indexOf("\n");
-              while (nlIdx !== -1) {
-                const line = reasoningLineBuffer.slice(0, nlIdx).trim();
-                if (line) {
-                  onReasoning(line);
-                }
-                reasoningLineBuffer = reasoningLineBuffer.slice(nlIdx + 1);
-                nlIdx = reasoningLineBuffer.indexOf("\n");
-              }
-            } else {
-              fullContent += tagBuffer;
-            }
-            tagBuffer = "";
-          }
-        } else if (insideThink) {
-          reasoningLineBuffer += ch;
-          // Flush complete lines
-          let nlIdx = reasoningLineBuffer.indexOf("\n");
-          while (nlIdx !== -1) {
-            const line = reasoningLineBuffer.slice(0, nlIdx).trim();
-            if (line) {
-              onReasoning(line);
-            }
-            reasoningLineBuffer = reasoningLineBuffer.slice(nlIdx + 1);
-            nlIdx = reasoningLineBuffer.indexOf("\n");
-          }
-        } else {
-          fullContent += ch;
+          reasoningLineBuffer = reasoningLineBuffer.slice(nlIdx + 1);
+          nlIdx = reasoningLineBuffer.indexOf("\n");
         }
       }
-    }
 
-    // Flush any remaining buffers
-    if (tagBuffer) {
-      if (insideThink) {
-        reasoningLineBuffer += tagBuffer;
-      } else {
-        fullContent += tagBuffer;
+      // ── Content tokens ──
+      const token = chunk.message?.content || "";
+      if (token) {
+        fullContent += token;
       }
     }
+
+    // Flush any remaining reasoning buffer
     if (reasoningLineBuffer.trim()) {
       onReasoning(reasoningLineBuffer.trim());
     }

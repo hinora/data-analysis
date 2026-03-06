@@ -60,15 +60,25 @@ Paginated message history in chronological order (ASC by `createdAt`).
 
 **Returns:** `{ messages[], total, page, limit, hasMore }`
 
-### Send Message
+### Send Message (SSE Streaming)
 
-Core chat action that orchestrates AI tool-calling in a loop.
+Core chat action that orchestrates AI tool-calling in a loop, returning results as a **Server-Sent Events (SSE)** stream.
 
 **Params:**
 - `conversationId` (uuid, required)
 - `content` (string, required, 1–10,000 chars)
 
-**Returns:** Full assistant message: `{ id, conversationId, role, content, confidenceScore, citedSources, toolsUsed, reasoningSteps, createdAt }`
+**Response:** `Content-Type: text/event-stream` with the following event types:
+
+| Event          | Data Fields                                      | Description                          |
+|----------------|--------------------------------------------------|--------------------------------------|
+| `status`       | `{ message }`                                    | High-level status updates            |
+| `reasoning`    | `{ step }`                                       | AI chain-of-thought reasoning lines  |
+| `tool_start`   | `{ toolName, parameters }`                       | Tool invocation started              |
+| `tool_end`     | `{ toolName, success, durationMs, resultPreview }`| Tool invocation completed           |
+| `content_delta`| `{ delta }`                                      | Streamed final content chunks        |
+| `done`         | Full assistant message object                    | Stream complete                      |
+| `error`        | `{ message }`                                    | Error during processing              |
 
 ### Internal Action: buildDynamicSystemPrompt
 
@@ -253,12 +263,17 @@ This gives the model a second chance to produce a user-facing answer. If the ret
 
 ### Think Tag Stripping
 
-Reasoning models like Qwen3 wrap internal chain-of-thought in `<think>...</think>` tags. The Ollama adapter (`lib/adapters/ai/ollama.adapter.ts`) automatically strips these tags from all responses (`chatWithTools`, `generateText`) using `stripThinkTags()` so they never leak into user-facing content.
+Reasoning models like Qwen3 wrap internal chain-of-thought reasoning. The Ollama SDK (>=0.5) separates thinking into a dedicated `message.thinking` field on both streaming and non-streaming responses. The adapter reads this field directly:
 
-The function handles three edge cases:
+- **Streaming mode**: Each chunk's `message.thinking` tokens are buffered and flushed line-by-line via the `onReasoning` callback in real-time
+- **Non-streaming mode**: The full `message.thinking` string is returned as the `reasoning` field
+
+As a fallback for older SDK versions, `extractThinkContent()` still parses `<think>...</think>` tags from `message.content`:
 1. **Standard paired tags**: `<think>reasoning</think>response` — strips the matched block
-2. **Orphaned closing tag**: `reasoning</think>response` — Ollama may place thinking in a separate field while leaving `</think>` in content; strips everything up to and including `</think>`
+2. **Orphaned closing tag**: `reasoning</think>response` — strips everything up to and including `</think>`
 3. **Unclosed opening tag**: `response<think>reasoning...` — strips from `<think>` to end
+
+All user-facing content has thinking removed via `stripThinkTags()` in the Ollama adapter (`lib/adapters/ai/ollama.adapter.ts`).
 
 ### Tool Definition Best Practices
 
