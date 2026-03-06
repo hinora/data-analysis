@@ -218,6 +218,44 @@ Every AI interaction is recorded in the `AILog` table for auditability:
 - Records `toolCalls` array with per-tool parameters and result summaries
 - Stores `iterationCount`, `confidenceScore`, and `status` (success/failed)
 
+## Reasoning History & Display
+
+### Saved Reasoning Data
+
+Every assistant message persists its full reasoning trail in the `reasoningSteps` jsonb column. This includes:
+
+1. **AI model reasoning** — chain-of-thought lines streamed via the `onReasoning` callback (e.g., thinking output from models like Qwen3)
+2. **Internal orchestration steps** — iteration markers, tool call logs, timing, and error messages
+
+Both categories are saved together in the `reasoningSteps` array. The `toolsUsed` jsonb column separately stores structured tool call data (name, parameters, result summary).
+
+### Frontend Reasoning Panel
+
+The `ReasoningPanel` component (`frontend/src/components/chat/ReasoningPanel.tsx`) renders saved reasoning on historical assistant messages. It provides a collapsible "Thought process" section with three sub-areas:
+
+```mermaid
+flowchart TD
+    A[Assistant Message] --> B{Has reasoning or tools?}
+    B -->|No| C[No panel shown]
+    B -->|Yes| D[Collapsible Reasoning Panel]
+    D --> E[AI Reasoning Steps]
+    D --> F[Tool Call Cards]
+    D --> G[Internal Steps - hidden by default]
+    D --> H[Cited Sources]
+```
+
+- **AI Reasoning** — model thinking steps, separated from internal logs via pattern matching (e.g., lines starting with `Iteration`, `Calling tool:`, `Tool ... returned` are classified as internal)
+- **Tool Call Cards** — each tool shows name, parameters, and an expandable result preview
+- **Internal Steps** — debug/orchestration lines, collapsed by default for advanced users
+- **Cited Sources** — dataset badges from the `citedSources` column
+
+### Live vs Historical Reasoning
+
+| Phase | Component | Data Source |
+|-------|-----------|-------------|
+| During streaming | `StreamingThinkingIndicator` | SSE events (`reasoning`, `tool_start`, `tool_end`, `status`) |
+| After completion | `ReasoningPanel` (in `ChatMessageBubble`) | `ChatMessage.reasoningSteps` + `ChatMessage.toolsUsed` from DB |
+
 ## Response Post-Processing
 
 ### Tool Message Protocol

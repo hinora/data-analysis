@@ -5,17 +5,16 @@
  * confidence indicator, cited sources, and tool usage details.
  */
 
-import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatMessage } from "../../hooks/useChat";
+import ReasoningPanel from "./ReasoningPanel";
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
 }
 
 export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
-  const [showDetails, setShowDetails] = useState(false);
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
 
@@ -61,99 +60,14 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
           </div>
         )}
 
-        {/* Cited sources */}
-        {isAssistant &&
-          message.citedSources &&
-          message.citedSources.length > 0 && (
-            <div
-              style={{
-                marginTop: "8px",
-                paddingTop: "8px",
-                borderTop: `1px solid ${isUser ? "rgba(255,255,255,0.2)" : "#ddd"}`,
-                fontSize: "12px",
-              }}
-            >
-              <strong>Sources:</strong>
-              {message.citedSources.map((source) => (
-                <span
-                  key={`${source.datasetName}-${source.columnName || ""}`}
-                  style={{
-                    display: "inline-block",
-                    margin: "2px 4px",
-                    padding: "2px 8px",
-                    borderRadius: "12px",
-                    backgroundColor: isUser
-                      ? "rgba(255,255,255,0.15)"
-                      : "#e0e0e0",
-                    fontSize: "11px",
-                  }}
-                >
-                  {source.datasetName}
-                  {source.columnName ? ` (${source.columnName})` : ""}
-                </span>
-              ))}
-            </div>
-          )}
-
-        {/* Tools used & reasoning toggle */}
-        {isAssistant &&
-          (message.toolsUsed?.length || message.reasoningSteps?.length) && (
-            <div style={{ marginTop: "8px" }}>
-              <button
-                type="button"
-                onClick={() => setShowDetails(!showDetails)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: isUser ? "rgba(255,255,255,0.7)" : "#0066cc",
-                  cursor: "pointer",
-                  fontSize: "12px",
-                  padding: 0,
-                  textDecoration: "underline",
-                }}
-              >
-                {showDetails ? "Hide details" : "Show details"}
-                {message.toolsUsed?.length
-                  ? ` (${message.toolsUsed.length} tools used)`
-                  : ""}
-              </button>
-
-              {showDetails && (
-                <div
-                  style={{
-                    marginTop: "8px",
-                    padding: "8px",
-                    borderRadius: "8px",
-                    backgroundColor: isUser
-                      ? "rgba(0,0,0,0.1)"
-                      : "rgba(0,0,0,0.03)",
-                    fontSize: "12px",
-                  }}
-                >
-                  {message.toolsUsed?.map((tool) => (
-                    <div
-                      key={`tool-${tool.toolName}`}
-                      style={{ marginBottom: "4px" }}
-                    >
-                      <strong>{tool.toolName}</strong>:{" "}
-                      {tool.resultSummary?.slice(0, 100)}
-                      {(tool.resultSummary?.length || 0) > 100 ? "..." : ""}
-                    </div>
-                  ))}
-                  {message.reasoningSteps?.map((step) => (
-                    <div
-                      key={`r-${step.slice(0, 40)}`}
-                      style={{
-                        color: isUser ? "rgba(255,255,255,0.6)" : "#888",
-                      }}
-                    >
-                      {step}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+        {/* Reasoning panel (reasoning steps, tools, cited sources) */}
+        {isAssistant && (
+          <ReasoningPanel
+            citedSources={message.citedSources}
+            reasoningSteps={message.reasoningSteps}
+            toolsUsed={message.toolsUsed}
+          />
+        )}
 
         {/* Timestamp */}
         <div

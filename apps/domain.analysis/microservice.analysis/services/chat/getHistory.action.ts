@@ -20,14 +20,15 @@ export interface GetHistoryParams {
 
 export interface GetHistoryResult {
   messages: Array<{
-    id: string;
-    role: string;
-    content: string;
-    confidenceScore: number | null;
     citedSources: unknown | null;
-    toolsUsed: unknown | null;
-    reasoningSteps: string[] | null;
+    confidenceScore: number | null;
+    content: string;
+    conversationId: string;
     createdAt: Date;
+    id: string;
+    reasoningSteps: string[] | null;
+    role: string;
+    toolsUsed: unknown | null;
   }>;
   total: number;
   page: number;
@@ -106,14 +107,15 @@ export default defineAction<GetHistoryParams, GetHistoryResult>({
 
     return {
       messages: messages.map((m) => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        confidenceScore: m.confidenceScore,
         citedSources: m.citedSources,
-        toolsUsed: m.toolsUsed,
-        reasoningSteps: m.reasoningSteps,
+        confidenceScore: m.confidenceScore,
+        content: m.content,
+        conversationId: m.conversationId,
         createdAt: m.createdAt,
+        id: m.id,
+        reasoningSteps: m.reasoningSteps,
+        role: m.role,
+        toolsUsed: m.toolsUsed,
       })),
       total,
       page,
