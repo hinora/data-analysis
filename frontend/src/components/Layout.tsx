@@ -13,7 +13,12 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div
-      style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
+      style={{
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
     >
       <header
         style={{
@@ -65,7 +70,9 @@ export default function Layout({ children }: LayoutProps) {
           </nav>
         </div>
       </header>
-      <main style={{ flex: 1 }}>{children}</main>
+      <main style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
+        {children}
+      </main>
     </div>
   );
 }

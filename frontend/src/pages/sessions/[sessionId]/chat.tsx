@@ -57,7 +57,14 @@ export default function ChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messageCount, isStreaming, streamEventCount]);
-  console.log("messageCount", messageCount, "isStreaming", isStreaming, "streamEventCount", streamEventCount);
+  console.log(
+    "messageCount",
+    messageCount,
+    "isStreaming",
+    isStreaming,
+    "streamEventCount",
+    streamEventCount,
+  );
 
   const handleCreateConversation = useCallback(() => {
     if (!sessionId) return;
@@ -90,7 +97,7 @@ export default function ChatPage() {
     historyData?.messages.filter((m) => m.role !== "system") || [];
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Header */}
       <div
         style={{
