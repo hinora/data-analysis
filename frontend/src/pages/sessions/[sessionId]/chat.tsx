@@ -46,25 +46,14 @@ export default function ChatPage() {
     }
   }, [conversations, activeConversationId]);
 
-  // Auto-scroll to bottom on new messages or when streaming
+  // Auto-scroll to bottom on new messages or when streaming content changes
   const messageCount = historyData?.messages.length ?? 0;
   const isStreaming = streamState.isStreaming;
-  const streamEventCount =
-    streamState.reasoningSteps.length +
-    streamState.tools.length +
-    (streamState.content ? 1 : 0);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: messageCount, isStreaming, and streamEventCount trigger scroll
+  const streamContentLen = streamState.content?.length ?? 0;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: messageCount, isStreaming, and streamContentLen trigger scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messageCount, isStreaming, streamEventCount]);
-  console.log(
-    "messageCount",
-    messageCount,
-    "isStreaming",
-    isStreaming,
-    "streamEventCount",
-    streamEventCount,
-  );
+  }, [messageCount, isStreaming, streamContentLen]);
 
   const handleCreateConversation = useCallback(() => {
     if (!sessionId) return;

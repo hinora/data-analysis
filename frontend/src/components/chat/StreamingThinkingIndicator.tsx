@@ -201,6 +201,17 @@ function ActivityLog({
   tools: ActiveTool[];
 }) {
   const [expanded, setExpanded] = useState(true);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll the activity log to the bottom when new items arrive
+  const itemCount = reasoningSteps.length + tools.length;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: itemCount drives scroll
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [itemCount]);
 
   return (
     <div
@@ -230,7 +241,7 @@ function ActivityLog({
       </button>
 
       {expanded && (
-        <div style={{ maxHeight: "200px", overflowY: "auto" }}>
+        <div ref={scrollRef} style={{ maxHeight: "200px", overflowY: "auto" }}>
           {reasoningSteps.map((step) => (
             <div
               key={`step-${step.slice(0, 60)}`}
