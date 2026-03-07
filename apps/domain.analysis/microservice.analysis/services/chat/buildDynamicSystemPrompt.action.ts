@@ -56,7 +56,7 @@ export default defineAction<
 function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
   const parts: string[] = [];
   const toolConfig = getDefaultToolEnabledConfig();
-  const { structured, unstructured } =
+  const { structured, unstructured, web } =
     getEnabledToolNamesByCategory(toolConfig);
 
   parts.push(
@@ -89,6 +89,15 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
       "### Unstructured Text Tools (ONLY for `unstructured-text` datasets)",
       "These tools operate on text documents (PDF, TXT, DOCX). They use vector embeddings and AI to search, summarize, and extract information from text.",
       `- ${unstructured.join(", ")}`,
+      "",
+    );
+  }
+
+  if (web.length > 0) {
+    parts.push(
+      "### Web Search Tools",
+      "These tools search the internet for up-to-date information, news, or facts not available in the uploaded datasets. Use when the user asks questions requiring real-time or external knowledge.",
+      `- ${web.join(", ")}`,
       "",
     );
   }

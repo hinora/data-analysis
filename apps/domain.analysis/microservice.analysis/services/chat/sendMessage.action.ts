@@ -99,7 +99,7 @@ export type StreamEvent =
 
 // ── Constants & config ──────────────────────────────────────────────────
 
-const MAX_TOOL_ITERATIONS = 10;
+const MAX_TOOL_ITERATIONS = 20;
 const toolEnabledConfig = getDefaultToolEnabledConfig();
 const TOOL_TO_ACTION = getEnabledToolActions(toolEnabledConfig);
 

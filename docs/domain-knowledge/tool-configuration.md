@@ -13,7 +13,7 @@ graph TD
     A[toolConfig.ts] -->|getDefaultToolEnabledConfig| B[ToolEnabledConfig]
     B -->|getEnabledToolActions| C[TOOL_TO_ACTION map]
     B -->|getEnabledToolDefinitions| D[ToolDefinition array]
-    B -->|getEnabledToolNamesByCategory| E[structured / unstructured lists]
+    B -->|getEnabledToolNamesByCategory| E[structured / unstructured / web lists]
     C --> F[sendMessage.action.ts — orchestration loop]
     D --> F
     E --> G[services/chat/buildDynamicSystemPrompt.action.ts — dynamic system prompt]
@@ -28,13 +28,13 @@ Single source of truth containing:
 | Export | Description |
 |--------|-------------|
 | `ToolName` | Union type of all tool names (alphabetical) |
-| `ToolCategory` | `"structured"` or `"unstructured"` |
+| `ToolCategory` | `"structured"`, `"unstructured"`, or `"web"` |
 | `ToolEnabledConfig` | `Record<ToolName, boolean>` |
 | `ALL_TOOL_NAMES` | Sorted array of every tool name |
 | `getDefaultToolEnabledConfig()` | Returns config with all tools **enabled** |
 | `getEnabledToolActions(config)` | Filtered `{ toolName: "tools.action" }` map |
 | `getEnabledToolDefinitions(config)` | Filtered `ToolDefinition[]` for the LLM |
-| `getEnabledToolNamesByCategory(config)` | `{ structured: [...], unstructured: [...] }` |
+| `getEnabledToolNamesByCategory(config)` | `{ structured: [...], unstructured: [...], web: [...] }` |
 | `getToolCategory(name)` | Returns category for a tool name |
 
 ## How to Disable a Tool
@@ -80,6 +80,22 @@ Operate on `unstructured-text` datasets (PDF, TXT, DOCX via vector embeddings):
 answerFromContext, compareDocuments, extractEntities, extractKeyTopics,
 findSimilarChunks, semanticSearch, sentimentAnalysis, summarizeDocument,
 timelineExtraction
+
+### Web Tools (`web`)
+
+Search the internet and fetch web page content:
+
+webFetch, webSearch
+
+> **webSearch** — Uses the **Brave Search API** via the `brave-search` npm package.
+> Requires the `BRAVE_API_KEY` environment variable to be set.
+> Supports filtering by country, language, and freshness (past day/week/month/year).
+>
+> **webFetch** — Uses **Puppeteer** (headless Chrome) to load and render a web page,
+> executing JavaScript before extracting plain text. Suitable for SPAs and
+> JS-heavy sites. Supports `waitForSelector` to wait for specific elements
+> and `maxLength` to truncate large pages. Blocks images, fonts, and stylesheets
+> for faster loading.
 
 ## Adding a New Tool
 

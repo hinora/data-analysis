@@ -38,9 +38,11 @@ export type ToolName =
   | "sortByField"
   | "summarizeDocument"
   | "sumField"
-  | "timelineExtraction";
+  | "timelineExtraction"
+  | "webFetch"
+  | "webSearch";
 
-export type ToolCategory = "structured" | "unstructured";
+export type ToolCategory = "structured" | "unstructured" | "web";
 
 export type ToolEnabledConfig = Record<ToolName, boolean>;
 
@@ -928,6 +930,86 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
       },
     },
   },
+
+  webSearch: {
+    action: "tools.webSearch",
+    category: "web",
+    definition: {
+      type: "function",
+      function: {
+        name: "webSearch",
+        description:
+          "[WEB SEARCH] Search the internet using Brave Search API to find up-to-date information, news, or facts not available in the uploaded datasets. Use when the user asks questions that require real-time or external knowledge.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "The search query string",
+            },
+            count: {
+              type: "number",
+              description: "Number of results to return (default: 5, max: 20)",
+            },
+            country: {
+              type: "string",
+              description:
+                "Country code for search results (e.g. 'us', 'vn', 'gb')",
+            },
+            freshness: {
+              type: "string",
+              enum: ["pd", "pw", "pm", "py"],
+              description:
+                "Filter results by age: pd (past day), pw (past week), pm (past month), py (past year)",
+            },
+            searchLang: {
+              type: "string",
+              description: "Search language preference (e.g. 'en', 'vi', 'ja')",
+            },
+          },
+          required: ["query"],
+        },
+      },
+    },
+  },
+
+  webFetch: {
+    action: "tools.webFetch",
+    category: "web",
+    definition: {
+      type: "function",
+      function: {
+        name: "webFetch",
+        description:
+          "[WEB FETCH] Fetch the content of a web page as plain text. Uses headless Chrome to execute JavaScript and render the page, so it works with SPAs and JS-heavy sites. Use when the user provides a URL and wants to read its content, or after webSearch to get full page content from a result.",
+        parameters: {
+          type: "object",
+          properties: {
+            url: {
+              type: "string",
+              description: "The URL of the web page to fetch",
+            },
+            waitForSelector: {
+              type: "string",
+              description:
+                "Optional CSS selector to wait for before extracting content (e.g. '#main-content', '.article-body'). Useful for pages that load content dynamically.",
+            },
+            maxLength: {
+              type: "number",
+              description:
+                "Maximum number of characters to return (default: 50000, max: 200000). Content is truncated if longer.",
+            },
+            timeout: {
+              type: "number",
+              description:
+                "Maximum time in milliseconds to wait for the page to load (default: 30000, max: 60000)",
+            },
+          },
+          required: ["url"],
+        },
+      },
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -954,6 +1036,8 @@ export function getDefaultToolEnabledConfig(): ToolEnabledConfig {
   for (const name of ALL_TOOL_NAMES) {
     config[name] = true;
   }
+  config.compareDocuments = false; // disabled
+  config.extractKeyTopics = false; // disabled
   return config;
 }
 
@@ -983,20 +1067,25 @@ export function getEnabledToolDefinitions(
 export function getEnabledToolNamesByCategory(config: ToolEnabledConfig): {
   structured: ToolName[];
   unstructured: ToolName[];
+  web: ToolName[];
 } {
   const structured: ToolName[] = [];
   const unstructured: ToolName[] = [];
+  const web: ToolName[] = [];
 
   for (const name of ALL_TOOL_NAMES) {
     if (!config[name]) continue;
-    if (TOOL_REGISTRY[name].category === "structured") {
+    const category = TOOL_REGISTRY[name].category;
+    if (category === "structured") {
       structured.push(name);
+    } else if (category === "web") {
+      web.push(name);
     } else {
       unstructured.push(name);
     }
   }
 
-  return { structured, unstructured };
+  return { structured, unstructured, web };
 }
 
 /** Looks up the category for a tool name. */
