@@ -233,7 +233,7 @@ async function processStream(
 
       writeSSE(stream, {
         type: "reasoning",
-        step: `Iteration ${iteration}: calling AI model…`,
+        step: `calling AI model…`,
       });
 
       const response = await ai.chatWithTools({
