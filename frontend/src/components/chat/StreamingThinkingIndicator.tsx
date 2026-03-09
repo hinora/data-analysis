@@ -242,9 +242,9 @@ function ActivityLog({
 
       {expanded && (
         <div ref={scrollRef} style={{ maxHeight: "200px", overflowY: "auto" }}>
-          {reasoningSteps.map((step) => (
+          {reasoningSteps.map((step, index) => (
             <div
-              key={`step-${step.slice(0, 60)}`}
+              key={`step-${index}`}
               style={{
                 padding: "2px 0",
                 color: "#777",

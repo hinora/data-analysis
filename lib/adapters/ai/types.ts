@@ -278,6 +278,12 @@ export interface ChatWithToolsParams {
   /** Model to use */
   model?: string;
   /**
+   * Optional callback invoked with content token chunks as the model generates them.
+   * When provided (together with onReasoning), the adapter streams content tokens
+   * incrementally instead of returning them only in the final response.
+   */
+  onContent?: (chunk: string) => void;
+  /**
    * Optional callback invoked with reasoning chunks as the model generates them.
    * When provided, the adapter should use streaming mode so that chain-of-thought
    * content inside `<think>` tags is forwarded incrementally.

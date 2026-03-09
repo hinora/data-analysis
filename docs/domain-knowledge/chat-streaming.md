@@ -5,9 +5,10 @@ Real-time AI reasoning progress delivered to the frontend via Server-Sent Events
 ## Overview
 
 When a user sends a chat message, the backend runs an AI tool-calling
-orchestration loop (up to 10 iterations). Previously the UI waited for the
+orchestration loop (up to 20 iterations). Previously the UI waited for the
 entire loop to finish before displaying a response. With streaming, each
-intermediate step is pushed to the client as it happens.
+intermediate step is pushed to the client as it happens — including the final
+answer which is streamed token-by-token via incremental `content_delta` events.
 
 ## Architecture
 
@@ -24,10 +25,11 @@ sequenceDiagram
     Chat-->>Gateway: returns PassThrough stream
     Gateway-->>Browser: HTTP 200 text/event-stream
 
-    loop AI orchestration (max 10 iterations)
-        Chat->>AI: chatWithTools(messages, tools)
-        AI-->>Chat: response (content or toolCalls)
-        Chat-->>Browser: SSE reasoning / tool_start
+    loop AI orchestration (max 20 iterations)
+        Chat->>AI: chatWithTools(messages, tools, onContent, onReasoning)
+        AI-->>Chat: streaming tokens via callbacks
+        Chat-->>Browser: SSE reasoning (thinking tokens)
+        Chat-->>Browser: SSE content_delta (answer tokens, streamed live)
         opt Tool calls present
             Chat->>Tools: ctx.call(actionName, args)
             Tools-->>Chat: result
@@ -35,7 +37,6 @@ sequenceDiagram
         end
     end
 
-    Chat-->>Browser: SSE content_delta (final answer)
     Chat-->>Browser: SSE done (saved ChatMessage)
     Note over Browser: stream closes
 ```
@@ -48,7 +49,7 @@ sequenceDiagram
 | `reasoning`     | `{ type, step }`                          | Single reasoning step string         |
 | `tool_start`    | `{ type, toolName, parameters }`          | Tool call initiated                  |
 | `tool_end`      | `{ type, toolName, durationMs, success, resultPreview }` | Tool call completed/failed |
-| `content_delta` | `{ type, delta }`                         | Streamed assistant text chunk        |
+| `content_delta` | `{ type, delta }`                         | Streamed assistant text chunk (token-by-token) |
 | `done`          | `{ type, message: ChatMessage }`          | Final saved message; stream ends     |
 | `error`         | `{ type, message }`                       | Unrecoverable error; stream ends     |
 
@@ -88,7 +89,10 @@ data: {"type":"done","message":{"id":"msg-123","content":"Based on…","role":"a
 2. Creates a `PassThrough` stream and returns it immediately.
 3. Runs the orchestration loop asynchronously, writing SSE events via
    `writeSSE(stream, event)`.
-4. On completion, writes a `done` event with the persisted `ChatMessage` and
+4. Passes `onContent` and `onReasoning` callbacks to `ai.chatWithTools()` so
+   that both reasoning steps and final answer content are streamed
+   token-by-token as `content_delta` SSE events to the client.
+5. On completion, writes a `done` event with the persisted `ChatMessage` and
    calls `stream.end()`.
 
 ### How moleculer-web Streams

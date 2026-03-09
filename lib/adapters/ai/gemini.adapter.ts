@@ -234,8 +234,8 @@ export class GeminiAdapter implements AIAdapter {
           ]
         : undefined;
 
-    // ── Streaming mode: stream tokens so reasoning can be forwarded live ──
-    if (params.onReasoning) {
+    // ── Streaming mode: stream tokens so reasoning/content can be forwarded live ──
+    if (params.onReasoning || params.onContent) {
       return this.chatWithToolsStreaming(
         contents,
         tools,
@@ -243,6 +243,7 @@ export class GeminiAdapter implements AIAdapter {
         params.temperature ?? 0.3,
         systemInstruction,
         params.onReasoning,
+        params.onContent,
         startTime,
       );
     }
@@ -491,7 +492,8 @@ export class GeminiAdapter implements AIAdapter {
     model: string,
     temperature: number,
     systemInstruction: string | undefined,
-    onReasoning: (chunk: string) => void,
+    onReasoning: ((chunk: string) => void) | undefined,
+    onContent: ((chunk: string) => void) | undefined,
     startTime: number,
   ): Promise<ChatWithToolsResponse> {
     const stream = await this.executeWithRetry(async () => {
@@ -549,27 +551,32 @@ export class GeminiAdapter implements AIAdapter {
         if (part.text) {
           if (part.thought) {
             // ── Thinking tokens ──
-            reasoningLineBuffer += part.text;
-            // Flush complete lines to the callback in real-time
-            let nlIdx = reasoningLineBuffer.indexOf("\n");
-            while (nlIdx !== -1) {
-              const line = reasoningLineBuffer.slice(0, nlIdx).trim();
-              if (line) {
-                onReasoning(line);
+            if (onReasoning) {
+              reasoningLineBuffer += part.text;
+              // Flush complete lines to the callback in real-time
+              let nlIdx = reasoningLineBuffer.indexOf("\n");
+              while (nlIdx !== -1) {
+                const line = reasoningLineBuffer.slice(0, nlIdx).trim();
+                if (line) {
+                  onReasoning(line);
+                }
+                reasoningLineBuffer = reasoningLineBuffer.slice(nlIdx + 1);
+                nlIdx = reasoningLineBuffer.indexOf("\n");
               }
-              reasoningLineBuffer = reasoningLineBuffer.slice(nlIdx + 1);
-              nlIdx = reasoningLineBuffer.indexOf("\n");
             }
           } else {
             // ── Content tokens ──
             fullContent += part.text;
+            if (onContent) {
+              onContent(part.text);
+            }
           }
         }
       }
     }
 
     // Flush any remaining reasoning buffer
-    if (reasoningLineBuffer.trim()) {
+    if (reasoningLineBuffer.trim() && onReasoning) {
       onReasoning(reasoningLineBuffer.trim());
     }
 

@@ -217,6 +217,7 @@ async function processStream(
   const toolsUsed: ToolUsage[] = [];
   const citedSources: CitedSource[] = [];
   let finalContent = "";
+  let contentStreamedViaCallback = false;
   let confidenceScore: number | null = null;
   let totalPromptTokens = 0;
   let totalCompletionTokens = 0;
@@ -233,16 +234,23 @@ async function processStream(
 
       writeSSE(stream, {
         type: "reasoning",
-        step: `calling AI model…`,
+        step: `Cooking...`,
       });
+
+      const isLastIteration = iteration > MAX_TOOL_ITERATIONS - 1;
 
       const response = await ai.chatWithTools({
         messages,
+        onContent: (chunk: string) => {
+          finalContent += chunk;
+          contentStreamedViaCallback = true;
+          writeSSE(stream, { type: "content_delta", delta: chunk });
+        },
         onReasoning: (chunk: string) => {
           reasoningSteps.push(chunk);
           writeSSE(stream, { type: "reasoning", step: chunk });
         },
-        tools: iteration <= MAX_TOOL_ITERATIONS - 1 ? tools : [],
+        tools: !isLastIteration ? tools : [],
       });
 
       totalPromptTokens += response.promptTokens || 0;
@@ -250,6 +258,10 @@ async function processStream(
 
       // ── Tool calls ────────────────────────────────────────────────
       if (response.toolCalls && response.toolCalls.length > 0) {
+        // Reset content state for the next iteration
+        finalContent = "";
+        contentStreamedViaCallback = false;
+
         messages.push({
           _rawAssistantParts: response._rawAssistantParts,
           content: response.content || "",
@@ -366,9 +378,12 @@ async function processStream(
       }
 
       // ── Final content (no tool calls) ─────────────────────────────
-      finalContent = response.content || "";
+      if (!contentStreamedViaCallback) {
+        finalContent = response.content || "";
+      }
 
       if (!finalContent && iteration < MAX_TOOL_ITERATIONS) {
+        contentStreamedViaCallback = false;
         writeSSE(stream, {
           type: "reasoning",
           step: "Empty response — retrying…",
@@ -380,8 +395,8 @@ async function processStream(
         continue;
       }
 
-      // Stream the final content as a single delta
-      if (finalContent) {
+      // Send final content as a single delta only if it wasn't already streamed
+      if (finalContent && !contentStreamedViaCallback) {
         writeSSE(stream, { type: "content_delta", delta: finalContent });
       }
 

@@ -268,14 +268,15 @@ export class OllamaAdapter implements AIAdapter {
       type: "function" as const,
     }));
 
-    // ── Streaming mode: stream tokens so reasoning can be forwarded live ──
-    if (params.onReasoning) {
+    // ── Streaming mode: stream tokens so reasoning/content can be forwarded live ──
+    if (params.onReasoning || params.onContent) {
       return this.chatWithToolsStreaming(
         messages,
         tools,
         model,
         params.temperature ?? 0.3,
         params.onReasoning,
+        params.onContent,
         startTime,
       );
     }
@@ -354,7 +355,8 @@ export class OllamaAdapter implements AIAdapter {
     tools: OllamaTool[],
     model: string,
     temperature: number,
-    onReasoning: (chunk: string) => void,
+    onReasoning: ((chunk: string) => void) | undefined,
+    onContent: ((chunk: string) => void) | undefined,
     startTime: number,
   ): Promise<ChatWithToolsResponse> {
     const stream = await this.executeWithRetry(async () => {
@@ -394,7 +396,7 @@ export class OllamaAdapter implements AIAdapter {
       const thinking =
         (chunk.message as unknown as Record<string, unknown> | undefined)
           ?.thinking ?? "";
-      if (typeof thinking === "string" && thinking) {
+      if (typeof thinking === "string" && thinking && onReasoning) {
         reasoningLineBuffer += thinking;
         // Flush complete lines to the callback in real-time
         let nlIdx = reasoningLineBuffer.indexOf("\n");
@@ -412,11 +414,14 @@ export class OllamaAdapter implements AIAdapter {
       const token = chunk.message?.content || "";
       if (token) {
         fullContent += token;
+        if (onContent) {
+          onContent(token);
+        }
       }
     }
 
     // Flush any remaining reasoning buffer
-    if (reasoningLineBuffer.trim()) {
+    if (reasoningLineBuffer.trim() && onReasoning) {
       onReasoning(reasoningLineBuffer.trim());
     }
 
