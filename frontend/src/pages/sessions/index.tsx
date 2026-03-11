@@ -19,7 +19,7 @@ const SessionsPage: React.FC = () => {
 
   const handleCreate = async () => {
     try {
-      const session = await createSession.mutateAsync();
+      const session = await createSession.mutateAsync({});
       router.push(`/sessions/${session.id}`);
     } catch (err) {
       console.error("Failed to create session:", err);
