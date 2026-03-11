@@ -21,9 +21,11 @@ import type { CitedSource, ToolUsage } from "../../db/chat-message.entity";
 import { ChatMessage, MessageRole } from "../../db/chat-message.entity";
 import { Conversation } from "../../db/conversation.entity";
 import {
+  type ToolName,
   getDefaultToolEnabledConfig,
   getEnabledToolActions,
   getEnabledToolDefinitions,
+  getToolCategory,
 } from "../../toolConfig";
 
 export interface SendMessageParams {
@@ -113,6 +115,63 @@ function writeSSE(stream: PassThrough, event: StreamEvent): void {
 /** Truncate a string to a maximum length, appending "…" if truncated. */
 function truncate(str: string, max: number): string {
   return str.length > max ? `${str.slice(0, max)}…` : str;
+}
+
+/**
+ * Validate that a tool's category matches the dataset type(s) it targets.
+ * Returns an error message string if there is a mismatch, or null if OK.
+ */
+async function validateToolDatasetType(
+  fnName: string,
+  fnArgs: Record<string, unknown>,
+  ctx: {
+    call: (name: string, params: Record<string, unknown>) => Promise<unknown>;
+  },
+): Promise<string | null> {
+  const category = getToolCategory(fnName as ToolName);
+
+  // Web tools don't target datasets — skip validation
+  if (category === "web") return null;
+
+  // Collect all dataset IDs referenced by this tool call
+  const datasetIds: string[] = [];
+  for (const key of [
+    "datasetId",
+    "leftDatasetId",
+    "rightDatasetId",
+  ] as const) {
+    const value = fnArgs[key];
+    if (typeof value === "string" && value.length > 0) {
+      datasetIds.push(value);
+    }
+  }
+
+  // No dataset ID provided — let the tool action handle its own validation
+  if (datasetIds.length === 0) return null;
+
+  const expectedType =
+    category === "structured" ? "structured-table" : "unstructured-text";
+
+  for (const datasetId of datasetIds) {
+    try {
+      const dataset = (await ctx.call("dataset.getDataset", {
+        id: datasetId,
+      })) as { datasetType: string; name: string };
+
+      if (dataset.datasetType !== expectedType) {
+        return (
+          `Error: Tool "${fnName}" is a ${category} data tool and requires a ${expectedType} dataset, ` +
+          `but dataset "${dataset.name}" (${datasetId}) is ${dataset.datasetType}. ` +
+          `Please use a ${category === "structured" ? "structured" : "unstructured text"} tool ` +
+          `for this dataset type instead.`
+        );
+      }
+    } catch {
+      // Dataset lookup failed — let the tool action handle its own error
+    }
+  }
+
+  return null;
 }
 
 // ── Action ──────────────────────────────────────────────────────────────
@@ -294,6 +353,34 @@ async function processStream(
             });
             messages.push({
               content: `Tool ${fnName} is not available.`,
+              role: "tool",
+              toolName: fnName,
+            });
+            continue;
+          }
+
+          // ── Dataset type validation ──────────────────────────────
+          const typeMismatchError = await validateToolDatasetType(
+            fnName,
+            fnArgs,
+            ctx as unknown as {
+              call: (
+                name: string,
+                params: Record<string, unknown>,
+              ) => Promise<unknown>;
+            },
+          );
+          if (typeMismatchError) {
+            reasoningSteps.push(typeMismatchError);
+            writeSSE(stream, {
+              type: "tool_end",
+              durationMs: 0,
+              resultPreview: truncate(typeMismatchError, 200),
+              success: false,
+              toolName: fnName,
+            });
+            messages.push({
+              content: typeMismatchError,
               role: "tool",
               toolName: fnName,
             });
