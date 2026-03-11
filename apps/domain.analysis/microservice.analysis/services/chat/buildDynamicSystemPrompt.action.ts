@@ -5,6 +5,13 @@ import {
   getEnabledToolNamesByCategory,
 } from "../../toolConfig";
 
+interface DocumentIndexEntry {
+  chunkEnd: number;
+  chunkStart: number;
+  summary: string;
+  title: string;
+}
+
 interface DatasetInfo {
   columnMappings?: Array<{
     camelCase: string;
@@ -19,7 +26,10 @@ interface DatasetInfo {
   rowCount: number;
   structuredMetadata?: { datasetDescription?: string };
   unstructuredMetadata?: {
+    chunkCount?: number;
+    documentIndex?: DocumentIndexEntry[];
     documentSummary?: string;
+    entities?: Array<{ count: number; name: string; type: string }>;
     keyTopics?: string[];
   };
 }
@@ -202,9 +212,34 @@ function appendDatasetInfo(parts: string[], dataset: DatasetInfo): void {
     parts.push(`- Summary: ${dataset.unstructuredMetadata.documentSummary}`);
   }
 
+  const chunkCount = dataset.unstructuredMetadata?.chunkCount;
+  if (chunkCount != null && chunkCount > 0) {
+    parts.push(`- Chunks: ${chunkCount}`);
+  }
+
   const topics = dataset.unstructuredMetadata?.keyTopics;
   if (topics && topics.length > 0) {
     parts.push(`- Topics: ${topics.join(", ")}`);
+  }
+
+  const entities = dataset.unstructuredMetadata?.entities;
+  if (entities && entities.length > 0) {
+    const topEntities = entities
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 15);
+    parts.push(
+      `- Key Entities: ${topEntities.map((e) => `${e.name} (${e.type})`).join(", ")}`,
+    );
+  }
+
+  const docIndex = dataset.unstructuredMetadata?.documentIndex;
+  if (docIndex && docIndex.length > 0) {
+    parts.push("- Document Index (use getChunks tool with chunk ranges to read sections):");
+    for (const entry of docIndex) {
+      parts.push(
+        `  - "${entry.title}" [chunks ${entry.chunkStart}–${entry.chunkEnd}]: ${entry.summary}`,
+      );
+    }
   }
 
   parts.push("");

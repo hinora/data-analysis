@@ -2,7 +2,6 @@
  * Map-Reduce Utilities
  *
  * Shared batching and concurrency helpers used by:
- * - summarizeDocument action (text summarization)
  * - generateMetadata event (unstructured metadata extraction)
  */
 
@@ -213,18 +212,26 @@ export interface PartialUnstructuredMetadata {
   entities: Array<{
     count: number;
     name: string;
-    type: "date" | "location" | "monetary" | "organisation" | "person";
+    type: string;
   }>;
   keyTopics: string[];
+  sections: Array<{
+    chunkEnd: number;
+    chunkStart: number;
+    summary: string;
+    title: string;
+  }>;
 }
 
 /**
- * Extract partial metadata (summary, topics, entities, domain) from a single
- * batch of text via AI JSON generation.
+ * Extract partial metadata (summary, topics, entities, domain, sections) from a single
+ * batch of text via AI JSON generation. Accepts chunk index range to build document index.
  */
 export async function extractMetadataBatch(req: {
   ai: AIAdapter;
   batchIndex: number;
+  chunkEndIndex: number;
+  chunkStartIndex: number;
   logger: MapReduceLogger;
   maxChars?: number;
   text: string;
@@ -233,6 +240,8 @@ export async function extractMetadataBatch(req: {
   const {
     ai,
     batchIndex,
+    chunkEndIndex,
+    chunkStartIndex,
     logger,
     maxChars = MAX_CHARS_PER_BATCH,
     text,
@@ -243,10 +252,11 @@ export async function extractMetadataBatch(req: {
     totalBatches > 1 ? ` (Part ${batchIndex + 1} of ${totalBatches})` : "";
 
   logger.info(
-    `[map-reduce] extractMetadataBatch ${batchIndex + 1}/${totalBatches} — input: ${text.length} chars`,
+    `[map-reduce] extractMetadataBatch ${batchIndex + 1}/${totalBatches} — input: ${text.length} chars, chunks ${chunkStartIndex}–${chunkEndIndex}`,
   );
 
   const prompt = `Analyse the following document excerpt${batchContext} and extract metadata. Respond in the same language as the document.
+This excerpt covers chunks indexed from ${chunkStartIndex} to ${chunkEndIndex}.
 
 Text:
 ${text.slice(0, maxChars)}
@@ -257,9 +267,16 @@ Respond with a JSON object (no markdown, no code blocks) with exactly this struc
   "keyTopics": ["topic1", "topic2", "topic3"],
   "contentDomain": "e.g. financial, legal, scientific, general",
   "entities": [
-    {"name": "Entity Name", "type": "person|organisation|location|date|monetary", "count": 1}
+    {"name": "Entity Name", "type": "any relevant type, e.g. person, organisation, location, date, monetary, product, event, regulation, technology, etc.", "count": 1}
+  ],
+  "sections": [
+    {"title": "Section Title", "summary": "Brief description of what this section covers", "chunkStart": ${chunkStartIndex}, "chunkEnd": ${chunkEndIndex}}
   ]
-}`;
+}
+
+For "entities", extract ALL relevant entities found in the text. Do not restrict to predefined types — use whatever entity type best describes each entity (e.g. person, organisation, location, date, monetary, product, event, regulation, technology, concept, metric, etc.).
+
+For "sections", identify logical sections or topics within this excerpt. Each section should reference the chunk index range it covers (between ${chunkStartIndex} and ${chunkEndIndex}). If the excerpt covers a single topic, return one section spanning the full range.`;
 
   const start = Date.now();
   const response = await ai.generateJSON({ prompt });
@@ -274,6 +291,25 @@ Respond with a JSON object (no markdown, no code blocks) with exactly this struc
       ? (response.data as Record<string, unknown>)
       : {};
 
+  const rawSections = Array.isArray(data.sections)
+    ? (data.sections as Array<Record<string, unknown>>)
+    : [];
+
+  const sections = rawSections
+    .filter((s) => s.title && typeof s.title === "string")
+    .map((s) => ({
+      chunkEnd: Math.min(
+        Number(s.chunkEnd ?? chunkEndIndex),
+        chunkEndIndex,
+      ),
+      chunkStart: Math.max(
+        Number(s.chunkStart ?? chunkStartIndex),
+        chunkStartIndex,
+      ),
+      summary: String(s.summary || ""),
+      title: String(s.title),
+    }));
+
   return {
     contentDomain: (data.contentDomain as string) || "unknown",
     documentSummary: (data.documentSummary as string) || "",
@@ -283,6 +319,17 @@ Respond with a JSON object (no markdown, no code blocks) with exactly this struc
     keyTopics: Array.isArray(data.keyTopics)
       ? (data.keyTopics as string[])
       : [],
+    sections:
+      sections.length > 0
+        ? sections
+        : [
+            {
+              chunkEnd: chunkEndIndex,
+              chunkStart: chunkStartIndex,
+              summary: (data.documentSummary as string) || "",
+              title: `Part ${batchIndex + 1}`,
+            },
+          ],
   };
 }
 
@@ -292,6 +339,7 @@ Respond with a JSON object (no markdown, no code blocks) with exactly this struc
  * - Topics are deduplicated (case-insensitive).
  * - Entities are merged by name+type, summing counts.
  * - Content domain picks the most frequently reported domain.
+ * - Sections are concatenated in order (already carry chunk index ranges).
  */
 export function mergePartialMetadata(
   partials: PartialUnstructuredMetadata[],
@@ -347,5 +395,11 @@ export function mergePartialMetadata(
     }
   }
 
-  return { contentDomain, documentSummary, entities, keyTopics };
+  // Concatenate sections in order (they already carry chunk index ranges)
+  const sections: PartialUnstructuredMetadata["sections"] = [];
+  for (const partial of partials) {
+    sections.push(...(partial.sections || []));
+  }
+
+  return { contentDomain, documentSummary, entities, keyTopics, sections };
 }

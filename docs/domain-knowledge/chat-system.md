@@ -146,12 +146,12 @@ flowchart LR
     DT -->|structured-table| ST[Structured Data Tools]
     DT -->|unstructured-text| UT[Unstructured Text Tools]
     ST --> R1[sumField, avgField, count, filterByCondition, ...]
-    UT --> R2[semanticSearch, summarizeDocument, answerFromContext, ...]
+    UT --> R2[semanticSearch, answerFromContext, getChunks]
 ```
 
 The system prompt explicitly groups datasets by type and tells the AI:
 - **`structured-table`** datasets → use ONLY structured data tools (tabular row/column operations)
-- **`unstructured-text`** datasets → use ONLY unstructured text tools (vector search, summarization, entity extraction)
+- **`unstructured-text`** datasets → use ONLY unstructured text tools (vector search, RAG, chunk reading)
 - NEVER mix tool categories across dataset types
 
 #### Structured Data Tools (for `structured-table` datasets only)
@@ -200,14 +200,8 @@ flowchart TD
 | Tool                 | Action                       | Description                                         |
 |----------------------|------------------------------|-----------------------------------------------------|
 | `answerFromContext`  | `tools.answerFromContext`    | Answer questions using retrieved text context (RAG)  |
-| `compareDocuments`   | `tools.compareDocuments`     | Compare content/themes across text datasets          |
-| `extractEntities`    | `tools.extractEntities`      | Extract people, orgs, dates, locations, monetary     |
-| `extractKeyTopics`   | `tools.extractKeyTopics`     | Identify main topics and themes                      |
-| `findSimilarChunks`  | `tools.findSimilarChunks`    | Find semantically similar text passages              |
+| `getChunks`          | `tools.getChunks`            | Retrieve text chunks by order index range from document index |
 | `semanticSearch`     | `tools.semanticSearch`       | Hybrid search: vector similarity + keyword matching across text chunks |
-| `sentimentAnalysis`  | `tools.sentimentAnalysis`    | Determine sentiment of text passages                 |
-| `summarizeDocument`  | `tools.summarizeDocument`    | Generate a summary of a text dataset                 |
-| `timelineExtraction` | `tools.timelineExtraction`   | Extract and order date-referenced events             |
 
 ## AI Logging
 

@@ -64,14 +64,22 @@ export interface StructuredMetadata {
   }>;
 }
 
+export interface DocumentIndexEntry {
+  chunkEnd: number;
+  chunkStart: number;
+  summary: string;
+  title: string;
+}
+
 export interface UnstructuredMetadata {
   chunkCount: number;
   contentDomain: string;
+  documentIndex: DocumentIndexEntry[];
   documentSummary: string;
   entities: Array<{
     count: number;
     name: string;
-    type: "date" | "location" | "monetary" | "organisation" | "person";
+    type: string;
   }>;
   keyTopics: string[];
   wordCount: number;

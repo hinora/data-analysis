@@ -77,9 +77,21 @@ sortByField, sumField
 
 Operate on `unstructured-text` datasets (PDF, TXT, DOCX via vector embeddings):
 
-answerFromContext, compareDocuments, extractEntities, extractKeyTopics,
-findSimilarChunks, semanticSearch, sentimentAnalysis, summarizeDocument,
-timelineExtraction
+answerFromContext, getChunks, semanticSearch
+
+- **answerFromContext** — RAG pattern: answers a question using retrieved text
+  context via vector search. Essential for question-answering on documents.
+- **getChunks** — Retrieve text chunks by order index range. Use the document
+  index from dataset metadata to find the relevant section, then call this
+  tool with the section's chunk range to read the actual content.
+- **semanticSearch** — Hybrid search combining vector similarity (pgvector) with
+  keyword matching for finding relevant text passages.
+
+> **Note:** Entity extraction, topic extraction, document summarization,
+> sentiment analysis, and timeline extraction are now handled during metadata
+> generation and stored in the dataset's `unstructuredMetadata`. This eliminates
+> redundant AI calls during chat and provides the AI with pre-computed context
+> including a document index that maps sections to chunk ranges.
 
 ### Web Tools (`web`)
 
@@ -104,69 +116,3 @@ webFetch, webSearch
    `definition` (OpenAI function-calling schema).
 3. Implement the corresponding action in `microservice.data/services/tools/`.
 4. Run `npm run generate:types:all` then `npm run lint:fix`.
-
-## Large Dataset Handling (compareDocuments)
-
-`tools.compareDocuments` now processes full datasets instead of sampling only a
-small fixed number of chunks.
-
-### Flow
-
-```mermaid
-flowchart TD
-        A[compareDocuments.action] --> B[scanTextChunkPages page scan]
-        B --> C[splitIntoBatchesByChars]
-        C --> D[summarizeTextBatch map phase]
-        D --> E[reduceTextSummaries reduce phase]
-        E --> F[Final cross-document comparison JSON]
-```
-
-### Notes
-
-- Chunk reading is paginated (`DEFAULT_TEXT_CHUNK_PAGE_SIZE = 100`) via
-    `lib/text-chunk-pagination.ts`.
-- Each page is summarized in batches, then all batch summaries are recursively
-    reduced to one summary per dataset.
-- Final comparison runs on the two reduced summaries, so the tool scales to
-    much larger corpora while keeping prompt size bounded.
-- Optional `summaryConcurrency` controls parallel summarization and defaults to
-    `1` for safe, predictable load.
-
-## Large Dataset Handling (other unstructured tools)
-
-The following tools now use the same paginated full-dataset pattern instead of
-fixed chunk sampling:
-
-- `tools.extractEntities`
-- `tools.extractKeyTopics`
-- `tools.timelineExtraction`
-- `tools.sentimentAnalysis`
-
-### Shared processing pattern
-
-```mermaid
-flowchart TD
-        A[Tool action] --> B[scanTextChunkPages]
-        B --> C[splitIntoBatchesByChars]
-        C --> D[AI extraction per batch]
-        D --> E[Merge or reduce final result]
-```
-
-### Tool-specific behavior
-
-- `extractEntities`: merges entities across all batches using
-    `type + normalized name`, aggregates counts, keeps strongest context.
-- `extractKeyTopics`: merges topic candidates across all batches and performs a
-    final consolidation pass to return top `maxTopics`.
-- `timelineExtraction`: extracts events per batch, de-duplicates candidates,
-    then performs a final chronological consolidation pass.
-- `sentimentAnalysis`:
-    - `granularity=document`: analyzes all text batches and aggregates score,
-        themes, and tones.
-    - `granularity=chunk`: analyzes every chunk (paginated) and returns per-chunk
-        sentiment plus corpus-level aggregate score.
-
-### Concurrency controls
-
-Each of these actions now accepts optional `concurrency` (default `1`, min `1`,
-max `10`) to tune throughput vs. AI provider load.

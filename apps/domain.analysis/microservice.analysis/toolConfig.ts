@@ -17,16 +17,13 @@ export type ToolName =
   | "aggregate"
   | "answerFromContext"
   | "avgField"
-  | "compareDocuments"
   | "correlateFields"
   | "count"
   | "countAndGroup"
   | "countDistinctValues"
   | "detectOutliers"
-  | "extractEntities"
-  | "extractKeyTopics"
   | "filterByCondition"
-  | "findSimilarChunks"
+  | "getChunks"
   | "getDistinctValues"
   | "getMinMax"
   | "getPercentile"
@@ -34,11 +31,8 @@ export type ToolName =
   | "joinDatasets"
   | "pivotTable"
   | "semanticSearch"
-  | "sentimentAnalysis"
   | "sortByField"
-  | "summarizeDocument"
   | "sumField"
-  | "timelineExtraction"
   | "webFetch"
   | "webSearch";
 
@@ -224,33 +218,6 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
     },
   },
 
-  compareDocuments: {
-    action: "tools.compareDocuments",
-    category: "unstructured",
-    definition: {
-      type: "function",
-      function: {
-        name: "compareDocuments",
-        description:
-          "[UNSTRUCTURED TEXT ONLY] Compare two unstructured-text datasets for similarities and differences. Do NOT use on structured-table datasets.",
-        parameters: {
-          type: "object",
-          properties: {
-            datasetId1: {
-              type: "string",
-              description: "First dataset UUID",
-            },
-            datasetId2: {
-              type: "string",
-              description: "Second dataset UUID",
-            },
-          },
-          required: ["datasetId1", "datasetId2"],
-        },
-      },
-    },
-  },
-
   correlateFields: {
     action: "tools.correlateFields",
     category: "structured",
@@ -421,57 +388,6 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
     },
   },
 
-  extractEntities: {
-    action: "tools.extractEntities",
-    category: "unstructured",
-    definition: {
-      type: "function",
-      function: {
-        name: "extractEntities",
-        description:
-          "[UNSTRUCTURED TEXT ONLY] Extract entities (people, orgs, dates, locations, monetary) from an unstructured-text dataset. Do NOT use on structured-table datasets.",
-        parameters: {
-          type: "object",
-          properties: {
-            datasetId: { type: "string", description: "Dataset UUID" },
-            entityTypes: {
-              type: "array",
-              items: { type: "string" },
-              description:
-                "Entity types to extract (default: person, organization, date, location, monetary)",
-            },
-          },
-          required: ["datasetId"],
-        },
-      },
-    },
-  },
-
-  extractKeyTopics: {
-    action: "tools.extractKeyTopics",
-    category: "unstructured",
-    definition: {
-      type: "function",
-      function: {
-        name: "extractKeyTopics",
-        description:
-          "[UNSTRUCTURED TEXT ONLY] Extract main topics from an unstructured-text dataset. Do NOT use on structured-table datasets.",
-        parameters: {
-          type: "object",
-          properties: {
-            datasetId: { type: "string", description: "Dataset UUID" },
-            maxTopics: {
-              type: "number",
-              description:
-                "Maximum number of topics to extract (default: 10, max: 20)",
-            },
-          },
-          required: ["datasetId"],
-        },
-      },
-    },
-  },
-
   filterByCondition: {
     action: "tools.filterByCondition",
     category: "structured",
@@ -531,33 +447,36 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
     },
   },
 
-  findSimilarChunks: {
-    action: "tools.findSimilarChunks",
+  getChunks: {
+    action: "tools.getChunks",
     category: "unstructured",
     definition: {
       type: "function",
       function: {
-        name: "findSimilarChunks",
+        name: "getChunks",
         description:
-          "[UNSTRUCTURED TEXT ONLY] Find text chunks similar to a given chunk using vector embeddings. Only works on unstructured-text datasets. Do NOT use on structured-table datasets.",
+          "[UNSTRUCTURED TEXT ONLY] Retrieve text chunks from an unstructured-text dataset by order index range. Use the document index from dataset metadata to find the relevant section, then call this tool with the section's chunk range to read the actual content. Do NOT use on structured-table datasets.",
         parameters: {
           type: "object",
           properties: {
-            chunkId: {
-              type: "string",
-              description: "Source text chunk UUID",
-            },
-            topK: {
+            datasetId: { type: "string", description: "Dataset UUID" },
+            startIndex: {
               type: "number",
-              description: "Number of similar chunks to return (default: 5)",
-            },
-            sessionId: {
-              type: "string",
               description:
-                "Optional session UUID to scope search (defaults to source chunk's session)",
+                "Starting chunk order index (default: 0). Use chunkStart from the document index.",
+            },
+            endIndex: {
+              type: "number",
+              description:
+                "Ending chunk order index (inclusive). Use chunkEnd from the document index.",
+            },
+            limit: {
+              type: "number",
+              description:
+                "Max chunks to return when endIndex is not specified (default: 20, max: 50)",
             },
           },
-          required: ["chunkId"],
+          required: ["datasetId"],
         },
       },
     },
@@ -792,32 +711,6 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
     },
   },
 
-  sentimentAnalysis: {
-    action: "tools.sentimentAnalysis",
-    category: "unstructured",
-    definition: {
-      type: "function",
-      function: {
-        name: "sentimentAnalysis",
-        description:
-          "[UNSTRUCTURED TEXT ONLY] Analyze sentiment of text content from an unstructured-text dataset. Do NOT use on structured-table datasets.",
-        parameters: {
-          type: "object",
-          properties: {
-            datasetId: { type: "string", description: "Dataset UUID" },
-            granularity: {
-              type: "string",
-              enum: ["document", "chunk"],
-              description:
-                "Analyze at document level or per-chunk (default: document)",
-            },
-          },
-          required: ["datasetId"],
-        },
-      },
-    },
-  },
-
   sortByField: {
     action: "tools.sortByField",
     category: "structured",
@@ -856,31 +749,6 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
     },
   },
 
-  summarizeDocument: {
-    action: "tools.summarizeDocument",
-    category: "unstructured",
-    definition: {
-      type: "function",
-      function: {
-        name: "summarizeDocument",
-        description:
-          "[UNSTRUCTURED TEXT ONLY] Generate an AI summary of an unstructured-text dataset using map-reduce. Handles documents of any size by splitting into batches, summarizing each, then merging. Do NOT use on structured-table datasets.",
-        parameters: {
-          type: "object",
-          properties: {
-            concurrency: {
-              type: "number",
-              description:
-                "How many AI calls run in parallel (default: 1 = sequential, max: 10). Increase for faster summarization of large documents when the AI backend supports concurrent requests.",
-            },
-            datasetId: { type: "string", description: "Dataset UUID" },
-          },
-          required: ["datasetId"],
-        },
-      },
-    },
-  },
-
   sumField: {
     action: "tools.sumField",
     category: "structured",
@@ -906,26 +774,6 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
             },
           },
           required: ["datasetId", "field"],
-        },
-      },
-    },
-  },
-
-  timelineExtraction: {
-    action: "tools.timelineExtraction",
-    category: "unstructured",
-    definition: {
-      type: "function",
-      function: {
-        name: "timelineExtraction",
-        description:
-          "[UNSTRUCTURED TEXT ONLY] Extract temporal events and dates from an unstructured-text dataset. Do NOT use on structured-table datasets.",
-        parameters: {
-          type: "object",
-          properties: {
-            datasetId: { type: "string", description: "Dataset UUID" },
-          },
-          required: ["datasetId"],
         },
       },
     },
@@ -1036,8 +884,6 @@ export function getDefaultToolEnabledConfig(): ToolEnabledConfig {
   for (const name of ALL_TOOL_NAMES) {
     config[name] = true;
   }
-  config.compareDocuments = false; // disabled
-  config.extractKeyTopics = false; // disabled
   return config;
 }
 
