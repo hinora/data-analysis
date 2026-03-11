@@ -461,6 +461,7 @@ export function assignIndexLabels(
 }
 
 function toLowerAlpha(n: number): string {
+  if (n <= 0) return "a";
   // 1 → a, 2 → b, ..., 26 → z, 27 → aa, ...
   let result = "";
   let num = n;
@@ -473,6 +474,7 @@ function toLowerAlpha(n: number): string {
 }
 
 function toRoman(n: number): string {
+  if (n <= 0) return "i";
   const numerals: [number, string][] = [
     [1000, "m"],
     [900, "cm"],
