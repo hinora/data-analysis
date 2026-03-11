@@ -55,11 +55,19 @@ Entity types are **not restricted** to predefined categories. The AI is free to 
 
 ### Document Index
 
-The metadata includes a `documentIndex` — an array of section entries that map logical document sections to chunk order index ranges. Each entry has:
+The metadata includes a `documentIndex` — an array of section entries that map logical document sections to chunk order index ranges, supporting multiple levels like a book's table of contents. Each entry has:
+- `indexLabel` — hierarchical label (e.g. "1", "2", "2a", "2b", "2a-i")
+- `level` — nesting depth (0 = main section, 1 = sub-section, 2 = sub-sub-section, etc.)
 - `title` — section or topic title
 - `summary` — brief description of what the section covers
 - `chunkStart` — starting chunk orderIndex
 - `chunkEnd` — ending chunk orderIndex
+
+Index labels are assigned automatically based on level:
+- Level 0: numeric (1, 2, 3, ...)
+- Level 1: parent number + lowercase letter (1a, 1b, 2a, ...)
+- Level 2: parent label + roman numeral (1a-i, 1a-ii, ...)
+- Level 3+: parent label + sequential number (1a-i-1, 1a-i-2, ...)
 
 This index enables the AI to navigate documents using the `getChunks` tool to read specific sections.
 

@@ -218,6 +218,7 @@ export interface PartialUnstructuredMetadata {
   sections: Array<{
     chunkEnd: number;
     chunkStart: number;
+    level: number;
     summary: string;
     title: string;
   }>;
@@ -270,13 +271,14 @@ Respond with a JSON object (no markdown, no code blocks) with exactly this struc
     {"name": "Entity Name", "type": "any relevant type, e.g. person, organisation, location, date, monetary, product, event, regulation, technology, etc.", "count": 1}
   ],
   "sections": [
-    {"title": "Section Title", "summary": "Brief description of what this section covers", "chunkStart": ${chunkStartIndex}, "chunkEnd": ${chunkEndIndex}}
+    {"title": "Main Section Title", "summary": "Brief description", "chunkStart": ${chunkStartIndex}, "chunkEnd": ${chunkEndIndex}, "level": 0},
+    {"title": "Sub Section Title", "summary": "Brief description of sub-section", "chunkStart": ${chunkStartIndex}, "chunkEnd": ${chunkEndIndex}, "level": 1}
   ]
 }
 
 For "entities", extract ALL relevant entities found in the text. Do not restrict to predefined types — use whatever entity type best describes each entity (e.g. person, organisation, location, date, monetary, product, event, regulation, technology, concept, metric, etc.).
 
-For "sections", identify logical sections or topics within this excerpt. Each section should reference the chunk index range it covers (between ${chunkStartIndex} and ${chunkEndIndex}). If the excerpt covers a single topic, return one section spanning the full range.`;
+For "sections", identify logical sections and sub-sections within this excerpt, like a book's table of contents with multiple levels. Use the "level" field to indicate depth: 0 for main sections, 1 for sub-sections, 2 for sub-sub-sections, etc. Each section should reference the chunk index range it covers (between ${chunkStartIndex} and ${chunkEndIndex}). List sections in document order, with sub-sections appearing right after their parent section. If the excerpt covers a single topic, return one section at level 0 spanning the full range.`;
 
   const start = Date.now();
   const response = await ai.generateJSON({ prompt });
@@ -298,14 +300,12 @@ For "sections", identify logical sections or topics within this excerpt. Each se
   const sections = rawSections
     .filter((s) => s.title && typeof s.title === "string")
     .map((s) => ({
-      chunkEnd: Math.min(
-        Number(s.chunkEnd ?? chunkEndIndex),
-        chunkEndIndex,
-      ),
+      chunkEnd: Math.min(Number(s.chunkEnd ?? chunkEndIndex), chunkEndIndex),
       chunkStart: Math.max(
         Number(s.chunkStart ?? chunkStartIndex),
         chunkStartIndex,
       ),
+      level: Math.max(0, Math.floor(Number(s.level ?? 0))),
       summary: String(s.summary || ""),
       title: String(s.title),
     }));
@@ -326,6 +326,7 @@ For "sections", identify logical sections or topics within this excerpt. Each se
             {
               chunkEnd: chunkEndIndex,
               chunkStart: chunkStartIndex,
+              level: 0,
               summary: (data.documentSummary as string) || "",
               title: `Part ${batchIndex + 1}`,
             },
@@ -402,4 +403,98 @@ export function mergePartialMetadata(
   }
 
   return { contentDomain, documentSummary, entities, keyTopics, sections };
+}
+
+/**
+ * Assign hierarchical index labels to a flat list of sections based on their level.
+ * Produces book-style labels: "1", "2", "2a", "2b", "3", "3a", "3a-i", etc.
+ *
+ * - Level 0: numeric (1, 2, 3, ...)
+ * - Level 1: parent number + lowercase letter (1a, 1b, 2a, ...)
+ * - Level 2: parent label + roman numeral (1a-i, 1a-ii, ...)
+ * - Level 3+: parent label + sequential number (1a-i-1, 1a-i-2, ...)
+ */
+export function assignIndexLabels(
+  sections: Array<{ level: number }>,
+): string[] {
+  const labels: string[] = [];
+  // Track current counter at each level
+  const counters: number[] = [];
+  // Track the label of the parent at each level
+  const parentLabels: string[] = [];
+
+  for (let i = 0; i < sections.length; i++) {
+    const level = sections[i].level;
+
+    // Reset counters for all deeper levels when we encounter a section
+    counters.length = Math.max(counters.length, level + 1);
+    for (let l = level + 1; l < counters.length; l++) {
+      counters[l] = 0;
+    }
+
+    // Initialize counter for this level if needed
+    if (counters[level] === undefined) {
+      counters[level] = 0;
+    }
+    counters[level]++;
+
+    let label: string;
+    if (level === 0) {
+      label = String(counters[level]);
+    } else {
+      const parent = parentLabels[level - 1] || String(counters[0] || 1);
+      const index = counters[level];
+      if (level === 1) {
+        label = `${parent}${toLowerAlpha(index)}`;
+      } else if (level === 2) {
+        label = `${parent}-${toRoman(index)}`;
+      } else {
+        label = `${parent}-${index}`;
+      }
+    }
+
+    labels.push(label);
+    parentLabels[level] = label;
+  }
+
+  return labels;
+}
+
+function toLowerAlpha(n: number): string {
+  // 1 → a, 2 → b, ..., 26 → z, 27 → aa, ...
+  let result = "";
+  let num = n;
+  while (num > 0) {
+    num--;
+    result = String.fromCharCode(97 + (num % 26)) + result;
+    num = Math.floor(num / 26);
+  }
+  return result;
+}
+
+function toRoman(n: number): string {
+  const numerals: [number, string][] = [
+    [1000, "m"],
+    [900, "cm"],
+    [500, "d"],
+    [400, "cd"],
+    [100, "c"],
+    [90, "xc"],
+    [50, "l"],
+    [40, "xl"],
+    [10, "x"],
+    [9, "ix"],
+    [5, "v"],
+    [4, "iv"],
+    [1, "i"],
+  ];
+  let result = "";
+  let remaining = n;
+  for (const [value, numeral] of numerals) {
+    while (remaining >= value) {
+      result += numeral;
+      remaining -= value;
+    }
+  }
+  return result;
 }

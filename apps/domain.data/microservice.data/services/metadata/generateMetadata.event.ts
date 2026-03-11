@@ -29,6 +29,7 @@ import {
 } from "../../db/dataset.entity";
 import { TextChunk } from "../../db/text-chunk.entity";
 import {
+  assignIndexLabels,
   extractMetadataBatch,
   MAX_CHARS_PER_BATCH,
   mergePartialMetadata,
@@ -390,15 +391,17 @@ async function generateUnstructuredMetadata(
     });
   }
 
-  // Build document index from merged sections
-  const documentIndex: DocumentIndexEntry[] = (merged.sections || []).map(
-    (s) => ({
-      chunkEnd: s.chunkEnd,
-      chunkStart: s.chunkStart,
-      summary: s.summary,
-      title: s.title,
-    }),
-  );
+  // Build document index from merged sections with hierarchical labels
+  const mergedSections = merged.sections || [];
+  const indexLabels = assignIndexLabels(mergedSections);
+  const documentIndex: DocumentIndexEntry[] = mergedSections.map((s, i) => ({
+    chunkEnd: s.chunkEnd,
+    chunkStart: s.chunkStart,
+    indexLabel: indexLabels[i],
+    level: s.level,
+    summary: s.summary,
+    title: s.title,
+  }));
 
   const latencyMs = Date.now() - overallStartTime;
 

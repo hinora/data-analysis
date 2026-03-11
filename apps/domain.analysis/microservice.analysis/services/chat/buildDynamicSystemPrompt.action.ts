@@ -8,6 +8,8 @@ import {
 interface DocumentIndexEntry {
   chunkEnd: number;
   chunkStart: number;
+  indexLabel: string;
+  level: number;
   summary: string;
   title: string;
 }
@@ -224,9 +226,7 @@ function appendDatasetInfo(parts: string[], dataset: DatasetInfo): void {
 
   const entities = dataset.unstructuredMetadata?.entities;
   if (entities && entities.length > 0) {
-    const topEntities = entities
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 15);
+    const topEntities = entities.sort((a, b) => b.count - a.count).slice(0, 15);
     parts.push(
       `- Key Entities: ${topEntities.map((e) => `${e.name} (${e.type})`).join(", ")}`,
     );
@@ -234,10 +234,14 @@ function appendDatasetInfo(parts: string[], dataset: DatasetInfo): void {
 
   const docIndex = dataset.unstructuredMetadata?.documentIndex;
   if (docIndex && docIndex.length > 0) {
-    parts.push("- Document Index (use getChunks tool with chunk ranges to read sections):");
+    parts.push(
+      "- Document Index (use getChunks tool with chunk ranges to read sections):",
+    );
     for (const entry of docIndex) {
+      const indent = "  ".repeat(1 + (entry.level || 0));
+      const label = entry.indexLabel || "-";
       parts.push(
-        `  - "${entry.title}" [chunks ${entry.chunkStart}–${entry.chunkEnd}]: ${entry.summary}`,
+        `${indent}${label}. "${entry.title}" [chunks ${entry.chunkStart}–${entry.chunkEnd}]: ${entry.summary}`,
       );
     }
   }
