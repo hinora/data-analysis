@@ -120,6 +120,8 @@ sequenceDiagram
                 ChatSvc->>ChatSvc: Append role:"tool" message with toolName
                 ChatSvc->>ChatSvc: Record reasoning step + cited sources
             end
+            ChatSvc->>ChatSvc: Inject self-reflection prompt
+            Note over ChatSvc: AI evaluates data sufficiency & relevance
         else Final response (no tool calls)
             ChatSvc->>ChatSvc: Extract confidence score
             ChatSvc->>ChatSvc: Break loop

@@ -21,11 +21,11 @@ import type { CitedSource, ToolUsage } from "../../db/chat-message.entity";
 import { ChatMessage, MessageRole } from "../../db/chat-message.entity";
 import { Conversation } from "../../db/conversation.entity";
 import {
-  type ToolName,
   getDefaultToolEnabledConfig,
   getEnabledToolActions,
   getEnabledToolDefinitions,
   getToolCategory,
+  type ToolName,
 } from "../../toolConfig";
 
 export interface SendMessageParams {
@@ -135,11 +135,7 @@ async function validateToolDatasetType(
 
   // Collect all dataset IDs referenced by this tool call
   const datasetIds: string[] = [];
-  for (const key of [
-    "datasetId",
-    "leftDatasetId",
-    "rightDatasetId",
-  ] as const) {
+  for (const key of ["datasetId", "leftDatasetId", "rightDatasetId"] as const) {
     const value = fnArgs[key];
     if (typeof value === "string" && value.length > 0) {
       datasetIds.push(value);
@@ -461,6 +457,25 @@ async function processStream(
             });
           }
         }
+
+        // ── Self-reflection: prompt the AI to verify data relevance ──
+        messages.push({
+          content:
+            "Before responding, reflect on the data you just retrieved:\n" +
+            "1. Is this data sufficient to answer the user's question?\n" +
+            "2. Is the retrieved information relevant and accurate?\n" +
+            "3. Do you need to fetch additional data from other sections or datasets?\n" +
+            "If the data is insufficient or irrelevant, use more tools to gather better information. " +
+            "If the data is sufficient, provide your final answer.",
+          role: "user",
+        });
+
+        writeSSE(stream, {
+          type: "reasoning",
+          step: "Self-reflection: verifying data relevance…",
+        });
+        reasoningSteps.push("Self-reflection: verifying data relevance…");
+
         continue;
       }
 

@@ -170,3 +170,111 @@ export async function chunkText(
     }))
     .filter((chunk) => chunk.content.length > 0);
 }
+
+/** Default configuration for semantic chunks */
+const DEFAULT_SEMANTIC_CHUNK_SIZE = 1500;
+const DEFAULT_SEMANTIC_MIN_SIZE = 200;
+
+/**
+ * Detect whether a line of text appears to be a section header.
+ * Uses heuristics: ALL-CAPS, ends with colon, numbered headings, short lines.
+ */
+function isSectionHeader(line: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed.length === 0) return false;
+  if (trimmed.length > 120) return false;
+  // ALL-CAPS with at least 3 characters
+  if (/^[A-Z\s\d.:!?–\-—]{3,}$/.test(trimmed) && /[A-Z]{2,}/.test(trimmed))
+    return true;
+  // Ends with colon (header/label style)
+  if (trimmed.endsWith(":") && trimmed.length <= 80) return true;
+  // Numbered heading: "1.", "1.2", "Section 1", "Chapter 3" etc.
+  if (
+    /^(\d+\.?\d*\s|Section\s|Chapter\s|Part\s)/i.test(trimmed) &&
+    trimmed.length <= 80
+  )
+    return true;
+  // Short line (likely a title) — at most 60 chars, starts with uppercase
+  if (trimmed.length <= 60 && /^[A-Z]/.test(trimmed) && !/[.!?]$/.test(trimmed))
+    return true;
+  return false;
+}
+
+/**
+ * Split text into semantically coherent chunks based on section boundaries.
+ *
+ * Unlike fixed-size chunking, this preserves context by:
+ * - Splitting at section header boundaries
+ * - Keeping headers together with their body text
+ * - Using variable-size chunks (target ~1500 chars)
+ * - Falling back to RecursiveCharacterTextSplitter for oversized sections
+ */
+export async function semanticChunkText(
+  text: string,
+  options: ChunkOptions = {},
+): Promise<ParsedTextChunk[]> {
+  const maxChunkSize = options.chunkSize ?? DEFAULT_SEMANTIC_CHUNK_SIZE;
+  const minChunkSize = DEFAULT_SEMANTIC_MIN_SIZE;
+  const startIndex = options.startIndex ?? 0;
+
+  if (!text || text.trim().length === 0) return [];
+
+  const normalizedText = normalizeExtractedText(text);
+  const paragraphs = normalizedText
+    .split(/\n\n+/)
+    .filter((p) => p.trim().length > 0);
+
+  if (paragraphs.length === 0) return [];
+
+  // Group paragraphs into semantic sections
+  const sections: string[][] = [[]];
+
+  for (const paragraph of paragraphs) {
+    const trimmed = paragraph.trim();
+    // Start a new section if this is a header and current section has content
+    if (isSectionHeader(trimmed) && sections[sections.length - 1].length > 0) {
+      sections.push([]);
+    }
+    sections[sections.length - 1].push(trimmed);
+  }
+
+  // Merge tiny sections with the next one
+  const mergedSections: string[][] = [];
+  for (let i = 0; i < sections.length; i++) {
+    const sectionText = sections[i].join("\n\n");
+    if (sectionText.length < minChunkSize && i + 1 < sections.length) {
+      // Merge with next section
+      sections[i + 1] = [...sections[i], ...sections[i + 1]];
+    } else {
+      mergedSections.push(sections[i]);
+    }
+  }
+
+  // Build chunks from sections
+  const chunks: ParsedTextChunk[] = [];
+  let orderIdx = startIndex;
+
+  for (const section of mergedSections) {
+    const sectionText = section.join("\n\n");
+
+    if (sectionText.length > maxChunkSize * 1.5) {
+      // Oversized section — split using RecursiveCharacterTextSplitter
+      const subChunks = await chunkText(sectionText, {
+        chunkSize: maxChunkSize,
+        overlap: options.overlap ?? 100,
+        startIndex: orderIdx,
+        sourcePage: options.sourcePage,
+      });
+      chunks.push(...subChunks);
+      orderIdx += subChunks.length;
+    } else {
+      chunks.push({
+        content: sectionText,
+        orderIndex: orderIdx++,
+        sourcePage: options.sourcePage,
+      });
+    }
+  }
+
+  return chunks.filter((c) => c.content.length > 0);
+}

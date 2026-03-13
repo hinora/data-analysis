@@ -162,6 +162,7 @@ interface UnstructuredMetadataShape {
   contentDomain?: string;
   documentIndex?: Array<{
     chunkEnd: number;
+    chunkIds?: string[];
     chunkStart: number;
     indexLabel: string;
     level: number;
@@ -232,7 +233,11 @@ const UnstructuredMetadataView: React.FC<{
                 </span>
                 <span style={{ color: "#94a3b8", fontSize: 11 }}>
                   {" "}
-                  [chunks {entry.chunkStart}–{entry.chunkEnd}]
+                  [chunks {entry.chunkStart}–{entry.chunkEnd}
+                  {entry.chunkIds && entry.chunkIds.length > 0
+                    ? ` · ${entry.chunkIds.length} linked`
+                    : ""}
+                  ]
                 </span>
                 {entry.summary && (
                   <div style={{ color: "#64748b", fontSize: 11 }}>

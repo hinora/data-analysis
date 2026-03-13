@@ -5,7 +5,7 @@
 The project uses a **map-reduce** strategy to process documents of any size. The shared utilities in `lib/map-reduce.ts` provide character-aware batching, concurrency control, and metadata extraction pipelines.
 
 These utilities are consumed by:
-- **`metadata.generateMetadata`** — extracts unstructured metadata (topics, entities, domain, summary, document index)
+- **`metadata.generateMetadata`** — extracts unstructured metadata (topics, entities, domain, summary, document index, chunk summaries)
 
 ## Shared Utilities (`lib/map-reduce.ts`)
 
@@ -18,6 +18,36 @@ These utilities are consumed by:
 | `reduceTextSummaries` | Recursively merge multiple summaries into one |
 | `extractMetadataBatch` | Extract partial metadata (topics, entities, domain, summary, sections) from a text batch via `ai.generateJSON()` |
 | `mergePartialMetadata` | Merge multiple partial metadata results (dedup topics, sum entity counts, pick most common domain, concatenate sections) |
+| `generateChunkSummaries` | Generate AI summaries for chunks in batched groups |
+
+## Chunk Summary Generation (`generateChunkSummaries`)
+
+Generates concise AI summaries for each text chunk. Summaries serve two purposes:
+
+1. **Better embeddings** — summaries are used as the text for vector embedding generation instead of raw content
+2. **Quick preview** — summaries provide a brief overview of each chunk for UI display and search results
+
+```mermaid
+flowchart TD
+    A[All TextChunks with IDs] --> B[Group into batches of 5]
+    B --> C1["Batch 1 → AI generateJSON\n'Summarize each chunk in 1-2 sentences'"]
+    B --> C2["Batch 2 → AI generateJSON"]
+    B --> CN["Batch N → AI generateJSON"]
+    C1 --> D[Parse JSON array of summaries]
+    C2 --> D
+    CN --> D
+    D --> E["Map<chunkId, summary>"]
+    E --> F[Save to TextChunk.summary column]
+    E --> G[Used for embedding generation]
+```
+
+### Configuration
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `groupSize` | 5 | Number of chunks per AI call |
+
+Each AI call receives up to 5 chunks (truncated to 2000 chars each) and returns a JSON array of summary strings.
 
 ## Unstructured Metadata Generation (`metadata.generateMetadata`)
 
@@ -25,7 +55,7 @@ Uses a map-reduce approach to cover the **entire** document and build comprehens
 
 ```mermaid
 flowchart TD
-    A[Paginated scan: ALL TextChunks with orderIndex] --> B[Split into char-aware batches]
+    A[Paginated scan: ALL TextChunks with IDs + orderIndex] --> B[Split into char-aware batches]
     B --> C1["Batch 1 → AI extractMetadataBatch(chunkStart, chunkEnd)"]
     B --> C2["Batch 2 → AI extractMetadataBatch(chunkStart, chunkEnd)"]
     B --> CN["Batch N → AI extractMetadataBatch(chunkStart, chunkEnd)"]
@@ -35,9 +65,12 @@ flowchart TD
     D --> E{Multiple batch summaries?}
     E -- Yes --> F["reduceTextSummaries() → single summary"]
     E -- No --> G[Use single summary as-is]
-    F --> H[Final UnstructuredMetadata]
+    F --> H[Generate per-chunk summaries]
     G --> H
-    H --> I[Save to dataset.unstructuredMetadata]
+    H --> I[Save chunk summaries to DB]
+    I --> J[Build document index with chunkIds]
+    J --> K[Save to dataset.unstructuredMetadata]
+    K --> L[Generate embeddings from summaries]
 ```
 
 ### Per-Batch Extraction
@@ -62,12 +95,15 @@ The metadata includes a `documentIndex` — an array of section entries that map
 - `summary` — brief description of what the section covers
 - `chunkStart` — starting chunk orderIndex
 - `chunkEnd` — ending chunk orderIndex
+- `chunkIds` — array of TextChunk UUIDs that belong to this section
 
 Index labels are assigned automatically based on level:
 - Level 0: numeric (1, 2, 3, ...)
 - Level 1: parent number + lowercase letter (1a, 1b, 2a, ...)
 - Level 2: parent label + roman numeral (1a-i, 1a-ii, ...)
 - Level 3+: parent label + sequential number (1a-i-1, 1a-i-2, ...)
+
+The `chunkIds` field enables direct lookup of TextChunk records for each document section without needing orderIndex range queries.
 
 This index enables the AI to navigate documents using the `getChunks` tool to read specific sections.
 
@@ -83,9 +119,24 @@ This index enables the AI to navigate documents using the `getChunks` tool to re
 | `wordCount` | Computed from full paginated scan |
 | `chunkCount` | Total from DB count query |
 
+### Embedding Generation
+
+After chunk summaries are generated and saved, the embedding pipeline uses **summaries as the embedding text** instead of raw chunk content. This means:
+
+```typescript
+// In generateTextChunkEmbeddings:
+const texts = batch.map((c) => c.summary || c.content);
+```
+
+If a chunk has a summary, the summary is embedded. Otherwise, the raw content is used as fallback. This produces higher-quality embeddings because summaries are:
+- More concise and semantically focused
+- Free from formatting noise and boilerplate
+- Better suited for the embedding model's input window
+
 ## Constants
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
 | `MAX_CHARS_PER_BATCH` | 12,000 | Character limit per batch (map and reduce) |
 | `PAGE_SIZE` (metadata) | 100 | DB pagination size for chunk loading |
+| `CHUNK_SUMMARY_GROUP_SIZE` | 5 | Chunks per AI call for summary generation |

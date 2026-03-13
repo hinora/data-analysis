@@ -41,6 +41,7 @@ interface RawRow {
   orderIndex: number;
   sourcePage: number | null;
   sourceSection: string | null;
+  summary: string | null;
 }
 
 export default defineAction<SemanticSearchParams, unknown>({
@@ -128,6 +129,7 @@ export default defineAction<SemanticSearchParams, unknown>({
         tc."sourcePage",
         tc."sourceSection",
         tc."orderIndex",
+        tc.summary,
         tc.embedding <=> $1::vector AS distance,
         d.name AS "datasetName"
       FROM "textChunks" tc
@@ -163,6 +165,7 @@ export default defineAction<SemanticSearchParams, unknown>({
         tc."sourcePage",
         tc."sourceSection",
         tc."orderIndex",
+        tc.summary,
         tc.embedding <=> $1::vector AS distance,
         d.name AS "datasetName"
       FROM "textChunks" tc
@@ -190,6 +193,7 @@ export default defineAction<SemanticSearchParams, unknown>({
         similarity: number;
         sourcePage: number | null;
         sourceSection: string | null;
+        summary: string | null;
       }
     >();
 
@@ -205,6 +209,7 @@ export default defineAction<SemanticSearchParams, unknown>({
         similarity: vectorScore * VECTOR_WEIGHT,
         sourcePage: r.sourcePage as number | null,
         sourceSection: r.sourceSection as string | null,
+        summary: r.summary as string | null,
       });
     }
 
@@ -228,6 +233,7 @@ export default defineAction<SemanticSearchParams, unknown>({
           similarity: vectorScore * VECTOR_WEIGHT + KEYWORD_WEIGHT,
           sourcePage: r.sourcePage as number | null,
           sourceSection: r.sourceSection as string | null,
+          summary: r.summary as string | null,
         });
       }
     }

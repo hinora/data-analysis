@@ -31,6 +31,7 @@ import { TextChunk } from "../../db/text-chunk.entity";
 import {
   assignIndexLabels,
   extractMetadataBatch,
+  generateChunkSummaries,
   MAX_CHARS_PER_BATCH,
   mergePartialMetadata,
   type PartialUnstructuredMetadata,
@@ -289,7 +290,11 @@ async function generateUnstructuredMetadata(
 
   const PAGE_SIZE = 100;
   let wordCount = 0;
-  const allChunkItems: Array<{ content: string; orderIndex: number }> = [];
+  const allChunkItems: Array<{
+    content: string;
+    id: string;
+    orderIndex: number;
+  }> = [];
 
   // Paginated scan: collect all chunk texts with order indices and count words
   for (let page = 0; page * PAGE_SIZE < totalChunks; page++) {
@@ -302,6 +307,7 @@ async function generateUnstructuredMetadata(
     for (const chunk of chunks) {
       allChunkItems.push({
         content: chunk.content,
+        id: chunk.id,
         orderIndex: chunk.orderIndex,
       });
       wordCount += chunk.content.split(/\s+/).filter(Boolean).length;
@@ -391,11 +397,36 @@ async function generateUnstructuredMetadata(
     });
   }
 
+  // --- Generate per-chunk summaries via AI ---
+  logger.info(
+    `[generateUnstructuredMetadata] generating summaries for ${allChunkItems.length} chunks`,
+  );
+  const chunkSummaries = await generateChunkSummaries({
+    ai,
+    chunks: allChunkItems,
+    logger,
+  });
+
+  // Save summaries to TextChunk records
+  const chunkRepo2 = dataSource.getRepository(TextChunk);
+  for (const [chunkId, summary] of chunkSummaries) {
+    if (summary) {
+      await chunkRepo2.update(chunkId, { summary });
+    }
+  }
+
+  logger.info(
+    `[generateUnstructuredMetadata] saved ${chunkSummaries.size} chunk summaries`,
+  );
+
   // Build document index from merged sections with hierarchical labels
   const mergedSections = merged.sections || [];
   const indexLabels = assignIndexLabels(mergedSections);
   const documentIndex: DocumentIndexEntry[] = mergedSections.map((s, i) => ({
     chunkEnd: s.chunkEnd,
+    chunkIds: allChunkItems
+      .filter((c) => c.orderIndex >= s.chunkStart && c.orderIndex <= s.chunkEnd)
+      .map((c) => c.id),
     chunkStart: s.chunkStart,
     indexLabel: indexLabels[i],
     level: s.level,
@@ -496,7 +527,7 @@ async function generateTextChunkEmbeddings(
     // Process each page in embedding batches
     for (let i = 0; i < chunks.length; i += EMBEDDING_BATCH_SIZE) {
       const batch = chunks.slice(i, i + EMBEDDING_BATCH_SIZE);
-      const texts = batch.map((c) => c.content);
+      const texts = batch.map((c) => c.summary || c.content);
       globalBatchIndex++;
 
       const chunkStartIndex = skip + i + 1;

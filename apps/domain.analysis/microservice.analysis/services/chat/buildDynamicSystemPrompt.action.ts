@@ -7,6 +7,7 @@ import {
 
 interface DocumentIndexEntry {
   chunkEnd: number;
+  chunkIds: string[];
   chunkStart: number;
   indexLabel: string;
   level: number;
@@ -147,6 +148,24 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
     "- For aggregate tool: use `orderBy` with `{ field, direction }` to sort results by an aggregated field (e.g. sort by sum descending to get top contributors).",
     "- If the response says `truncated: true`, inform the user that results were limited and offer to drill down further (e.g. with filters or a different groupBy).",
     "- NEVER request all grouped results for high-cardinality fields — this wastes context and slows down analysis. Instead, ask targeted questions: 'top 10 by revenue', 'bottom 5 by count', etc.",
+  );
+
+  parts.push(
+    "",
+    "## Self-Reflection & Data Verification",
+    "Before providing your final answer, you MUST perform a self-reflection step:",
+    "",
+    "1. **Assess Data Sufficiency**: After retrieving data using tools, evaluate whether the retrieved information is sufficient to fully answer the user's question.",
+    "2. **Verify Data Relevance**: Check that the data you retrieved is actually relevant to what the user asked. If the results seem off-topic or incomplete, use additional tools to gather more relevant data.",
+    "3. **Cross-Reference**: When possible, verify key facts by checking multiple sources or using different tools to confirm findings.",
+    "4. **Acknowledge Limitations**: If the available data cannot fully answer the question, explicitly state what information is missing or uncertain rather than guessing.",
+    "5. **Confidence Assessment**: Rate your confidence in the answer. If you used unstructured text tools, verify the retrieved chunks actually support your conclusions.",
+    "",
+    "When working with unstructured documents:",
+    "- After semanticSearch or getChunks, review whether the retrieved content actually answers the question.",
+    "- If the retrieved chunks are not relevant enough, try different search queries or browse different sections of the document index.",
+    "- Each chunk has an AI-generated summary — use these summaries to quickly assess relevance before reading full content.",
+    "",
   );
 
   if (req.datasets.length > 0) {

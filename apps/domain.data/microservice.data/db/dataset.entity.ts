@@ -66,6 +66,7 @@ export interface StructuredMetadata {
 
 export interface DocumentIndexEntry {
   chunkEnd: number;
+  chunkIds: string[];
   chunkStart: number;
   indexLabel: string;
   level: number;

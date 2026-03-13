@@ -63,6 +63,10 @@ export class TextChunk {
   @Column({ nullable: true, type: "text" })
   embedding: string | null;
 
+  /** AI-generated summary of this chunk's content for semantic search. */
+  @Column({ nullable: true, type: "text" })
+  summary: string | null;
+
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 }

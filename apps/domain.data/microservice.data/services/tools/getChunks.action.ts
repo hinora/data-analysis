@@ -7,9 +7,9 @@
 
 import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
+import { Between, type FindOperator } from "typeorm";
 import { dataSource } from "../../db";
 import { TextChunk } from "../../db/text-chunk.entity";
-import { Between, type FindOperator } from "typeorm";
 
 export interface GetChunksParams {
   datasetId: string;
@@ -90,6 +90,7 @@ export default defineAction<GetChunksParams, unknown>({
         content: c.content,
         sourcePage: c.sourcePage,
         sourceSection: c.sourceSection,
+        summary: c.summary,
       })),
       totalChunks,
       startIndex: chunks.length > 0 ? chunks[0].orderIndex : startIndex,

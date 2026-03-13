@@ -205,6 +205,54 @@ export async function reduceTextSummaries(req: {
   });
 }
 
+/**
+ * Generate AI summaries for a batch of text chunks.
+ * Processes chunks in groups, sending multiple chunks per AI call for efficiency.
+ * Returns a Map of chunk ID → summary string.
+ */
+export async function generateChunkSummaries(req: {
+  ai: AIAdapter;
+  chunks: Array<{ content: string; id: string; orderIndex: number }>;
+  groupSize?: number;
+  logger: MapReduceLogger;
+}): Promise<Map<string, string>> {
+  const { ai, chunks, groupSize = 5, logger } = req;
+  const summaries = new Map<string, string>();
+
+  if (chunks.length === 0) return summaries;
+
+  logger.info(
+    `[map-reduce] generateChunkSummaries — ${chunks.length} chunks in groups of ${groupSize}`,
+  );
+
+  for (let i = 0; i < chunks.length; i += groupSize) {
+    const batch = chunks.slice(i, i + groupSize);
+
+    const prompt = `Summarize each of the following text chunks in 1-2 concise sentences. Respond in the same language as the text. Respond with a JSON array of summary strings in the same order as the chunks (no markdown, no code blocks).
+
+${batch.map((c, idx) => `--- Chunk ${idx + 1} (index ${c.orderIndex}) ---\n${c.content.slice(0, 2000)}`).join("\n\n")}
+
+Respond with a JSON array: ["summary for chunk 1", "summary for chunk 2", ...]`;
+
+    const start = Date.now();
+    const response = await ai.generateJSON({ prompt });
+    const latencyMs = Date.now() - start;
+
+    const data = Array.isArray(response.data) ? response.data : [];
+
+    for (let j = 0; j < batch.length; j++) {
+      const summary = typeof data[j] === "string" ? data[j] : "";
+      summaries.set(batch[j].id, summary);
+    }
+
+    logger.info(
+      `[map-reduce] generateChunkSummaries — batch ${Math.floor(i / groupSize) + 1}/${Math.ceil(chunks.length / groupSize)} done (${latencyMs}ms)`,
+    );
+  }
+
+  return summaries;
+}
+
 /** Partial metadata extracted from a single batch of text. */
 export interface PartialUnstructuredMetadata {
   contentDomain: string;
