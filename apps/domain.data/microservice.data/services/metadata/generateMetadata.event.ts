@@ -408,10 +408,10 @@ async function generateUnstructuredMetadata(
   });
 
   // Save summaries to TextChunk records
-  const chunkRepo2 = dataSource.getRepository(TextChunk);
+  const textChunkRepo = dataSource.getRepository(TextChunk);
   for (const [chunkId, summary] of chunkSummaries) {
     if (summary) {
-      await chunkRepo2.update(chunkId, { summary });
+      await textChunkRepo.update(chunkId, { summary });
     }
   }
 

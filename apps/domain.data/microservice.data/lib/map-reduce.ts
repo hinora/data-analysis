@@ -205,6 +205,9 @@ export async function reduceTextSummaries(req: {
   });
 }
 
+/** Max characters per chunk sent to the AI for summary generation. */
+const MAX_CHUNK_CONTENT_FOR_SUMMARY = 2000;
+
 /**
  * Generate AI summaries for a batch of text chunks.
  * Processes chunks in groups, sending multiple chunks per AI call for efficiency.
@@ -230,7 +233,7 @@ export async function generateChunkSummaries(req: {
 
     const prompt = `Summarize each of the following text chunks in 1-2 concise sentences. Respond in the same language as the text. Respond with a JSON array of summary strings in the same order as the chunks (no markdown, no code blocks).
 
-${batch.map((c, idx) => `--- Chunk ${idx + 1} (index ${c.orderIndex}) ---\n${c.content.slice(0, 2000)}`).join("\n\n")}
+${batch.map((c, idx) => `--- Chunk ${idx + 1} (index ${c.orderIndex}) ---\n${c.content.slice(0, MAX_CHUNK_CONTENT_FOR_SUMMARY)}`).join("\n\n")}
 
 Respond with a JSON array: ["summary for chunk 1", "summary for chunk 2", ...]`;
 
