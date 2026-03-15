@@ -216,8 +216,13 @@ function extractSummaryArray(data: unknown): string[] {
   if (Array.isArray(data)) return data;
 
   if (data && typeof data === "object") {
-    // Try to find the first array value inside the object
-    for (const value of Object.values(data)) {
+    const obj = data as Record<string, unknown>;
+
+    // Check well-known keys first
+    if (Array.isArray(obj.summaries)) return obj.summaries;
+
+    // Fall back to the first array value found
+    for (const value of Object.values(obj)) {
       if (Array.isArray(value)) return value;
     }
   }
@@ -281,8 +286,7 @@ Respond with a JSON array: ["summary for chunk 1", "summary for chunk 2", ...]`;
 
       let batchOk = true;
       for (let j = 0; j < batch.length; j++) {
-        const summary =
-          typeof data[j] === "string" ? (data[j] as string).trim() : "";
+        const summary = typeof data[j] === "string" ? data[j].trim() : "";
         if (summary) {
           summaries.set(batch[j].id, summary);
         } else {
