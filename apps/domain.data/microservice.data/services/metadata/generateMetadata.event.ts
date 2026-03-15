@@ -409,14 +409,16 @@ async function generateUnstructuredMetadata(
 
   // Save summaries to TextChunk records
   const textChunkRepo = dataSource.getRepository(TextChunk);
+  let savedSummaryCount = 0;
   for (const [chunkId, summary] of chunkSummaries) {
     if (summary) {
       await textChunkRepo.update(chunkId, { summary });
+      savedSummaryCount++;
     }
   }
 
   logger.info(
-    `[generateUnstructuredMetadata] saved ${chunkSummaries.size} chunk summaries`,
+    `[generateUnstructuredMetadata] saved ${savedSummaryCount}/${allChunkItems.length} chunk summaries`,
   );
 
   // Build document index from merged sections with hierarchical labels
