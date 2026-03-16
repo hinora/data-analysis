@@ -11,6 +11,7 @@
  */
 
 import { PassThrough } from "node:stream";
+import { encode as toonEncode } from "@toon-format/toon";
 import type { TypedContext } from "core.lib/__generated__";
 import type { AIMessageWithTools } from "core.lib/adapters/ai";
 import { createAIAdapter } from "core.lib/adapters/ai";
@@ -182,6 +183,24 @@ async function validateToolDatasetType(
   return null;
 }
 
+// ── TOON serialization ───────────────────────────────────────────────────
+
+/**
+ * Serialize a tool result for inclusion in the LLM message history.
+ * Non-string values are encoded as TOON (Token-Oriented Object Notation)
+ * which is more token-efficient than JSON. Falls back to JSON on failure.
+ */
+function formatToolResult(result: unknown): string {
+  if (typeof result === "string") return result;
+
+  try {
+    return toonEncode(result);
+  } catch {
+    // Encoding failed – fall back to JSON
+    return JSON.stringify(result, null, 2);
+  }
+}
+
 /** Execute a single tool call and return the result string. */
 async function executeToolCall(req: {
   ctx: {
@@ -226,8 +245,7 @@ async function executeToolCall(req: {
     const toolStart = Date.now();
     const result = await ctx.call(actionName, fnArgs);
     const durationMs = Date.now() - toolStart;
-    const resultStr =
-      typeof result === "string" ? result : JSON.stringify(result, null, 2);
+    const resultStr = formatToolResult(result);
 
     writeSSE(stream, {
       type: "tool_end",
@@ -750,10 +768,7 @@ async function processStream(
             ).call(actionName, fnArgs);
             const toolDuration = Date.now() - toolStart;
 
-            const resultStr =
-              typeof result === "string"
-                ? result
-                : JSON.stringify(result, null, 2);
+            const resultStr = formatToolResult(result);
 
             toolsUsed.push({
               parameters: fnArgs,
