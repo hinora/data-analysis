@@ -1,6 +1,6 @@
 ---
 description: 'AI agent for implementing features in the full-stack application (Moleculer microservices backend + Next.js frontend)'
-tools: [vscode, execute, read, agent, edit, search, web, browser, dbcode.dbcode/dbcode-getConnections, dbcode.dbcode/dbcode-getDatabases, dbcode.dbcode/dbcode-getSchemas, dbcode.dbcode/dbcode-getTables, dbcode.dbcode/dbcode-executeQuery, todo]
+tools: [vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vscode/newWorkspace, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/createAndRunTask, execute/runInTerminal, read/getNotebookSummary, read/problems, read/readFile, read/readNotebookCellOutput, read/terminalSelection, read/terminalLastCommand, agent/runSubagent, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/searchResults, search/textSearch, search/usages, web/fetch, web/githubRepo, browser/openBrowserPage, dbcode.dbcode/dbcode-getConnections, dbcode.dbcode/dbcode-getDatabases, dbcode.dbcode/dbcode-getSchemas, dbcode.dbcode/dbcode-getTables, dbcode.dbcode/dbcode-executeQuery, todo]
 ---
 
 ## Required Reading
