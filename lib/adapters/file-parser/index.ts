@@ -29,7 +29,11 @@ export {
   sanitizeColumnNames,
 } from "./utils/column-sanitizer";
 export type { ChunkOptions } from "./utils/text-chunker";
-export { chunkText, normalizeExtractedText } from "./utils/text-chunker";
+export {
+  chunkText,
+  normalizeExtractedText,
+  semanticChunkText,
+} from "./utils/text-chunker";
 export type { InferredType } from "./utils/type-inferrer";
 export { inferColumnType } from "./utils/type-inferrer";
 export { XlsmParser } from "./xlsm.parser";

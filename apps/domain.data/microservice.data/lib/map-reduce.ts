@@ -2,7 +2,6 @@
  * Map-Reduce Utilities
  *
  * Shared batching and concurrency helpers used by:
- * - summarizeDocument action (text summarization)
  * - generateMetadata event (unstructured metadata extraction)
  */
 
@@ -206,6 +205,151 @@ export async function reduceTextSummaries(req: {
   });
 }
 
+/** Max characters per chunk sent to the AI for summary generation. */
+const MAX_CHUNK_CONTENT_FOR_SUMMARY = 2000;
+
+/**
+ * Extract a string array from an AI JSON response that may be a raw array
+ * or an object wrapping one (e.g. `{ "summaries": ["…"] }`).
+ */
+function extractSummaryArray(data: unknown): string[] {
+  if (Array.isArray(data)) return data;
+
+  if (data && typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+
+    // Check well-known keys first
+    if (Array.isArray(obj.summaries)) return obj.summaries;
+
+    // Fall back to the first array value found
+    for (const value of Object.values(obj)) {
+      if (Array.isArray(value)) return value;
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Generate a single-chunk summary via AI as a fallback when batch
+ * summarisation fails.
+ */
+async function summariseSingleChunk(
+  ai: AIAdapter,
+  chunk: { content: string; orderIndex: number },
+): Promise<string> {
+  const prompt = `Summarize the following text in 1-2 concise sentences. Respond in the same language as the text. Return only the summary text, no JSON.
+
+${chunk.content.slice(0, MAX_CHUNK_CONTENT_FOR_SUMMARY)}`;
+
+  const response = await ai.generateText({ prompt });
+  return (response.content || "").trim();
+}
+
+/**
+ * Generate AI summaries for a batch of text chunks.
+ * Processes chunks in groups, sending multiple chunks per AI call for efficiency.
+ * Falls back to single-chunk summarisation when a batch fails.
+ * Returns a Map of chunk ID → summary string.
+ */
+export async function generateChunkSummaries(req: {
+  ai: AIAdapter;
+  chunks: Array<{ content: string; id: string; orderIndex: number }>;
+  groupSize?: number;
+  logger: MapReduceLogger;
+}): Promise<Map<string, string>> {
+  const { ai, chunks, groupSize = 5, logger } = req;
+  const summaries = new Map<string, string>();
+
+  if (chunks.length === 0) return summaries;
+
+  logger.info(
+    `[map-reduce] generateChunkSummaries — ${chunks.length} chunks in groups of ${groupSize}`,
+  );
+
+  for (let i = 0; i < chunks.length; i += groupSize) {
+    const batch = chunks.slice(i, i + groupSize);
+    const batchLabel = `batch ${Math.floor(i / groupSize) + 1}/${Math.ceil(chunks.length / groupSize)}`;
+
+    try {
+      const prompt = `Summarize each of the following text chunks in 1-2 concise sentences. Respond in the same language as the text. Respond with a JSON array of summary strings in the same order as the chunks (no markdown, no code blocks).
+
+${batch.map((c, idx) => `--- Chunk ${idx + 1} (index ${c.orderIndex}) ---\n${c.content.slice(0, MAX_CHUNK_CONTENT_FOR_SUMMARY)}`).join("\n\n")}
+
+Respond with a JSON array: ["summary for chunk 1", "summary for chunk 2", ...]`;
+
+      const start = Date.now();
+      const response = await ai.generateJSON({ prompt });
+      const latencyMs = Date.now() - start;
+
+      const data = extractSummaryArray(response.data);
+
+      let batchOk = true;
+      for (let j = 0; j < batch.length; j++) {
+        const summary = typeof data[j] === "string" ? data[j].trim() : "";
+        if (summary) {
+          summaries.set(batch[j].id, summary);
+        } else {
+          batchOk = false;
+        }
+      }
+
+      if (!batchOk) {
+        // Fall back to individual summarisation for chunks that didn't
+        // receive a summary from the batch call.
+        for (let j = 0; j < batch.length; j++) {
+          if (summaries.has(batch[j].id)) continue;
+          try {
+            const fallback = await summariseSingleChunk(ai, batch[j]);
+            if (fallback) {
+              summaries.set(batch[j].id, fallback);
+            } else {
+              logger.info(
+                `[map-reduce] generateChunkSummaries — ${batchLabel} chunk ${batch[j].orderIndex}: empty fallback summary`,
+              );
+            }
+          } catch (singleErr: unknown) {
+            const msg =
+              singleErr instanceof Error
+                ? singleErr.message
+                : String(singleErr);
+            logger.info(
+              `[map-reduce] generateChunkSummaries — ${batchLabel} chunk ${batch[j].orderIndex} fallback failed: ${msg}`,
+            );
+          }
+        }
+      }
+
+      logger.info(
+        `[map-reduce] generateChunkSummaries — ${batchLabel} done (${latencyMs}ms)`,
+      );
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logger.info(
+        `[map-reduce] generateChunkSummaries — ${batchLabel} failed: ${errMsg}, falling back to individual summarisation`,
+      );
+
+      // Fall back to summarising each chunk individually
+      for (const chunk of batch) {
+        try {
+          const fallback = await summariseSingleChunk(ai, chunk);
+          if (fallback) {
+            summaries.set(chunk.id, fallback);
+          }
+        } catch (singleErr: unknown) {
+          const msg =
+            singleErr instanceof Error ? singleErr.message : String(singleErr);
+          logger.info(
+            `[map-reduce] generateChunkSummaries — chunk ${chunk.orderIndex} fallback failed: ${msg}`,
+          );
+        }
+      }
+    }
+  }
+
+  return summaries;
+}
+
 /** Partial metadata extracted from a single batch of text. */
 export interface PartialUnstructuredMetadata {
   contentDomain: string;
@@ -213,18 +357,27 @@ export interface PartialUnstructuredMetadata {
   entities: Array<{
     count: number;
     name: string;
-    type: "date" | "location" | "monetary" | "organisation" | "person";
+    type: string;
   }>;
   keyTopics: string[];
+  sections: Array<{
+    chunkEnd: number;
+    chunkStart: number;
+    level: number;
+    summary: string;
+    title: string;
+  }>;
 }
 
 /**
- * Extract partial metadata (summary, topics, entities, domain) from a single
- * batch of text via AI JSON generation.
+ * Extract partial metadata (summary, topics, entities, domain, sections) from a single
+ * batch of text via AI JSON generation. Accepts chunk index range to build document index.
  */
 export async function extractMetadataBatch(req: {
   ai: AIAdapter;
   batchIndex: number;
+  chunkEndIndex: number;
+  chunkStartIndex: number;
   logger: MapReduceLogger;
   maxChars?: number;
   text: string;
@@ -233,6 +386,8 @@ export async function extractMetadataBatch(req: {
   const {
     ai,
     batchIndex,
+    chunkEndIndex,
+    chunkStartIndex,
     logger,
     maxChars = MAX_CHARS_PER_BATCH,
     text,
@@ -243,10 +398,11 @@ export async function extractMetadataBatch(req: {
     totalBatches > 1 ? ` (Part ${batchIndex + 1} of ${totalBatches})` : "";
 
   logger.info(
-    `[map-reduce] extractMetadataBatch ${batchIndex + 1}/${totalBatches} — input: ${text.length} chars`,
+    `[map-reduce] extractMetadataBatch ${batchIndex + 1}/${totalBatches} — input: ${text.length} chars, chunks ${chunkStartIndex}–${chunkEndIndex}`,
   );
 
   const prompt = `Analyse the following document excerpt${batchContext} and extract metadata. Respond in the same language as the document.
+This excerpt covers chunks indexed from ${chunkStartIndex} to ${chunkEndIndex}.
 
 Text:
 ${text.slice(0, maxChars)}
@@ -257,9 +413,17 @@ Respond with a JSON object (no markdown, no code blocks) with exactly this struc
   "keyTopics": ["topic1", "topic2", "topic3"],
   "contentDomain": "e.g. financial, legal, scientific, general",
   "entities": [
-    {"name": "Entity Name", "type": "person|organisation|location|date|monetary", "count": 1}
+    {"name": "Entity Name", "type": "any relevant type, e.g. person, organisation, location, date, monetary, product, event, regulation, technology, etc.", "count": 1}
+  ],
+  "sections": [
+    {"title": "Main Section Title", "summary": "Brief description", "chunkStart": ${chunkStartIndex}, "chunkEnd": ${chunkEndIndex}, "level": 0},
+    {"title": "Sub Section Title", "summary": "Brief description of sub-section", "chunkStart": ${chunkStartIndex}, "chunkEnd": ${chunkEndIndex}, "level": 1}
   ]
-}`;
+}
+
+For "entities", extract ALL relevant entities found in the text. Do not restrict to predefined types — use whatever entity type best describes each entity (e.g. person, organisation, location, date, monetary, product, event, regulation, technology, concept, metric, etc.).
+
+For "sections", identify logical sections and sub-sections within this excerpt, like a book's table of contents with multiple levels. Use the "level" field to indicate depth: 0 for main sections, 1 for sub-sections, 2 for sub-sub-sections, etc. Each section should reference the chunk index range it covers (between ${chunkStartIndex} and ${chunkEndIndex}). List sections in document order, with sub-sections appearing right after their parent section. If the excerpt covers a single topic, return one section at level 0 spanning the full range.`;
 
   const start = Date.now();
   const response = await ai.generateJSON({ prompt });
@@ -274,6 +438,23 @@ Respond with a JSON object (no markdown, no code blocks) with exactly this struc
       ? (response.data as Record<string, unknown>)
       : {};
 
+  const rawSections = Array.isArray(data.sections)
+    ? (data.sections as Array<Record<string, unknown>>)
+    : [];
+
+  const sections = rawSections
+    .filter((s) => s.title && typeof s.title === "string")
+    .map((s) => ({
+      chunkEnd: Math.min(Number(s.chunkEnd ?? chunkEndIndex), chunkEndIndex),
+      chunkStart: Math.max(
+        Number(s.chunkStart ?? chunkStartIndex),
+        chunkStartIndex,
+      ),
+      level: Math.max(0, Math.floor(Number(s.level ?? 0))),
+      summary: String(s.summary || ""),
+      title: String(s.title),
+    }));
+
   return {
     contentDomain: (data.contentDomain as string) || "unknown",
     documentSummary: (data.documentSummary as string) || "",
@@ -283,6 +464,18 @@ Respond with a JSON object (no markdown, no code blocks) with exactly this struc
     keyTopics: Array.isArray(data.keyTopics)
       ? (data.keyTopics as string[])
       : [],
+    sections:
+      sections.length > 0
+        ? sections
+        : [
+            {
+              chunkEnd: chunkEndIndex,
+              chunkStart: chunkStartIndex,
+              level: 0,
+              summary: (data.documentSummary as string) || "",
+              title: `Part ${batchIndex + 1}`,
+            },
+          ],
   };
 }
 
@@ -292,6 +485,7 @@ Respond with a JSON object (no markdown, no code blocks) with exactly this struc
  * - Topics are deduplicated (case-insensitive).
  * - Entities are merged by name+type, summing counts.
  * - Content domain picks the most frequently reported domain.
+ * - Sections are concatenated in order (already carry chunk index ranges).
  */
 export function mergePartialMetadata(
   partials: PartialUnstructuredMetadata[],
@@ -347,5 +541,107 @@ export function mergePartialMetadata(
     }
   }
 
-  return { contentDomain, documentSummary, entities, keyTopics };
+  // Concatenate sections in order (they already carry chunk index ranges)
+  const sections: PartialUnstructuredMetadata["sections"] = [];
+  for (const partial of partials) {
+    sections.push(...(partial.sections || []));
+  }
+
+  return { contentDomain, documentSummary, entities, keyTopics, sections };
+}
+
+/**
+ * Assign hierarchical index labels to a flat list of sections based on their level.
+ * Produces book-style labels: "1", "2", "2a", "2b", "3", "3a", "3a-i", etc.
+ *
+ * - Level 0: numeric (1, 2, 3, ...)
+ * - Level 1: parent number + lowercase letter (1a, 1b, 2a, ...)
+ * - Level 2: parent label + roman numeral (1a-i, 1a-ii, ...)
+ * - Level 3+: parent label + sequential number (1a-i-1, 1a-i-2, ...)
+ */
+export function assignIndexLabels(
+  sections: Array<{ level: number }>,
+): string[] {
+  const labels: string[] = [];
+  // Track current counter at each level
+  const counters: number[] = [];
+  // Track the label of the parent at each level
+  const parentLabels: string[] = [];
+
+  for (let i = 0; i < sections.length; i++) {
+    const level = sections[i].level;
+
+    // Reset counters for all deeper levels when we encounter a section
+    counters.length = Math.max(counters.length, level + 1);
+    for (let l = level + 1; l < counters.length; l++) {
+      counters[l] = 0;
+    }
+
+    // Initialize counter for this level if needed
+    if (counters[level] === undefined) {
+      counters[level] = 0;
+    }
+    counters[level]++;
+
+    let label: string;
+    if (level === 0) {
+      label = String(counters[level]);
+    } else {
+      const parent = parentLabels[level - 1] || String(counters[0] || 1);
+      const index = counters[level];
+      if (level === 1) {
+        label = `${parent}${toLowerAlpha(index)}`;
+      } else if (level === 2) {
+        label = `${parent}-${toRoman(index)}`;
+      } else {
+        label = `${parent}-${index}`;
+      }
+    }
+
+    labels.push(label);
+    parentLabels[level] = label;
+  }
+
+  return labels;
+}
+
+function toLowerAlpha(n: number): string {
+  if (n <= 0) return "a";
+  // 1 → a, 2 → b, ..., 26 → z, 27 → aa, ...
+  let result = "";
+  let num = n;
+  while (num > 0) {
+    num--;
+    result = String.fromCharCode(97 + (num % 26)) + result;
+    num = Math.floor(num / 26);
+  }
+  return result;
+}
+
+function toRoman(n: number): string {
+  if (n <= 0) return "i";
+  const numerals: [number, string][] = [
+    [1000, "m"],
+    [900, "cm"],
+    [500, "d"],
+    [400, "cd"],
+    [100, "c"],
+    [90, "xc"],
+    [50, "l"],
+    [40, "xl"],
+    [10, "x"],
+    [9, "ix"],
+    [5, "v"],
+    [4, "iv"],
+    [1, "i"],
+  ];
+  let result = "";
+  let remaining = n;
+  for (const [value, numeral] of numerals) {
+    while (remaining >= value) {
+      result += numeral;
+      remaining -= value;
+    }
+  }
+  return result;
 }

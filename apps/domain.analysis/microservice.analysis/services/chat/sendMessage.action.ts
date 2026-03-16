@@ -24,6 +24,8 @@ import {
   getDefaultToolEnabledConfig,
   getEnabledToolActions,
   getEnabledToolDefinitions,
+  getToolCategory,
+  type ToolName,
 } from "../../toolConfig";
 
 export interface SendMessageParams {
@@ -113,6 +115,59 @@ function writeSSE(stream: PassThrough, event: StreamEvent): void {
 /** Truncate a string to a maximum length, appending "…" if truncated. */
 function truncate(str: string, max: number): string {
   return str.length > max ? `${str.slice(0, max)}…` : str;
+}
+
+/**
+ * Validate that a tool's category matches the dataset type(s) it targets.
+ * Returns an error message string if there is a mismatch, or null if OK.
+ */
+async function validateToolDatasetType(
+  fnName: string,
+  fnArgs: Record<string, unknown>,
+  ctx: {
+    call: (name: string, params: Record<string, unknown>) => Promise<unknown>;
+  },
+): Promise<string | null> {
+  const category = getToolCategory(fnName as ToolName);
+
+  // Web tools don't target datasets — skip validation
+  if (category === "web") return null;
+
+  // Collect all dataset IDs referenced by this tool call
+  const datasetIds: string[] = [];
+  for (const key of ["datasetId", "leftDatasetId", "rightDatasetId"] as const) {
+    const value = fnArgs[key];
+    if (typeof value === "string" && value.length > 0) {
+      datasetIds.push(value);
+    }
+  }
+
+  // No dataset ID provided — let the tool action handle its own validation
+  if (datasetIds.length === 0) return null;
+
+  const expectedType =
+    category === "structured" ? "structured-table" : "unstructured-text";
+
+  for (const datasetId of datasetIds) {
+    try {
+      const dataset = (await ctx.call("dataset.getDataset", {
+        id: datasetId,
+      })) as { datasetType: string; name: string };
+
+      if (dataset.datasetType !== expectedType) {
+        return (
+          `Error: Tool "${fnName}" is a ${category} data tool and requires a ${expectedType} dataset, ` +
+          `but dataset "${dataset.name}" (${datasetId}) is ${dataset.datasetType}. ` +
+          `Please use a ${category === "structured" ? "structured" : "unstructured text"} tool ` +
+          `for this dataset type instead.`
+        );
+      }
+    } catch {
+      // Dataset lookup failed — let the tool action handle its own error
+    }
+  }
+
+  return null;
 }
 
 // ── Action ──────────────────────────────────────────────────────────────
@@ -300,6 +355,34 @@ async function processStream(
             continue;
           }
 
+          // ── Dataset type validation ──────────────────────────────
+          const typeMismatchError = await validateToolDatasetType(
+            fnName,
+            fnArgs,
+            ctx as unknown as {
+              call: (
+                name: string,
+                params: Record<string, unknown>,
+              ) => Promise<unknown>;
+            },
+          );
+          if (typeMismatchError) {
+            reasoningSteps.push(typeMismatchError);
+            writeSSE(stream, {
+              type: "tool_end",
+              durationMs: 0,
+              resultPreview: truncate(typeMismatchError, 200),
+              success: false,
+              toolName: fnName,
+            });
+            messages.push({
+              content: typeMismatchError,
+              role: "tool",
+              toolName: fnName,
+            });
+            continue;
+          }
+
           try {
             const toolStart = Date.now();
             const result = await (
@@ -374,6 +457,25 @@ async function processStream(
             });
           }
         }
+
+        // ── Self-reflection: prompt the AI to verify data relevance ──
+        messages.push({
+          content:
+            "Before responding, reflect on the data you just retrieved:\n" +
+            "1. Is this data sufficient to answer the user's question?\n" +
+            "2. Is the retrieved information relevant and accurate?\n" +
+            "3. Do you need to fetch additional data from other sections or datasets?\n" +
+            "If the data is insufficient or irrelevant, use more tools to gather better information. " +
+            "If the data is sufficient, provide your final answer.",
+          role: "user",
+        });
+
+        writeSSE(stream, {
+          type: "reasoning",
+          step: "Self-reflection: verifying data relevance…",
+        });
+        reasoningSteps.push("Self-reflection: verifying data relevance…");
+
         continue;
       }
 

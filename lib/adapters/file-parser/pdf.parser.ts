@@ -22,7 +22,7 @@ import type {
   ParseResult,
 } from "./types";
 import { sanitizeColumnNames } from "./utils/column-sanitizer";
-import { chunkText } from "./utils/text-chunker";
+import { semanticChunkText } from "./utils/text-chunker";
 import { inferColumnType } from "./utils/type-inferrer";
 
 export class PdfParser implements FileParserAdapter {
@@ -93,9 +93,9 @@ export class PdfParser implements FileParserAdapter {
     }
 
     // Create unstructured text dataset from the full text
-    const textChunks = await chunkText(pdfText, {
-      chunkSize: 800,
-      overlap: 200,
+    const textChunks = await semanticChunkText(pdfText, {
+      chunkSize: 1500,
+      overlap: 100,
     });
 
     if (textChunks.length > 0) {

@@ -21,6 +21,7 @@ import { DataRecord } from "../../db/data-record.entity";
 import {
   Dataset,
   DatasetType,
+  type DocumentIndexEntry,
   MetadataStatus,
   type RelationshipSuggestion,
   type StructuredMetadata,
@@ -28,7 +29,9 @@ import {
 } from "../../db/dataset.entity";
 import { TextChunk } from "../../db/text-chunk.entity";
 import {
+  assignIndexLabels,
   extractMetadataBatch,
+  generateChunkSummaries,
   MAX_CHARS_PER_BATCH,
   mergePartialMetadata,
   type PartialUnstructuredMetadata,
@@ -275,6 +278,7 @@ async function generateUnstructuredMetadata(
       unstructuredMetadata: {
         chunkCount: 0,
         contentDomain: "unknown",
+        documentIndex: [],
         documentSummary: "No text content found.",
         entities: [],
         keyTopics: [],
@@ -286,9 +290,13 @@ async function generateUnstructuredMetadata(
 
   const PAGE_SIZE = 100;
   let wordCount = 0;
-  const allChunkTexts: string[] = [];
+  const allChunkItems: Array<{
+    content: string;
+    id: string;
+    orderIndex: number;
+  }> = [];
 
-  // Paginated scan: collect all chunk texts and count words
+  // Paginated scan: collect all chunk texts with order indices and count words
   for (let page = 0; page * PAGE_SIZE < totalChunks; page++) {
     const chunks = await chunkRepo.find({
       where: { datasetId: dataset.id },
@@ -297,7 +305,11 @@ async function generateUnstructuredMetadata(
       take: PAGE_SIZE,
     });
     for (const chunk of chunks) {
-      allChunkTexts.push(chunk.content);
+      allChunkItems.push({
+        content: chunk.content,
+        id: chunk.id,
+        orderIndex: chunk.orderIndex,
+      });
       wordCount += chunk.content.split(/\s+/).filter(Boolean).length;
     }
   }
@@ -308,26 +320,30 @@ async function generateUnstructuredMetadata(
 
   const overallStartTime = Date.now();
 
-  // --- Map phase: extract partial metadata from each batch ---
-  const textBatches = splitIntoBatchesByChars({
-    getLength: (t) => t.length,
-    items: allChunkTexts,
+  // --- Map phase: split chunks into batches and extract partial metadata ---
+  const chunkBatches = splitIntoBatchesByChars({
+    getLength: (item) => item.content.length,
+    items: allChunkItems,
     maxChars: MAX_CHARS_PER_BATCH,
   });
 
   logger.info(
-    `[generateUnstructuredMetadata] map phase — ${textBatches.length} batches (max ${MAX_CHARS_PER_BATCH} chars/batch)`,
+    `[generateUnstructuredMetadata] map phase — ${chunkBatches.length} batches (max ${MAX_CHARS_PER_BATCH} chars/batch)`,
   );
 
-  const mapTasks = textBatches.map(
+  const mapTasks = chunkBatches.map(
     (batch, index) => (): Promise<PartialUnstructuredMetadata> => {
-      const batchText = batch.join("\n\n");
+      const batchText = batch.map((item) => item.content).join("\n\n");
+      const chunkStartIndex = batch[0].orderIndex;
+      const chunkEndIndex = batch[batch.length - 1].orderIndex;
       return extractMetadataBatch({
         ai,
         batchIndex: index,
+        chunkEndIndex,
+        chunkStartIndex,
         logger,
         text: batchText,
-        totalBatches: textBatches.length,
+        totalBatches: chunkBatches.length,
       });
     },
   );
@@ -381,11 +397,51 @@ async function generateUnstructuredMetadata(
     });
   }
 
+  // --- Generate per-chunk summaries via AI ---
+  logger.info(
+    `[generateUnstructuredMetadata] generating summaries for ${allChunkItems.length} chunks`,
+  );
+  const chunkSummaries = await generateChunkSummaries({
+    ai,
+    chunks: allChunkItems,
+    logger,
+  });
+
+  // Save summaries to TextChunk records
+  const textChunkRepo = dataSource.getRepository(TextChunk);
+  let savedSummaryCount = 0;
+  for (const [chunkId, summary] of chunkSummaries) {
+    if (summary) {
+      await textChunkRepo.update(chunkId, { summary });
+      savedSummaryCount++;
+    }
+  }
+
+  logger.info(
+    `[generateUnstructuredMetadata] saved ${savedSummaryCount}/${allChunkItems.length} chunk summaries`,
+  );
+
+  // Build document index from merged sections with hierarchical labels
+  const mergedSections = merged.sections || [];
+  const indexLabels = assignIndexLabels(mergedSections);
+  const documentIndex: DocumentIndexEntry[] = mergedSections.map((s, i) => ({
+    chunkEnd: s.chunkEnd,
+    chunkIds: allChunkItems
+      .filter((c) => c.orderIndex >= s.chunkStart && c.orderIndex <= s.chunkEnd)
+      .map((c) => c.id),
+    chunkStart: s.chunkStart,
+    indexLabel: indexLabels[i],
+    level: s.level,
+    summary: s.summary,
+    title: s.title,
+  }));
+
   const latencyMs = Date.now() - overallStartTime;
 
   const metadata: UnstructuredMetadata = {
     chunkCount: totalChunks,
     contentDomain: merged.contentDomain,
+    documentIndex,
     documentSummary: finalSummary,
     entities: merged.entities,
     keyTopics: merged.keyTopics,
@@ -403,7 +459,7 @@ async function generateUnstructuredMetadata(
       sessionId: dataset.sessionId,
       datasetId: dataset.id,
       purpose: AILogPurpose.UNSTRUCTURED_METADATA,
-      promptSent: `Map-reduce metadata generation: ${textBatches.length} batches, ${totalChunks} chunks`,
+      promptSent: `Map-reduce metadata generation: ${chunkBatches.length} batches, ${totalChunks} chunks`,
       responseReceived: JSON.stringify(metadata),
       model:
         ai.getConfig?.()?.defaultModel || process.env.OLLAMA_MODEL || "unknown",
@@ -417,7 +473,7 @@ async function generateUnstructuredMetadata(
   );
 
   logger.info(
-    `[generateUnstructuredMetadata] complete for dataset ${dataset.id}: ${totalChunks} chunks, ${textBatches.length} batches, ${latencyMs}ms`,
+    `[generateUnstructuredMetadata] complete for dataset ${dataset.id}: ${totalChunks} chunks, ${chunkBatches.length} batches, ${documentIndex.length} index entries, ${latencyMs}ms`,
   );
 }
 
@@ -473,7 +529,7 @@ async function generateTextChunkEmbeddings(
     // Process each page in embedding batches
     for (let i = 0; i < chunks.length; i += EMBEDDING_BATCH_SIZE) {
       const batch = chunks.slice(i, i + EMBEDDING_BATCH_SIZE);
-      const texts = batch.map((c) => c.content);
+      const texts = batch.map((c) => c.summary || c.content);
       globalBatchIndex++;
 
       const chunkStartIndex = skip + i + 1;

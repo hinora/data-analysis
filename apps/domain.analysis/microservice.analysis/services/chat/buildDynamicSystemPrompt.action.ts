@@ -5,6 +5,16 @@ import {
   getEnabledToolNamesByCategory,
 } from "../../toolConfig";
 
+interface DocumentIndexEntry {
+  chunkEnd: number;
+  chunkIds: string[];
+  chunkStart: number;
+  indexLabel: string;
+  level: number;
+  summary: string;
+  title: string;
+}
+
 interface DatasetInfo {
   columnMappings?: Array<{
     camelCase: string;
@@ -19,7 +29,10 @@ interface DatasetInfo {
   rowCount: number;
   structuredMetadata?: { datasetDescription?: string };
   unstructuredMetadata?: {
+    chunkCount?: number;
+    documentIndex?: DocumentIndexEntry[];
     documentSummary?: string;
+    entities?: Array<{ count: number; name: string; type: string }>;
     keyTopics?: string[];
   };
 }
@@ -137,6 +150,24 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
     "- NEVER request all grouped results for high-cardinality fields — this wastes context and slows down analysis. Instead, ask targeted questions: 'top 10 by revenue', 'bottom 5 by count', etc.",
   );
 
+  parts.push(
+    "",
+    "## Self-Reflection & Data Verification",
+    "Before providing your final answer, you MUST perform a self-reflection step:",
+    "",
+    "1. **Assess Data Sufficiency**: After retrieving data using tools, evaluate whether the retrieved information is sufficient to fully answer the user's question.",
+    "2. **Verify Data Relevance**: Check that the data you retrieved is actually relevant to what the user asked. If the results seem off-topic or incomplete, use additional tools to gather more relevant data.",
+    "3. **Cross-Reference**: When possible, verify key facts by checking multiple sources or using different tools to confirm findings.",
+    "4. **Acknowledge Limitations**: If the available data cannot fully answer the question, explicitly state what information is missing or uncertain rather than guessing.",
+    "5. **Confidence Assessment**: Rate your confidence in the answer. If you used unstructured text tools, verify the retrieved chunks actually support your conclusions.",
+    "",
+    "When working with unstructured documents:",
+    "- After semanticSearch or getChunks, review whether the retrieved content actually answers the question.",
+    "- If the retrieved chunks are not relevant enough, try different search queries or browse different sections of the document index.",
+    "- Each chunk has an AI-generated summary — use these summaries to quickly assess relevance before reading full content.",
+    "",
+  );
+
   if (req.datasets.length > 0) {
     const structuredDatasets = req.datasets.filter(
       (dataset) => dataset.datasetType === "structured-table",
@@ -202,9 +233,36 @@ function appendDatasetInfo(parts: string[], dataset: DatasetInfo): void {
     parts.push(`- Summary: ${dataset.unstructuredMetadata.documentSummary}`);
   }
 
+  const chunkCount = dataset.unstructuredMetadata?.chunkCount;
+  if (chunkCount != null && chunkCount > 0) {
+    parts.push(`- Chunks: ${chunkCount}`);
+  }
+
   const topics = dataset.unstructuredMetadata?.keyTopics;
   if (topics && topics.length > 0) {
     parts.push(`- Topics: ${topics.join(", ")}`);
+  }
+
+  const entities = dataset.unstructuredMetadata?.entities;
+  if (entities && entities.length > 0) {
+    const topEntities = entities.sort((a, b) => b.count - a.count).slice(0, 15);
+    parts.push(
+      `- Key Entities: ${topEntities.map((e) => `${e.name} (${e.type})`).join(", ")}`,
+    );
+  }
+
+  const docIndex = dataset.unstructuredMetadata?.documentIndex;
+  if (docIndex && docIndex.length > 0) {
+    parts.push(
+      "- Document Index (use getChunks tool with chunk ranges to read sections):",
+    );
+    for (const entry of docIndex) {
+      const indent = "  ".repeat(1 + (entry.level || 0));
+      const label = entry.indexLabel || "-";
+      parts.push(
+        `${indent}${label}. "${entry.title}" [chunks ${entry.chunkStart}–${entry.chunkEnd}]: ${entry.summary}`,
+      );
+    }
   }
 
   parts.push("");

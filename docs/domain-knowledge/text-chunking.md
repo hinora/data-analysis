@@ -8,15 +8,24 @@ Text extracted from documents (PDFs, etc.) must be split into chunks suitable fo
 2. Overlapping context between chunks preserves continuity for semantic search
 3. Soft line-wraps from PDF layout are normalized before splitting
 
+Two chunking strategies are available:
+- **Fixed-size chunking** (`chunkText`) — traditional RecursiveCharacterTextSplitter approach
+- **Semantic chunking** (`semanticChunkText`) — section-aware chunking that preserves document structure
+
 ## Architecture
 
 ```mermaid
 flowchart LR
     A[PDF Text\nwith soft wraps] --> B[normalizeExtractedText]
     B --> C[Cleaned text\njoined lines]
-    C --> D[RecursiveCharacterTextSplitter\n@langchain/textsplitters]
-    D --> E[TextChunk[]\nsentence-boundary splits]
-    E --> F[(pgvector\n768-dim embeddings)]
+    C --> D{Chunking Strategy}
+    D -->|Fixed-size| E[RecursiveCharacterTextSplitter\n@langchain/textsplitters]
+    D -->|Semantic| F[Section Header Detection\n+ Paragraph Grouping]
+    E --> G[TextChunk[]\nsentence-boundary splits]
+    F --> H{Section too large?}
+    H -->|Yes| E
+    H -->|No| G
+    G --> I[(pgvector\n768-dim embeddings)]
 ```
 
 ## Library: `@langchain/textsplitters`
@@ -33,12 +42,60 @@ We use LangChain's **`RecursiveCharacterTextSplitter`** — the industry-standar
 
 **Note:** Single `\n` is intentionally excluded from separators. PDF text has soft line-wraps at the column boundary that appear as `\n` mid-sentence. These are normalized to spaces before splitting (see below).
 
-### Configuration
+## Chunking Strategies
+
+### Fixed-Size Chunking (`chunkText`)
+
+Traditional approach using RecursiveCharacterTextSplitter.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `chunkSize` | 800 | Target chunk size in characters |
 | `overlap` | 200 | Characters of overlap between adjacent chunks |
+
+### Semantic Chunking (`semanticChunkText`) — **Default for PDFs**
+
+Semantic chunking preserves document structure by splitting at section boundaries rather than using a fixed character count. This produces variable-size chunks that keep headers together with their body text.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `chunkSize` | 1500 | Maximum chunk size before fallback splitting |
+| `overlap` | 100 | Overlap for fallback splits of oversized sections |
+
+#### How It Works
+
+```mermaid
+flowchart TD
+    A[Normalized Text] --> B[Split on \\n\\n into paragraphs]
+    B --> C[Detect section headers via heuristics]
+    C --> D[Group paragraphs into sections]
+    D --> E{Section < 200 chars?}
+    E -->|Yes| F[Merge with next section]
+    E -->|No| G{Section > 1.5× maxChunkSize?}
+    G -->|Yes| H[Split via RecursiveCharacterTextSplitter]
+    G -->|No| I[Keep as single chunk]
+    F --> G
+    H --> J[Assign sequential orderIndex]
+    I --> J
+```
+
+#### Section Header Detection Heuristics
+
+A line is considered a section header if it matches any of these patterns:
+
+| Pattern | Example | Condition |
+|---------|---------|-----------|
+| ALL-CAPS | `"EDUCATION"`, `"KEY SKILLS"` | 3+ chars, all uppercase/digits/punctuation |
+| Ends with colon | `"Summary:"`, `"Responsibilities:"` | ≤80 chars |
+| Numbered heading | `"1. Introduction"`, `"Section 3"` | Starts with number/Section/Chapter/Part, ≤80 chars |
+| Short title line | `"Background"`, `"Results"` | ≤60 chars, starts uppercase, no ending punctuation |
+
+Lines longer than 120 chars are never considered headers.
+
+#### Merging Rules
+
+- **Tiny sections** (under 200 chars) are merged with the next section to avoid fragmenting context
+- **Oversized sections** (over 1.5× `maxChunkSize`) fall back to `chunkText` for sub-splitting
 
 ## Text Normalization (`normalizeExtractedText`)
 
@@ -70,18 +127,33 @@ Chunks are stored in the `textChunks` table:
 |--------|------|-------------|
 | `content` | text | The chunk text |
 | `embedding` | vector(768) | nomic-embed-text embedding |
+| `summary` | text (nullable) | AI-generated summary for semantic search |
 | `orderIndex` | int | Position in the original document |
 | `sourcePage` | int | Source page number (PDFs) |
 | `sourceSection` | text | Optional section identifier |
 | `datasetId` | uuid | FK to parent Dataset |
 
+### Chunk Summaries
+
+After chunking, the metadata generation pipeline generates AI summaries for each chunk. Summaries are:
+- 1-2 concise sentences per chunk
+- Generated in batches of 5 chunks per AI call for efficiency
+- Used as the text for vector embedding instead of raw content (improves semantic search quality)
+- Stored in the `summary` column of `textChunks`
+
 ## Usage
 
 ```typescript
-import { chunkText } from "core.lib/adapters/file-parser";
+import { chunkText, semanticChunkText } from "core.lib/adapters/file-parser";
 
-// chunkText is async — uses RecursiveCharacterTextSplitter internally
-const chunks = await chunkText(pdfText, {
+// Semantic chunking (preferred for PDFs)
+const chunks = await semanticChunkText(pdfText, {
+  chunkSize: 1500,
+  overlap: 100,
+});
+
+// Fixed-size chunking (fallback / other use cases)
+const chunks = await chunkText(text, {
   chunkSize: 800,
   overlap: 200,
 });
@@ -90,14 +162,14 @@ const chunks = await chunkText(pdfText, {
 
 ## Before vs After
 
-**Before** (custom splitter — cut mid-sentence):
+**Before** (fixed-size chunking — 800 char chunks):
 ```
-Chunk 0: "...I am also well-versed in DevOps, with"  ← CUT
-Chunk 1: "in web development. My areas of..."
+Chunk 0: "EDUCATION\nBachelor of Science in..."  ← header + partial content
+Chunk 1: "...in Computer Science. WORK EXPERIENCE"  ← section boundary mid-chunk
 ```
 
-**After** (LangChain RecursiveCharacterTextSplitter — sentence boundary):
+**After** (semantic chunking — section-aware):
 ```
-Chunk 0: "...Next, React, and Moleculer service"  ← splits at ". "
-Chunk 1: ". My areas of expertise include..."      ← overlap from previous
+Chunk 0: "EDUCATION\n\nBachelor of Science in Computer Science from..."  ← complete section
+Chunk 1: "WORK EXPERIENCE\n\nSoftware Engineer at Company X..."          ← starts at header
 ```
