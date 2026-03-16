@@ -1,6 +1,6 @@
 ---
 description: "Frontend developer for the Next.js application in the frontend folder"
-tools: ["vscode", "execute", "read", "edit", "search", "web", "agent", "todo"]
+tools: [vscode, execute, read, agent, edit, search, web, browser, todo]
 ---
 
 ## Required Reading

@@ -43,6 +43,15 @@ export const useListSessions = (page = 1, limit = 20) => {
   return useQuery({
     queryKey: [SESSION_LIST_KEY, page, limit],
     queryFn: listSessionsFn,
+    refetchInterval: (query) => {
+      const result = query.state.data;
+      if (!result) return false;
+      // Keep polling while any session still has the default name and has datasets
+      const hasPendingName = result.data.some(
+        (s) => s.name.startsWith("Session —") && s.datasetCount > 0,
+      );
+      return hasPendingName ? 5000 : false;
+    },
   });
 };
 
@@ -62,6 +71,14 @@ export const useGetSession = (id: string | undefined) => {
     queryKey: [SESSION_DETAIL_KEY, id],
     queryFn: getSessionFn,
     enabled: !!id,
+    refetchInterval: (query) => {
+      const session = query.state.data;
+      if (!session) return false;
+      // Keep polling while session still has the default name and has datasets
+      // (AI naming runs after metadata generation, there may be a short delay)
+      const hasDefaultName = session.name.startsWith("Session —");
+      return hasDefaultName && session.datasetCount > 0 ? 5000 : false;
+    },
   });
 };
 

@@ -13,6 +13,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 import { CHAT_HISTORY_KEY, type ChatMessage } from "./useChat";
+import { CONVERSATION_LIST_KEY } from "./useConversation";
 
 // ── SSE event types (mirrors backend StreamEvent) ───────────────────────
 
@@ -317,6 +318,10 @@ function applyEvent(
       // Invalidate react-query cache so history picks up the new messages
       queryClient.invalidateQueries({
         queryKey: [CHAT_HISTORY_KEY, conversationId],
+      });
+      // Refetch conversations to pick up AI-generated name after first message
+      queryClient.invalidateQueries({
+        queryKey: [CONVERSATION_LIST_KEY],
       });
       setState((prev) => ({
         ...prev,

@@ -21,6 +21,7 @@ export enum AILogType {
 
 export enum AILogPurpose {
   EMBEDDING_GENERATION = "embedding-generation",
+  NAME_GENERATION = "name-generation",
   RELATIONSHIP_DETECTION = "relationship-detection",
   STRUCTURED_METADATA = "structured-metadata",
   UNSTRUCTURED_METADATA = "unstructured-metadata",

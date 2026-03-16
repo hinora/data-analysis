@@ -246,6 +246,44 @@ async function processStream(
   });
   await msgRepo.save(userMessage);
 
+  // ── Auto-rename conversation on first message ───────────────────────
+  if (conversation.messageCount === 0) {
+    try {
+      writeSSE(stream, { type: "status", message: "Generating title…" });
+
+      // Build context: user question + dataset summary
+      const datasets = (await ctx.call("dataset.listDatasets", {
+        sessionId,
+      })) as Array<{ datasetType: string; name: string; rowCount: number }>;
+
+      const datasetSummary =
+        datasets.length > 0
+          ? `\nDatasets in session: ${datasets.map((d) => `${d.name} (${d.datasetType}, ${d.rowCount} rows)`).join(", ")}`
+          : "";
+
+      const nameContext = `User question: ${content}${datasetSummary}`;
+
+      const { name } = await ctx.call(
+        "chat.generateName",
+        { context: nameContext, target: "conversation" as const },
+        { timeout: 120000 },
+      );
+      await ctx.call("conversation.renameConversation", {
+        id: conversationId,
+        name,
+      });
+      ctx.broker.logger.info(
+        `Conversation ${conversationId} auto-renamed to "${name}"`,
+      );
+    } catch (renameErr: unknown) {
+      const msg =
+        renameErr instanceof Error ? renameErr.message : String(renameErr);
+      ctx.broker.logger.warn(
+        `Failed to auto-rename conversation ${conversationId}: ${msg}`,
+      );
+    }
+  }
+
   // ── Load conversation history ───────────────────────────────────────
   writeSSE(stream, { type: "status", message: "Loading history…" });
 

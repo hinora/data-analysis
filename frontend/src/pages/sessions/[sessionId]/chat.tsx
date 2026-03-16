@@ -21,7 +21,10 @@ import { useStreamMessage } from "../../../hooks/useStreamChat";
 
 export default function ChatPage() {
   const router = useRouter();
-  const { sessionId } = router.query as { sessionId: string };
+  const { sessionId, chatId } = router.query as {
+    sessionId: string;
+    chatId?: string;
+  };
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(null);
@@ -39,12 +42,32 @@ export default function ChatPage() {
   const createConversation = useCreateConversation();
   const { sendMessage, streamState } = useStreamMessage();
 
-  // Auto-select first conversation
+  // Restore chatId from URL or auto-select first conversation
   useEffect(() => {
-    if (conversations && conversations.length > 0 && !activeConversationId) {
+    if (!conversations || conversations.length === 0) return;
+    if (activeConversationId) return;
+
+    if (chatId && conversations.some((c) => c.id === chatId)) {
+      setActiveConversationId(chatId);
+    } else {
       setActiveConversationId(conversations[0].id);
     }
-  }, [conversations, activeConversationId]);
+  }, [conversations, activeConversationId, chatId]);
+
+  // Sync activeConversationId to URL query param
+  useEffect(() => {
+    if (!router.isReady || !activeConversationId) return;
+    if (router.query.chatId === activeConversationId) return;
+
+    router.replace(
+      {
+        pathname: router.pathname,
+        query: { ...router.query, chatId: activeConversationId },
+      },
+      undefined,
+      { shallow: true },
+    );
+  }, [activeConversationId, router]);
 
   // Auto-scroll to bottom on new messages or when streaming content changes
   const messageCount = historyData?.messages.length ?? 0;

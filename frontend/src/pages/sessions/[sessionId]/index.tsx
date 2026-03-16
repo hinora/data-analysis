@@ -318,7 +318,7 @@ const SessionWorkspacePage: React.FC = () => {
               </button>
               {conversations && conversations.length > 0 && (
                 <Link
-                  href={`/sessions/${id}/chat`}
+                  href={`/sessions/${id}/chat?chatId=${conversations[0].id}`}
                   style={{
                     padding: "4px 12px",
                     borderRadius: 6,
@@ -340,7 +340,9 @@ const SessionWorkspacePage: React.FC = () => {
           ) : (
             <ConversationList
               conversations={conversations || []}
-              onSelect={(_convId) => router.push(`/sessions/${id}/chat`)}
+              onSelect={(convId) =>
+                router.push(`/sessions/${id}/chat?chatId=${convId}`)
+              }
               onRename={async (convId, name) => {
                 await renameConv.mutateAsync({ id: convId, name });
               }}
