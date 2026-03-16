@@ -188,20 +188,19 @@ export default defineAction<AggregateParams, unknown>({
     // Build aggregation selects
     const selectParts: string[] = [];
     for (const agg of aggregations) {
-      const aggRepo = dataSource.getRepository(DataRecord);
       switch (agg.operation) {
         case "sum":
         case "avg": {
           await assertFieldIsNumeric({
             datasetId,
             field: agg.field,
-            repo: aggRepo,
+            repo,
             toolName: "aggregate",
           });
           const numCol = await getNumericCastExpr({
             datasetId,
             field: agg.field,
-            repo: aggRepo,
+            repo,
             tableAlias: "r",
           });
           selectParts.push(
@@ -216,13 +215,13 @@ export default defineAction<AggregateParams, unknown>({
           const numeric = await isFieldNumeric({
             datasetId,
             field: agg.field,
-            repo: aggRepo,
+            repo,
           });
           const col = numeric
             ? await getNumericCastExpr({
                 datasetId,
                 field: agg.field,
-                repo: aggRepo,
+                repo,
                 tableAlias: "r",
               })
             : `r.data->>'${agg.field}'`;
