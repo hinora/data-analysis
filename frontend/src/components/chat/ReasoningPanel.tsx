@@ -193,9 +193,9 @@ export default function ReasoningPanel({
               <div
                 style={{ display: "flex", flexDirection: "column", gap: "6px" }}
               >
-                {toolsUsed.map((tool) => (
+                {toolsUsed.map((tool, index) => (
                   <ToolCallCard
-                    key={`tool-${tool.toolName}-${JSON.stringify(tool.parameters).slice(0, 40)}`}
+                    key={`tool-${tool.toolName}-${index}`}
                     tool={tool}
                   />
                 ))}

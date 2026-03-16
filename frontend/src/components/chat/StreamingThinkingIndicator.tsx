@@ -256,9 +256,9 @@ function ActivityLog({
             </div>
           ))}
 
-          {tools.map((tool) => (
+          {tools.map((tool, index) => (
             <ToolCallItem
-              key={`tool-${tool.toolName}-${tool.status}`}
+              key={`tool-${tool.toolName}-${tool.status}-${index}`}
               tool={tool}
             />
           ))}

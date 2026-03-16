@@ -102,8 +102,15 @@ export type StreamEvent =
 // ── Constants & config ──────────────────────────────────────────────────
 
 const MAX_TOOL_ITERATIONS = 20;
+const MAX_SUB_AGENT_ITERATIONS = 20;
 const toolEnabledConfig = getDefaultToolEnabledConfig();
 const TOOL_TO_ACTION = getEnabledToolActions(toolEnabledConfig);
+
+// Sub-agent tool config: all tools enabled except createSubAgent
+const subAgentToolConfig = getDefaultToolEnabledConfig();
+subAgentToolConfig.createSubAgent = false;
+const SUB_AGENT_TOOLS = getEnabledToolDefinitions(subAgentToolConfig);
+const SUB_AGENT_TOOL_TO_ACTION = getEnabledToolActions(subAgentToolConfig);
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -130,8 +137,8 @@ async function validateToolDatasetType(
 ): Promise<string | null> {
   const category = getToolCategory(fnName as ToolName);
 
-  // Web tools don't target datasets — skip validation
-  if (category === "web") return null;
+  // Web and meta tools don't target datasets — skip validation
+  if (category === "web" || category === "meta") return null;
 
   // Collect all dataset IDs referenced by this tool call
   const datasetIds: string[] = [];
@@ -168,6 +175,224 @@ async function validateToolDatasetType(
   }
 
   return null;
+}
+
+/** Execute a single tool call and return the result string. */
+async function executeToolCall(req: {
+  ctx: {
+    call: (name: string, params: Record<string, unknown>) => Promise<unknown>;
+  };
+  fnArgs: Record<string, unknown>;
+  fnName: string;
+  stream: PassThrough;
+  toolToAction: Record<string, string>;
+}): Promise<{ durationMs: number; error: boolean; result: string }> {
+  const { ctx, fnArgs, fnName, stream, toolToAction } = req;
+  const actionName = toolToAction[fnName];
+
+  if (!actionName) {
+    writeSSE(stream, {
+      type: "tool_end",
+      durationMs: 0,
+      resultPreview: "Tool not available",
+      success: false,
+      toolName: fnName,
+    });
+    return {
+      durationMs: 0,
+      error: true,
+      result: `Tool ${fnName} is not available.`,
+    };
+  }
+
+  const typeMismatchError = await validateToolDatasetType(fnName, fnArgs, ctx);
+  if (typeMismatchError) {
+    writeSSE(stream, {
+      type: "tool_end",
+      durationMs: 0,
+      resultPreview: truncate(typeMismatchError, 200),
+      success: false,
+      toolName: fnName,
+    });
+    return { durationMs: 0, error: true, result: typeMismatchError };
+  }
+
+  try {
+    const toolStart = Date.now();
+    const result = await ctx.call(actionName, fnArgs);
+    const durationMs = Date.now() - toolStart;
+    const resultStr =
+      typeof result === "string" ? result : JSON.stringify(result, null, 2);
+
+    writeSSE(stream, {
+      type: "tool_end",
+      durationMs,
+      resultPreview: truncate(resultStr, 200),
+      success: true,
+      toolName: fnName,
+    });
+    return { durationMs, error: false, result: resultStr };
+  } catch (toolErr: unknown) {
+    const errMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);
+    writeSSE(stream, {
+      type: "tool_end",
+      durationMs: 0,
+      resultPreview: truncate(errMsg, 200),
+      success: false,
+      toolName: fnName,
+    });
+    return {
+      durationMs: 0,
+      error: true,
+      result: `Tool ${fnName} failed: ${errMsg}`,
+    };
+  }
+}
+
+// ── Sub-agent orchestration ─────────────────────────────────────────────
+
+/**
+ * Run a sub-agent that independently performs an analysis task.
+ * The sub-agent has access to all tools except createSubAgent.
+ * Returns the sub-agent's final textual answer.
+ */
+async function runSubAgent(req: {
+  ctx: {
+    broker: {
+      logger: { info: (msg: string) => void; warn: (msg: string) => void };
+    };
+    call: (name: string, params: Record<string, unknown>) => Promise<unknown>;
+  };
+  prompt: string;
+  stream: PassThrough;
+  systemPrompt: string;
+}): Promise<{
+  completionTokens: number;
+  content: string;
+  promptTokens: number;
+  toolsUsed: ToolUsage[];
+}> {
+  const { ctx, prompt, stream, systemPrompt } = req;
+  const ai = createAIAdapter();
+  const toolsUsed: ToolUsage[] = [];
+
+  const messages: AIMessageWithTools[] = [
+    { content: systemPrompt, role: "system" },
+    { content: prompt, role: "user" },
+  ];
+
+  let finalContent = "";
+  let contentStreamedViaCallback = false;
+  let totalPromptTokens = 0;
+  let totalCompletionTokens = 0;
+
+  writeSSE(stream, { type: "status", message: "Sub-agent started…" });
+
+  let iteration = 0;
+  while (iteration < MAX_SUB_AGENT_ITERATIONS) {
+    iteration++;
+
+    writeSSE(stream, {
+      type: "reasoning",
+      step: `[Sub-agent] Cooking…`,
+    });
+
+    const isLastIteration = iteration > MAX_SUB_AGENT_ITERATIONS - 1;
+
+    const response = await ai.chatWithTools({
+      messages,
+      onContent: (chunk: string) => {
+        finalContent += chunk;
+        contentStreamedViaCallback = true;
+      },
+      onReasoning: (chunk: string) => {
+        writeSSE(stream, { type: "reasoning", step: `[Sub-agent] ${chunk}` });
+      },
+      tools: !isLastIteration ? SUB_AGENT_TOOLS : [],
+    });
+
+    totalPromptTokens += response.promptTokens || 0;
+    totalCompletionTokens += response.completionTokens || 0;
+
+    if (response.toolCalls && response.toolCalls.length > 0) {
+      finalContent = "";
+      contentStreamedViaCallback = false;
+
+      messages.push({
+        _rawAssistantParts: response._rawAssistantParts,
+        content: response.content || "",
+        role: "assistant",
+        toolCalls: response.toolCalls,
+      });
+
+      for (const toolCall of response.toolCalls) {
+        const fnName = toolCall.function.name;
+        const fnArgs = toolCall.function.arguments;
+
+        writeSSE(stream, {
+          type: "tool_start",
+          toolName: fnName,
+          parameters: fnArgs,
+        });
+        writeSSE(stream, {
+          type: "reasoning",
+          step: `[Sub-agent] Calling tool: ${fnName}`,
+        });
+
+        const toolResult = await executeToolCall({
+          ctx,
+          fnArgs,
+          fnName,
+          stream,
+          toolToAction: SUB_AGENT_TOOL_TO_ACTION,
+        });
+
+        if (!toolResult.error) {
+          toolsUsed.push({
+            parameters: fnArgs,
+            resultSummary: toolResult.result,
+            toolName: fnName,
+          });
+          writeSSE(stream, {
+            type: "reasoning",
+            step: `[Sub-agent] Tool ${fnName} returned (${toolResult.durationMs}ms)`,
+          });
+        }
+
+        messages.push({
+          content: toolResult.result,
+          role: "tool",
+          toolName: fnName,
+        });
+      }
+      continue;
+    }
+
+    // Final content (no tool calls)
+    if (!contentStreamedViaCallback) {
+      finalContent = response.content || "";
+    }
+
+    if (!finalContent && iteration < MAX_SUB_AGENT_ITERATIONS) {
+      contentStreamedViaCallback = false;
+      messages.push({
+        content: "Please provide your final analysis.",
+        role: "user",
+      });
+      continue;
+    }
+
+    break;
+  }
+
+  writeSSE(stream, { type: "status", message: "Sub-agent finished." });
+
+  return {
+    completionTokens: totalCompletionTokens,
+    content: finalContent || "Sub-agent was unable to produce a response.",
+    promptTokens: totalPromptTokens,
+    toolsUsed,
+  };
 }
 
 // ── Action ──────────────────────────────────────────────────────────────
@@ -266,7 +491,7 @@ async function processStream(
       const { name } = await ctx.call(
         "chat.generateName",
         { context: nameContext, target: "conversation" as const },
-        { timeout: 120000 },
+        { timeout: 600000 },
       );
       await ctx.call("conversation.renameConversation", {
         id: conversationId,
@@ -365,7 +590,6 @@ async function processStream(
         for (const toolCall of response.toolCalls) {
           const fnName = toolCall.function.name;
           const fnArgs = toolCall.function.arguments;
-          const actionName = TOOL_TO_ACTION[fnName];
 
           const stepDesc = `Calling tool: ${fnName}(${JSON.stringify(fnArgs)})`;
           reasoningSteps.push(stepDesc);
@@ -375,6 +599,94 @@ async function processStream(
             toolName: fnName,
             parameters: fnArgs,
           });
+
+          // ── Sub-agent delegation ────────────────────────────────
+          if (fnName === "createSubAgent") {
+            const subAgentPrompt = fnArgs.prompt as string;
+            if (!subAgentPrompt) {
+              const errMsg = "createSubAgent requires a prompt parameter.";
+              reasoningSteps.push(errMsg);
+              writeSSE(stream, {
+                type: "tool_end",
+                durationMs: 0,
+                resultPreview: errMsg,
+                success: false,
+                toolName: fnName,
+              });
+              messages.push({
+                content: errMsg,
+                role: "tool",
+                toolName: fnName,
+              });
+              continue;
+            }
+
+            try {
+              const subStart = Date.now();
+              const subResult = await runSubAgent({
+                ctx: ctx as unknown as {
+                  broker: {
+                    logger: {
+                      info: (msg: string) => void;
+                      warn: (msg: string) => void;
+                    };
+                  };
+                  call: (
+                    name: string,
+                    params: Record<string, unknown>,
+                  ) => Promise<unknown>;
+                },
+                prompt: subAgentPrompt,
+                stream,
+                systemPrompt:
+                  messages.find((m) => m.role === "system")?.content || "",
+              });
+              const subDuration = Date.now() - subStart;
+
+              totalPromptTokens += subResult.promptTokens;
+              totalCompletionTokens += subResult.completionTokens;
+              toolsUsed.push(...subResult.toolsUsed);
+
+              const stepResult = `Sub-agent finished (${subDuration}ms)`;
+              reasoningSteps.push(stepResult);
+              writeSSE(stream, { type: "reasoning", step: stepResult });
+              writeSSE(stream, {
+                type: "tool_end",
+                durationMs: subDuration,
+                resultPreview: truncate(subResult.content, 200),
+                success: true,
+                toolName: fnName,
+              });
+
+              messages.push({
+                content: subResult.content,
+                role: "tool",
+                toolName: fnName,
+              });
+            } catch (subErr: unknown) {
+              const errMsg =
+                subErr instanceof Error ? subErr.message : String(subErr);
+              const stepFail = `Sub-agent failed: ${errMsg}`;
+              reasoningSteps.push(stepFail);
+              writeSSE(stream, { type: "reasoning", step: stepFail });
+              writeSSE(stream, {
+                type: "tool_end",
+                durationMs: 0,
+                resultPreview: truncate(errMsg, 200),
+                success: false,
+                toolName: fnName,
+              });
+              messages.push({
+                content: `Sub-agent failed: ${errMsg}`,
+                role: "tool",
+                toolName: fnName,
+              });
+            }
+            continue;
+          }
+
+          // ── Normal tool execution ───────────────────────────────
+          const actionName = TOOL_TO_ACTION[fnName];
 
           if (!actionName) {
             reasoningSteps.push(`Unknown tool: ${fnName} — skipped`);

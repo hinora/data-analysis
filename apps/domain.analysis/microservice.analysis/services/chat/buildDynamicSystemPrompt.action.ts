@@ -69,7 +69,7 @@ export default defineAction<
 function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
   const parts: string[] = [];
   const toolConfig = getDefaultToolEnabledConfig();
-  const { structured, unstructured, web } =
+  const { meta, structured, unstructured, web } =
     getEnabledToolNamesByCategory(toolConfig);
 
   parts.push(
@@ -111,6 +111,29 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
       "### Web Search Tools",
       "These tools search the internet for up-to-date information, news, or facts not available in the uploaded datasets. Use when the user asks questions requiring real-time or external knowledge.",
       `- ${web.join(", ")}`,
+      "",
+    );
+  }
+
+  if (meta.length > 0) {
+    parts.push(
+      "### Sub-Agent Tools",
+      "These tools allow you to delegate self-contained analysis tasks to a sub-agent.",
+      "The sub-agent has access to all data tools and can independently gather data, reason, and return results.",
+      "Sub-agents CANNOT create further sub-agents.",
+      `- ${meta.join(", ")}`,
+      "",
+      "#### When to use sub-agents:",
+      "- **Complex multi-part questions**: If the user asks something that requires analysing multiple datasets or multiple independent aspects, create one sub-agent per sub-task.",
+      "- **Comparative analysis**: When comparing data across different datasets or dimensions, delegate each comparison to a separate sub-agent and synthesize results.",
+      "- **Multiple independent calculations**: If the answer requires several unrelated aggregations or lookups, spin up sub-agents to handle each one.",
+      "- **Cross-dataset questions**: When a question spans both structured and unstructured datasets, create one sub-agent for the structured analysis and another for the unstructured analysis.",
+      "",
+      "#### How to use sub-agents effectively:",
+      "- **Be specific in the prompt**: Include dataset IDs, field names, and the exact question the sub-agent should answer. The more detail you provide, the better the sub-agent performs.",
+      "- **Create multiple sub-agents in one turn**: You can call `createSubAgent` multiple times in a single tool-calling turn to run sub-tasks in parallel.",
+      "- **Synthesize results**: After all sub-agents return, combine their findings into a coherent final answer for the user.",
+      "- **Don't over-use**: For simple single-tool lookups (e.g. one aggregation, one filter), call the tool directly instead of creating a sub-agent. Sub-agents are for tasks that need multiple tool calls and reasoning.",
       "",
     );
   }

@@ -17,6 +17,7 @@ export type ToolName =
   | "aggregate"
   | "correlateFields"
   | "countDistinctValues"
+  | "createSubAgent"
   | "detectOutliers"
   | "filterByCondition"
   | "getChunks"
@@ -30,7 +31,7 @@ export type ToolName =
   | "webFetch"
   | "webSearch";
 
-export type ToolCategory = "structured" | "unstructured" | "web";
+export type ToolCategory = "meta" | "structured" | "unstructured" | "web";
 
 export type ToolEnabledConfig = Record<ToolName, boolean>;
 
@@ -194,6 +195,30 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
             },
           },
           required: ["datasetId", "field"],
+        },
+      },
+    },
+  },
+
+  createSubAgent: {
+    action: "__subagent__",
+    category: "meta",
+    definition: {
+      type: "function",
+      function: {
+        name: "createSubAgent",
+        description:
+          "Delegate a self-contained analysis task to a sub-agent. The sub-agent has access to all data tools (structured, unstructured, web) and will independently gather data, reason, and return a final answer. Use this when a task can be performed in parallel or when you want to break a complex question into independent sub-tasks. The sub-agent cannot create further sub-agents.",
+        parameters: {
+          type: "object",
+          properties: {
+            prompt: {
+              type: "string",
+              description:
+                "A detailed instruction for the sub-agent describing exactly what to analyse, which datasets to use, and what to return. Be specific about dataset IDs and field names.",
+            },
+          },
+          required: ["prompt"],
         },
       },
     },
@@ -700,10 +725,12 @@ export function getEnabledToolDefinitions(
 
 /** Returns enabled tool names grouped by category. */
 export function getEnabledToolNamesByCategory(config: ToolEnabledConfig): {
+  meta: ToolName[];
   structured: ToolName[];
   unstructured: ToolName[];
   web: ToolName[];
 } {
+  const meta: ToolName[] = [];
   const structured: ToolName[] = [];
   const unstructured: ToolName[] = [];
   const web: ToolName[] = [];
@@ -715,12 +742,14 @@ export function getEnabledToolNamesByCategory(config: ToolEnabledConfig): {
       structured.push(name);
     } else if (category === "web") {
       web.push(name);
+    } else if (category === "meta") {
+      meta.push(name);
     } else {
       unstructured.push(name);
     }
   }
 
-  return { structured, unstructured, web };
+  return { meta, structured, unstructured, web };
 }
 
 /** Looks up the category for a tool name. */
