@@ -16,23 +16,18 @@ import type { ToolDefinition } from "core.lib/adapters/ai";
 export type ToolName =
   | "aggregate"
   | "answerFromContext"
-  | "avgField"
   | "correlateFields"
-  | "count"
-  | "countAndGroup"
   | "countDistinctValues"
   | "detectOutliers"
   | "filterByCondition"
   | "getChunks"
   | "getDistinctValues"
-  | "getMinMax"
   | "getPercentile"
-  | "getTopByField"
   | "joinDatasets"
   | "pivotTable"
+  | "sampleData"
   | "semanticSearch"
   | "sortByField"
-  | "sumField"
   | "webFetch"
   | "webSearch";
 
@@ -59,7 +54,7 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
       function: {
         name: "aggregate",
         description:
-          "[STRUCTURED DATA ONLY] Multi-field aggregation pipeline for structured-table datasets. Returns at most 200 grouped rows. NULL group-by values are automatically excluded. When grouping by high-cardinality fields, always provide orderBy and a reasonable limit to get the most relevant results. The response includes totalGroups and truncated flag. Do NOT use on unstructured-text datasets.",
+          "[STRUCTURED DATA ONLY] Multi-field aggregation pipeline for structured-table datasets. Supports sum, avg, min, max, count operations with optional groupBy, ordering, conditions, and filters. Returns at most 200 grouped rows. NULL group-by values are automatically excluded. When grouping by high-cardinality fields, always provide orderBy and a reasonable limit to get the most relevant results. The response includes totalGroups and truncated flag. Use this tool for any aggregation need: totals, averages, counts (with or without groupBy), min/max ranges, etc. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -89,10 +84,45 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
               items: { type: "string" },
               description: "Fields to group by",
             },
+            conditions: {
+              type: "array",
+              description:
+                "Optional array of filter conditions with operators. Use for filtering records before aggregating.",
+              items: {
+                type: "object",
+                properties: {
+                  field: {
+                    type: "string",
+                    description: "Column key to filter on",
+                  },
+                  operator: {
+                    type: "string",
+                    enum: [
+                      "eq",
+                      "neq",
+                      "gt",
+                      "gte",
+                      "lt",
+                      "lte",
+                      "contains",
+                      "in",
+                    ],
+                    description:
+                      "Comparison operator: eq (equals), neq (not equals), gt/gte/lt/lte (numeric range), contains (case-insensitive substring match), in (value in list)",
+                  },
+                  value: {
+                    type: "string",
+                    description:
+                      "Value to compare against. For 'in' operator, provide an array of values.",
+                  },
+                },
+                required: ["field", "operator", "value"],
+              },
+            },
             filters: {
               type: "object",
               description:
-                "Optional simple equality filters as key-value pairs (e.g. {country: 'VN'}). For complex filtering (gt, lt, contains, in), use filterByCondition tool instead.",
+                "Optional simple equality filters as key-value pairs (e.g. {country: 'VN'}). For complex filtering use 'conditions' instead.",
             },
             limit: {
               type: "number",
@@ -153,71 +183,6 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
     },
   },
 
-  avgField: {
-    action: "tools.avgField",
-    category: "structured",
-    definition: {
-      type: "function",
-      function: {
-        name: "avgField",
-        description:
-          "[STRUCTURED DATA ONLY] Average a numeric field in a structured-table dataset with optional groupBy and filter conditions. When groupBy is used, returns at most 200 rows (sorted by average DESC). Use 'conditions' to filter records before averaging. Do NOT use on unstructured-text datasets.",
-        parameters: {
-          type: "object",
-          properties: {
-            datasetId: { type: "string", description: "Dataset UUID" },
-            field: { type: "string", description: "Column key to average" },
-            conditions: {
-              type: "array",
-              description:
-                "Optional array of filter conditions with operators. Use for filtering records before averaging.",
-              items: {
-                type: "object",
-                properties: {
-                  field: {
-                    type: "string",
-                    description: "Column key to filter on",
-                  },
-                  operator: {
-                    type: "string",
-                    enum: [
-                      "eq",
-                      "neq",
-                      "gt",
-                      "gte",
-                      "lt",
-                      "lte",
-                      "contains",
-                      "in",
-                    ],
-                    description:
-                      "Comparison operator: eq (equals), neq (not equals), gt/gte/lt/lte (numeric range), contains (case-insensitive substring match), in (value in list)",
-                  },
-                  value: {
-                    type: "string",
-                    description:
-                      "Value to compare against. For 'in' operator, provide an array of values.",
-                  },
-                },
-                required: ["field", "operator", "value"],
-              },
-            },
-            groupBy: {
-              type: "string",
-              description: "Optional column to group by",
-            },
-            limit: {
-              type: "number",
-              description:
-                "Max grouped rows to return when using groupBy (default: 200, max: 200)",
-            },
-          },
-          required: ["datasetId", "field"],
-        },
-      },
-    },
-  },
-
   correlateFields: {
     action: "tools.correlateFields",
     category: "structured",
@@ -235,96 +200,6 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
             field2: { type: "string", description: "Second numeric column" },
           },
           required: ["datasetId", "field1", "field2"],
-        },
-      },
-    },
-  },
-
-  count: {
-    action: "tools.count",
-    category: "structured",
-    definition: {
-      type: "function",
-      function: {
-        name: "count",
-        description:
-          "[STRUCTURED DATA ONLY] Count records in a structured-table dataset with optional filter conditions. Supports both simple key-value equality filters and rich conditions with operators (eq, neq, gt, gte, lt, lte, contains, in). Use 'conditions' for advanced filtering (e.g. substring match via 'contains'). Do NOT use on unstructured-text datasets.",
-        parameters: {
-          type: "object",
-          properties: {
-            datasetId: { type: "string", description: "Dataset UUID" },
-            conditions: {
-              type: "array",
-              description:
-                "Array of filter conditions with operators. Use this for advanced filtering (contains, range comparisons, etc.)",
-              items: {
-                type: "object",
-                properties: {
-                  field: {
-                    type: "string",
-                    description: "Column key to filter on",
-                  },
-                  operator: {
-                    type: "string",
-                    enum: [
-                      "eq",
-                      "neq",
-                      "gt",
-                      "gte",
-                      "lt",
-                      "lte",
-                      "contains",
-                      "in",
-                    ],
-                    description:
-                      "Comparison operator: eq (equals), neq (not equals), gt/gte/lt/lte (numeric range), contains (case-insensitive substring match), in (value in list)",
-                  },
-                  value: {
-                    type: "string",
-                    description:
-                      "Value to compare against. For 'in' operator, provide an array of values.",
-                  },
-                },
-                required: ["field", "operator", "value"],
-              },
-            },
-            filters: {
-              type: "object",
-              description:
-                "Simple equality filter conditions as key-value pairs (legacy, prefer 'conditions' for new queries)",
-            },
-          },
-          required: ["datasetId"],
-        },
-      },
-    },
-  },
-
-  countAndGroup: {
-    action: "tools.countAndGroup",
-    category: "structured",
-    definition: {
-      type: "function",
-      function: {
-        name: "countAndGroup",
-        description:
-          "[STRUCTURED DATA ONLY] Count records grouped by one or more fields in a structured-table dataset. Returns at most 200 groups (sorted by count DESC). Do NOT use on unstructured-text datasets.",
-        parameters: {
-          type: "object",
-          properties: {
-            datasetId: { type: "string", description: "Dataset UUID" },
-            fields: {
-              type: "array",
-              items: { type: "string" },
-              description: "Column keys to group by",
-            },
-            limit: {
-              type: "number",
-              description:
-                "Max number of groups to return (default: 200, max: 200)",
-            },
-          },
-          required: ["datasetId", "fields"],
         },
       },
     },
@@ -490,7 +365,7 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
       function: {
         name: "getDistinctValues",
         description:
-          "[STRUCTURED DATA ONLY] Get distinct values with counts for a CATEGORICAL field in a structured-table dataset. Do NOT use on numeric/number fields (use countDistinctValues, getMinMax, or aggregate instead). Do NOT use on unstructured-text datasets.",
+          "[STRUCTURED DATA ONLY] Get distinct values with counts for a CATEGORICAL field in a structured-table dataset. Do NOT use on numeric/number fields (use countDistinctValues or aggregate with min/max instead). Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
@@ -504,27 +379,6 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
               description:
                 "Maximum number of distinct values to return (default: 50)",
             },
-          },
-          required: ["datasetId", "field"],
-        },
-      },
-    },
-  },
-
-  getMinMax: {
-    action: "tools.getMinMax",
-    category: "structured",
-    definition: {
-      type: "function",
-      function: {
-        name: "getMinMax",
-        description:
-          "[STRUCTURED DATA ONLY] Get min and max values for a field in a structured-table dataset. Do NOT use on unstructured-text datasets.",
-        parameters: {
-          type: "object",
-          properties: {
-            datasetId: { type: "string", description: "Dataset UUID" },
-            field: { type: "string", description: "Column key" },
           },
           required: ["datasetId", "field"],
         },
@@ -554,35 +408,6 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
               items: { type: "number" },
               description:
                 "Percentile values 0-100 to compute (default: [25,50,75,90,95,99])",
-            },
-          },
-          required: ["datasetId", "field"],
-        },
-      },
-    },
-  },
-
-  getTopByField: {
-    action: "tools.getTopByField",
-    category: "structured",
-    definition: {
-      type: "function",
-      function: {
-        name: "getTopByField",
-        description:
-          "[STRUCTURED DATA ONLY] Get top N records sorted by a field in a structured-table dataset. Do NOT use on unstructured-text datasets.",
-        parameters: {
-          type: "object",
-          properties: {
-            datasetId: { type: "string", description: "Dataset UUID" },
-            field: { type: "string", description: "Column key to sort by" },
-            limit: {
-              type: "number",
-              description: "Number of records (default: 10)",
-            },
-            order: {
-              type: "string",
-              description: "ASC or DESC (default: DESC)",
             },
           },
           required: ["datasetId", "field"],
@@ -677,6 +502,30 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
     },
   },
 
+  sampleData: {
+    action: "tools.sampleData",
+    category: "structured",
+    definition: {
+      type: "function",
+      function: {
+        name: "sampleData",
+        description:
+          "[STRUCTURED DATA ONLY] Preview rows from a structured-table dataset. Returns the first N rows so you can understand column formats, data types, and representative values before performing analysis. Use this as a first step to explore unfamiliar data. Do NOT use on unstructured-text datasets.",
+        parameters: {
+          type: "object",
+          properties: {
+            datasetId: { type: "string", description: "Dataset UUID" },
+            limit: {
+              type: "number",
+              description: "Number of rows to return (default: 10, max: 100)",
+            },
+          },
+          required: ["datasetId"],
+        },
+      },
+    },
+  },
+
   semanticSearch: {
     action: "tools.semanticSearch",
     category: "unstructured",
@@ -741,36 +590,6 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
               type: "boolean",
               description:
                 "Treat field as numeric for sorting (auto-detected if omitted)",
-            },
-          },
-          required: ["datasetId", "field"],
-        },
-      },
-    },
-  },
-
-  sumField: {
-    action: "tools.sumField",
-    category: "structured",
-    definition: {
-      type: "function",
-      function: {
-        name: "sumField",
-        description:
-          "[STRUCTURED DATA ONLY] Sum a numeric field in a structured-table dataset with optional groupBy. When groupBy is used, returns at most 200 rows (sorted by total DESC). Do NOT use on unstructured-text datasets.",
-        parameters: {
-          type: "object",
-          properties: {
-            datasetId: { type: "string", description: "Dataset UUID" },
-            field: { type: "string", description: "Column key to sum" },
-            groupBy: {
-              type: "string",
-              description: "Optional column to group by",
-            },
-            limit: {
-              type: "number",
-              description:
-                "Max grouped rows to return when using groupBy (default: 200, max: 200)",
             },
           },
           required: ["datasetId", "field"],

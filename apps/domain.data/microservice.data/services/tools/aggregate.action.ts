@@ -1,7 +1,10 @@
 /**
  * Aggregate Tool
  *
- * Multi-field aggregation pipeline with optional groupBy.
+ * Multi-field aggregation pipeline with optional groupBy and rich condition
+ * filtering. This is the single tool for all aggregation operations (sum, avg,
+ * min, max, count) — dedicated single-operation tools (sumField, avgField,
+ * countAndGroup, getMinMax, count) have been consolidated here.
  */
 
 import type { TypedContext } from "core.lib/__generated__";
@@ -21,8 +24,15 @@ interface AggregationDef {
   operation: "sum" | "avg" | "min" | "max" | "count";
 }
 
+interface AggregateCondition {
+  field: string;
+  operator: "contains" | "eq" | "gt" | "gte" | "in" | "lt" | "lte" | "neq";
+  value: unknown;
+}
+
 export interface AggregateParams {
   aggregations: AggregationDef[];
+  conditions?: AggregateCondition[];
   datasetId: string;
   filters?: Record<string, unknown>;
   groupBy?: string[];
@@ -42,6 +52,21 @@ export default defineAction<AggregateParams, unknown>({
             type: "enum",
             values: ["sum", "avg", "min", "max", "count"],
           },
+        },
+      },
+    },
+    conditions: {
+      type: "array",
+      optional: true,
+      items: {
+        type: "object",
+        props: {
+          field: { type: "string" },
+          operator: {
+            type: "enum",
+            values: ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "in"],
+          },
+          value: { type: "any" },
         },
       },
     },
@@ -66,8 +91,15 @@ export default defineAction<AggregateParams, unknown>({
   },
 
   async handler(ctx: TypedContext<AggregateParams>) {
-    const { aggregations, datasetId, filters, groupBy, limit, orderBy } =
-      ctx.params;
+    const {
+      aggregations,
+      conditions,
+      datasetId,
+      filters,
+      groupBy,
+      limit,
+      orderBy,
+    } = ctx.params;
     await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
@@ -75,7 +107,7 @@ export default defineAction<AggregateParams, unknown>({
       .createQueryBuilder("r")
       .where("r.datasetId = :datasetId", { datasetId });
 
-    // Apply filters (equality only — for complex conditions, use filterByCondition)
+    // Apply simple equality filters (legacy — prefer conditions for new queries)
     if (filters) {
       for (const [key, value] of Object.entries(filters)) {
         // Skip non-primitive values (AI sometimes passes objects with operators)
@@ -85,6 +117,64 @@ export default defineAction<AggregateParams, unknown>({
         qb.andWhere(`r.data->>'${key}' = :filter_${key}`, {
           [`filter_${key}`]: String(value),
         });
+      }
+    }
+
+    // Apply rich conditions with operators
+    if (conditions) {
+      for (let i = 0; i < conditions.length; i++) {
+        const c = conditions[i];
+        const paramName = `cond_${i}`;
+        const jsonField = `r.data->>'${c.field}'`;
+
+        switch (c.operator) {
+          case "eq":
+            qb.andWhere(`${jsonField} = :${paramName}`, {
+              [paramName]: String(c.value),
+            });
+            break;
+          case "neq":
+            qb.andWhere(`${jsonField} != :${paramName}`, {
+              [paramName]: String(c.value),
+            });
+            break;
+          case "gt":
+          case "gte":
+          case "lt":
+          case "lte": {
+            const numeric = await isFieldNumeric({
+              datasetId,
+              field: c.field,
+              repo,
+            });
+            const castField = numeric
+              ? await getNumericCastExpr({
+                  datasetId,
+                  field: c.field,
+                  repo,
+                  tableAlias: "r",
+                })
+              : jsonField;
+            const paramVal = numeric ? Number(c.value) : String(c.value);
+            const ops = { gt: ">", gte: ">=", lt: "<", lte: "<=" } as const;
+            qb.andWhere(`${castField} ${ops[c.operator]} :${paramName}`, {
+              [paramName]: paramVal,
+            });
+            break;
+          }
+          case "contains":
+            qb.andWhere(`${jsonField} ILIKE :${paramName}`, {
+              [paramName]: `%${c.value}%`,
+            });
+            break;
+          case "in":
+            if (Array.isArray(c.value)) {
+              qb.andWhere(`${jsonField} IN (:...${paramName})`, {
+                [paramName]: c.value.map(String),
+              });
+            }
+            break;
+        }
       }
     }
 
@@ -98,7 +188,6 @@ export default defineAction<AggregateParams, unknown>({
     // Build aggregation selects
     const selectParts: string[] = [];
     for (const agg of aggregations) {
-      const repo = dataSource.getRepository(DataRecord);
       switch (agg.operation) {
         case "sum":
         case "avg": {
