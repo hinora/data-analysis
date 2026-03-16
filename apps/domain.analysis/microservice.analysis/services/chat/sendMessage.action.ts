@@ -182,13 +182,13 @@ async function validateToolDatasetType(
   return null;
 }
 
-// ── TOON serialisation (lazy-loaded ESM module) ─────────────────────────
+// ── TOON serialization (lazy-loaded ESM module) ─────────────────────────
 
 let toonEncode: ((input: unknown) => string) | undefined;
 let toonLoadAttempted = false;
 
 /**
- * Serialise a tool result for inclusion in the LLM message history.
+ * Serialize a tool result for inclusion in the LLM message history.
  * Non-string values are encoded as TOON (Token-Oriented Object Notation)
  * which is more token-efficient than JSON. Falls back to JSON on failure.
  */
