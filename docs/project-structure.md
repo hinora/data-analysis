@@ -150,7 +150,7 @@ apps/
 
 **Structured tools:** aggregate, correlateFields, countDistinctValues, detectOutliers, filterByCondition, getDistinctValues, getPercentile, joinDatasets, pivotTable, sampleData, sortByField
 
-**Unstructured tools:** semanticSearch, answerFromContext, getChunks
+**Unstructured tools:** semanticSearch, getChunks
 
 **Entities:** OriginalFile, Dataset, DataRecord, TextChunk, AILog
 **Database:** data_db (PostgreSQL + pgvector)

@@ -148,7 +148,7 @@ flowchart LR
     DT -->|structured-table| ST[Structured Data Tools]
     DT -->|unstructured-text| UT[Unstructured Text Tools]
     ST --> R1[aggregate, filterByCondition, sortByField, sampleData, ...]
-    UT --> R2[semanticSearch, answerFromContext, getChunks]
+    UT --> R2[semanticSearch, getChunks]
 ```
 
 The system prompt explicitly groups datasets by type and tells the AI:
@@ -193,7 +193,6 @@ flowchart TD
 
 | Tool                 | Action                       | Description                                         |
 |----------------------|------------------------------|-----------------------------------------------------|
-| `answerFromContext`  | `tools.answerFromContext`    | Answer questions using retrieved text context (RAG)  |
 | `getChunks`          | `tools.getChunks`            | Retrieve text chunks by order index range from document index |
 | `semanticSearch`     | `tools.semanticSearch`       | Hybrid search: vector similarity + keyword matching across text chunks |
 

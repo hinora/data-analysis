@@ -15,7 +15,6 @@ import type { ToolDefinition } from "core.lib/adapters/ai";
 
 export type ToolName =
   | "aggregate"
-  | "answerFromContext"
   | "correlateFields"
   | "countDistinctValues"
   | "detectOutliers"
@@ -149,35 +148,6 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
             },
           },
           required: ["datasetId", "aggregations"],
-        },
-      },
-    },
-  },
-
-  answerFromContext: {
-    action: "tools.answerFromContext",
-    category: "unstructured",
-    definition: {
-      type: "function",
-      function: {
-        name: "answerFromContext",
-        description:
-          "[UNSTRUCTURED TEXT ONLY] Answer a question using retrieved text context via vector search on unstructured-text datasets. Do NOT use on structured-table datasets.",
-        parameters: {
-          type: "object",
-          properties: {
-            sessionId: { type: "string", description: "Session UUID" },
-            question: { type: "string", description: "The question to answer" },
-            topK: {
-              type: "number",
-              description: "Context chunks to retrieve (default: 5)",
-            },
-            datasetId: {
-              type: "string",
-              description: "Optional dataset UUID to scope the search",
-            },
-          },
-          required: ["sessionId", "question"],
         },
       },
     },

@@ -56,8 +56,10 @@ export interface ChunkOptions {
  * Everything else is joined with a space (soft-wrap continuation).
  */
 export function normalizeExtractedText(text: string): string {
+  // Strip null bytes (0x00) — PostgreSQL rejects them in text columns
+  const sanitized = text.replace(/\0/g, "");
   // Normalize page markers like "-- 1 of 3 --" into paragraph breaks
-  const cleaned = text.replace(/\n*--\s*\d+\s*of\s*\d+\s*--\n*/g, "\n\n");
+  const cleaned = sanitized.replace(/\n*--\s*\d+\s*of\s*\d+\s*--\n*/g, "\n\n");
 
   // Split into paragraphs (separated by blank lines), then process each
   const paragraphs = cleaned.split(/\n{2,}/);

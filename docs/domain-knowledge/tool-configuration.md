@@ -77,10 +77,8 @@ sampleData, sortByField
 
 Operate on `unstructured-text` datasets (PDF, TXT, DOCX via vector embeddings):
 
-answerFromContext, getChunks, semanticSearch
+getChunks, semanticSearch
 
-- **answerFromContext** — RAG pattern: answers a question using retrieved text
-  context via vector search. Essential for question-answering on documents.
 - **getChunks** — Retrieve text chunks by order index range. Use the document
   index from dataset metadata to find the relevant section, then call this
   tool with the section's chunk range to read the actual content.

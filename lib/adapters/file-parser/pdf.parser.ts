@@ -40,7 +40,8 @@ export class PdfParser implements FileParserAdapter {
     try {
       const parser = new PDFParse({ data: buffer });
       const textResult = await parser.getText();
-      pdfText = textResult.text || "";
+      // Strip null bytes (0x00) — PostgreSQL rejects them in text columns
+      pdfText = (textResult.text || "").replace(/\0/g, "");
       await parser.destroy();
     } catch (err) {
       errors.push({

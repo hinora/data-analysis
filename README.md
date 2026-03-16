@@ -155,7 +155,6 @@ Handles file upload, parsing, AI metadata generation, and 25 data analysis tools
 
 | Tool | Description |
 |------|-------------|
-| `answerFromContext` | RAG — answer questions from retrieved text context |
 | `compareDocuments` | Compare content/themes across text datasets |
 | `extractEntities` | Extract people, orgs, dates, locations, monetary values |
 | `extractKeyTopics` | Identify main topics and themes |
