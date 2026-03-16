@@ -13,12 +13,31 @@ import type { DataRecord } from "../../db/data-record.entity";
 /**
  * Matches numbers in standard or comma-decimal format:
  * - "123", "-123" (integers)
- * - "123.45", "-123.45" (dot decimal)
+ * - "123.45", "-123.456789" (dot decimal, any precision)
  * - "123,45", "-123,45" (comma decimal)
  * - "1.234,56" (European: dot thousands, comma decimal)
  * - "1,234.56" (US: comma thousands, dot decimal)
+ * - "1,234.5678" (US with high precision)
+ *
+ * NOTE: Values must be stripped of currency/unit symbols before testing.
+ * Use `stripNonNumeric()` for JS-side stripping.
  */
-const NUMERIC_REGEX = /^-?\d{1,3}([.,]\d{3})*([.,]\d{1,2})?$|^-?\d+([.,]\d+)?$/;
+const NUMERIC_REGEX = /^-?\d{1,3}([.,]\d{3})*([.,]\d+)?$|^-?\d+([.,]\d+)?$/;
+
+/**
+ * Strips common currency symbols, unit prefixes/suffixes, and whitespace
+ * from a string value so the numeric regex can match the core number.
+ * Handles: $, €, £, ¥, ₫, ₩, ₹, %, spaces, and other common prefixes.
+ *
+ * @example
+ * stripNonNumeric("$188.54")   // → "188.54"
+ * stripNonNumeric("€1.234,56") // → "1.234,56"
+ * stripNonNumeric("50%")       // → "50"
+ * stripNonNumeric("-$12.34")   // → "-12.34"
+ */
+function stripNonNumeric(val: string): string {
+  return val.replace(/^[^\d-]*(-?)[^\d]*/, "$1").replace(/[^\d.,]+$/, "");
+}
 
 type NumberFormat = "comma_decimal" | "standard";
 
@@ -45,7 +64,7 @@ async function detectNumberFormat(req: {
   if (samples.length === 0) return "standard";
 
   for (const sample of samples) {
-    const val = sample.val?.trim();
+    const val = stripNonNumeric(sample.val?.trim() ?? "");
     if (!val) continue;
 
     // Comma followed by 1 or 2 digits at end → comma is decimal separator
@@ -64,20 +83,20 @@ async function detectNumberFormat(req: {
 }
 
 /**
- * Builds a SQL expression to cast a JSONB text value to numeric,
- * handling comma-decimal format by replacing separators.
- *
- * For comma-decimal format (e.g., "1.234,56"):
- *   REPLACE(REPLACE(expr, '.', ''), ',', '.')::numeric
- *
- * For standard format (e.g., "1234.56"):
- *   (expr)::numeric
+ * SQL expression that strips non-numeric characters (currency symbols, letters,
+ * spaces) from a JSONB text value, keeping only digits, dots, commas, and minus.
+ * This is applied before decimal-format transforms and ::numeric casting.
  */
+function sqlStripNonNumeric(jsonExpr: string): string {
+  return `REGEXP_REPLACE(${jsonExpr}, '[^0-9.,-]', '', 'g')`;
+}
+
 function buildNumericCast(jsonExpr: string, format: NumberFormat): string {
+  const stripped = sqlStripNonNumeric(jsonExpr);
   if (format === "comma_decimal") {
-    return `REPLACE(REPLACE(${jsonExpr}, '.', ''), ',', '.')::numeric`;
+    return `REPLACE(REPLACE(${stripped}, '.', ''), ',', '.')::numeric`;
   }
-  return `(${jsonExpr})::numeric`;
+  return `(${stripped})::numeric`;
 }
 
 /**
@@ -108,9 +127,13 @@ export async function getNumericCastExpr(req: {
   return buildNumericCast(jsonExpr, format);
 }
 
+const SAMPLE_SIZE = 10;
+const NUMERIC_THRESHOLD = 0.5;
+
 /**
- * Samples one non-null value from a JSONB field and checks if it looks numeric.
- * Handles both dot-decimal and comma-decimal formats.
+ * Samples multiple non-empty values from a JSONB field and checks if the
+ * majority look numeric. Filters out empty/blank strings so stray empty
+ * cells don't cause false negatives.
  */
 export async function isFieldNumeric(req: {
   datasetId: string;
@@ -119,15 +142,22 @@ export async function isFieldNumeric(req: {
 }): Promise<boolean> {
   const { datasetId, field, repo } = req;
 
-  const sample = await repo
+  const samples = await repo
     .createQueryBuilder("r")
     .select(`r.data->>'${field}'`, "val")
     .where("r.datasetId = :datasetId", { datasetId })
     .andWhere(`r.data->>'${field}' IS NOT NULL`)
-    .limit(1)
-    .getRawOne();
+    .andWhere(`TRIM(r.data->>'${field}') != ''`)
+    .limit(SAMPLE_SIZE)
+    .getRawMany();
 
-  return sample?.val != null && NUMERIC_REGEX.test(sample.val.trim());
+  if (samples.length === 0) return false;
+
+  const numericCount = samples.filter((s) =>
+    NUMERIC_REGEX.test(stripNonNumeric(s.val.trim())),
+  ).length;
+
+  return numericCount / samples.length >= NUMERIC_THRESHOLD;
 }
 
 /**
@@ -151,4 +181,25 @@ export async function assertFieldIsNumeric(req: {
       { field },
     );
   }
+}
+
+/**
+ * Returns a SQL WHERE clause fragment that filters out NULL and empty/blank
+ * values for a JSONB field. Use this in raw SQL queries before numeric casting
+ * to prevent `::numeric` cast errors on stray non-numeric rows.
+ *
+ * @param tableAlias - Optional table alias (e.g., "r"). Omit for raw SQL.
+ *
+ * @example
+ * const filter = numericWhereClause({ field: "price", tableAlias: "r" });
+ * // → "r.data->>'price' IS NOT NULL AND TRIM(r.data->>'price') != ''"
+ */
+export function numericWhereClause(req: {
+  field: string;
+  tableAlias?: string;
+}): string {
+  const { field, tableAlias } = req;
+  const prefix = tableAlias ? `${tableAlias}.` : "";
+  const jsonExpr = `${prefix}data->>'${field}'`;
+  return `${jsonExpr} IS NOT NULL AND TRIM(${jsonExpr}) != ''`;
 }

@@ -6,7 +6,8 @@
 
 import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
-import { dataSource } from "../../db";
+import { dataSource, getTableName } from "../../db";
+import { DataRecord } from "../../db/data-record.entity";
 
 export interface JoinDatasetsParams {
   leftDatasetId: string;
@@ -67,8 +68,8 @@ export default defineAction<JoinDatasetsParams, unknown>({
       SELECT
         l.data AS "leftData",
         r.data AS "rightData"
-      FROM data_record l
-      ${joinClause} data_record r
+      FROM ${getTableName(DataRecord)} l
+      ${joinClause} ${getTableName(DataRecord)} r
         ON r."datasetId" = $2
         AND l.data->>'${leftField}' = r.data->>'${rightField}'
       WHERE l."datasetId" = $1

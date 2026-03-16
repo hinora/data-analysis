@@ -8,7 +8,11 @@ import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
-import { getNumericCastExpr, isFieldNumeric } from "./numericFieldUtils";
+import {
+  getNumericCastExpr,
+  isFieldNumeric,
+  numericWhereClause,
+} from "./numericFieldUtils";
 
 export interface SortByFieldParams {
   datasetId: string;
@@ -61,7 +65,11 @@ export default defineAction<SortByFieldParams, unknown>({
       .createQueryBuilder("r")
       .select("r.data")
       .where("r.datasetId = :datasetId", { datasetId })
-      .andWhere(`r.data->>'${field}' IS NOT NULL`)
+      .andWhere(
+        isNumeric
+          ? numericWhereClause({ field, tableAlias: "r" })
+          : `r.data->>'${field}' IS NOT NULL`,
+      )
       .orderBy(orderExpr, order as "ASC" | "DESC")
       .limit(limit)
       .getRawMany();

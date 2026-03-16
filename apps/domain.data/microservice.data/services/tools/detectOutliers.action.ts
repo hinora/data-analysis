@@ -6,9 +6,13 @@
 
 import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
-import { dataSource } from "../../db";
+import { dataSource, getTableName } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
-import { assertFieldIsNumeric, getNumericCastExpr } from "./numericFieldUtils";
+import {
+  assertFieldIsNumeric,
+  getNumericCastExpr,
+  numericWhereClause,
+} from "./numericFieldUtils";
 
 export interface DetectOutliersParams {
   datasetId: string;
@@ -43,6 +47,7 @@ export default defineAction<DetectOutliersParams, unknown>({
     });
 
     const numExpr = await getNumericCastExpr({ datasetId, field, repo });
+    const numericFilter = numericWhereClause({ field });
 
     if (method === "zscore") {
       // Z-score method
@@ -51,8 +56,8 @@ export default defineAction<DetectOutliersParams, unknown>({
         SELECT
           AVG(${numExpr}) AS mean,
           STDDEV(${numExpr}) AS stddev
-        FROM data_record
-        WHERE "datasetId" = $1 AND data->>'${field}' IS NOT NULL
+        FROM ${getTableName(DataRecord)}
+        WHERE "datasetId" = $1 AND ${numericFilter}
         `,
         [datasetId],
       );
@@ -70,9 +75,9 @@ export default defineAction<DetectOutliersParams, unknown>({
       const outliers = await dataSource.query(
         `
         SELECT data
-        FROM data_record
+        FROM ${getTableName(DataRecord)}
         WHERE "datasetId" = $1
-          AND data->>'${field}' IS NOT NULL
+          AND ${numericFilter}
           AND ABS((${numExpr} - $2) / $3) > $4
         ORDER BY ABS((${numExpr} - $2) / $3) DESC
         LIMIT 50
@@ -97,8 +102,8 @@ export default defineAction<DetectOutliersParams, unknown>({
       SELECT
         PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY ${numExpr}) AS q1,
         PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY ${numExpr}) AS q3
-      FROM data_record
-      WHERE "datasetId" = $1 AND data->>'${field}' IS NOT NULL
+      FROM ${getTableName(DataRecord)}
+      WHERE "datasetId" = $1 AND ${numericFilter}
       `,
       [datasetId],
     );
@@ -115,9 +120,9 @@ export default defineAction<DetectOutliersParams, unknown>({
     const outliers = await dataSource.query(
       `
       SELECT data
-      FROM data_record
+      FROM ${getTableName(DataRecord)}
       WHERE "datasetId" = $1
-        AND data->>'${field}' IS NOT NULL
+        AND ${numericFilter}
         AND (${numExpr} < $2 OR ${numExpr} > $3)
       ORDER BY ABS(${numExpr} - ($4 + $5) / 2) DESC
       LIMIT 50

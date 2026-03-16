@@ -8,7 +8,11 @@ import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
-import { assertFieldIsNumeric, getNumericCastExpr } from "./numericFieldUtils";
+import {
+  assertFieldIsNumeric,
+  getNumericCastExpr,
+  numericWhereClause,
+} from "./numericFieldUtils";
 
 export interface PivotTableParams {
   datasetId: string;
@@ -82,6 +86,7 @@ export default defineAction<PivotTableParams, unknown>({
       .createQueryBuilder("r")
       .select([`r.data->>'${rowField}' AS "row"`, ...caseParts])
       .where("r.datasetId = :datasetId", { datasetId })
+      .andWhere(numericWhereClause({ field: valueField, tableAlias: "r" }))
       .groupBy(`r.data->>'${rowField}'`)
       .orderBy(`r.data->>'${rowField}'`, "ASC");
 

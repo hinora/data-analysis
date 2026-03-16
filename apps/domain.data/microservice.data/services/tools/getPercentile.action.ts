@@ -6,9 +6,13 @@
 
 import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
-import { dataSource } from "../../db";
+import { dataSource, getTableName } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
-import { assertFieldIsNumeric, getNumericCastExpr } from "./numericFieldUtils";
+import {
+  assertFieldIsNumeric,
+  getNumericCastExpr,
+  numericWhereClause,
+} from "./numericFieldUtils";
 
 export interface GetPercentileParams {
   datasetId: string;
@@ -51,14 +55,16 @@ export default defineAction<GetPercentileParams, unknown>({
         `PERCENTILE_CONT(${p / 100}) WITHIN GROUP (ORDER BY ${numExpr}) AS "p${p}"`,
     );
 
+    const whereClause = numericWhereClause({ field });
+
     const result = await dataSource.query(
       `
       SELECT
         ${percentileExprs.join(",\n        ")},
         COUNT(*) AS "count"
-      FROM data_record
+      FROM ${getTableName(DataRecord)}
       WHERE "datasetId" = $1
-        AND data->>'${field}' IS NOT NULL
+        AND ${whereClause}
       `,
       [datasetId],
     );

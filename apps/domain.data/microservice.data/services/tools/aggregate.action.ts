@@ -15,6 +15,7 @@ import {
   assertFieldIsNumeric,
   getNumericCastExpr,
   isFieldNumeric,
+  numericWhereClause,
 } from "./numericFieldUtils";
 
 const MAX_AGGREGATE_ROWS = 200;
@@ -197,6 +198,9 @@ export default defineAction<AggregateParams, unknown>({
             repo,
             toolName: "aggregate",
           });
+          qb.andWhere(
+            numericWhereClause({ field: agg.field, tableAlias: "r" }),
+          );
           const numCol = await getNumericCastExpr({
             datasetId,
             field: agg.field,
@@ -217,6 +221,11 @@ export default defineAction<AggregateParams, unknown>({
             field: agg.field,
             repo,
           });
+          if (numeric) {
+            qb.andWhere(
+              numericWhereClause({ field: agg.field, tableAlias: "r" }),
+            );
+          }
           const col = numeric
             ? await getNumericCastExpr({
                 datasetId,

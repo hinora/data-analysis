@@ -38,3 +38,14 @@ export const dataSource = createDataSource({
   enableVector: true,
   synchronize: process.env.NODE_ENV !== "production",
 });
+
+/**
+ * Returns the quoted table name for an entity from TypeORM metadata.
+ * Use this in raw SQL queries instead of hardcoding table names.
+ */
+export function getTableName(
+  entity: Parameters<typeof dataSource.getMetadata>[0],
+): string {
+  const { tableName } = dataSource.getMetadata(entity);
+  return `"${tableName}"`;
+}
