@@ -160,6 +160,15 @@ const StructuredMetadataView: React.FC<{
 interface UnstructuredMetadataShape {
   chunkCount?: number;
   contentDomain?: string;
+  documentIndex?: Array<{
+    chunkEnd: number;
+    chunkIds?: string[];
+    chunkStart: number;
+    indexLabel: string;
+    level: number;
+    summary: string;
+    title: string;
+  }>;
   documentSummary?: string;
   entities?: Array<{ count: number; name: string; type: string }>;
   keyTopics?: string[];
@@ -179,7 +188,7 @@ const UnstructuredMetadataView: React.FC<{
         </p>
       )}
 
-      {(m.keyTopics?.length ?? 0) > 0 && (
+      {m.keyTopics && m.keyTopics.length > 0 && (
         <div style={{ marginBottom: 8 }}>
           <h4 style={{ fontSize: 13, fontWeight: 600, margin: "0 0 4px" }}>
             Key Topics
@@ -197,6 +206,45 @@ const UnstructuredMetadataView: React.FC<{
               >
                 {topic}
               </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {m.documentIndex && m.documentIndex.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <h4 style={{ fontSize: 13, fontWeight: 600, margin: "0 0 4px" }}>
+            Document Index
+          </h4>
+          <div style={{ fontSize: 12 }}>
+            {m.documentIndex.map((entry) => (
+              <div
+                key={`${entry.indexLabel}-${entry.chunkStart}`}
+                style={{
+                  padding: "2px 0",
+                  paddingLeft: (entry.level || 0) * 16,
+                }}
+              >
+                <span style={{ color: "#3b82f6", fontWeight: 500 }}>
+                  {entry.indexLabel}.
+                </span>{" "}
+                <span style={{ fontWeight: entry.level === 0 ? 600 : 400 }}>
+                  {entry.title}
+                </span>
+                <span style={{ color: "#94a3b8", fontSize: 11 }}>
+                  {" "}
+                  [chunks {entry.chunkStart}–{entry.chunkEnd}
+                  {entry.chunkIds && entry.chunkIds.length > 0
+                    ? ` · ${entry.chunkIds.length} linked`
+                    : ""}
+                  ]
+                </span>
+                {entry.summary && (
+                  <div style={{ color: "#64748b", fontSize: 11 }}>
+                    {entry.summary}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>

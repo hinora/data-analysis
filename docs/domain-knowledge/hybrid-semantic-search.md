@@ -40,6 +40,16 @@ For each chunk in the merged result set:
 
 Chunks that match the query as a substring always receive a `0.3` boost, which typically promotes them above vector-only results.
 
+### Summary-Based Embeddings
+
+Vector embeddings are generated from **AI-generated chunk summaries** rather than raw content. When a chunk has a `summary` field, that summary text is used for embedding generation. This improves search quality because:
+
+- Summaries are more concise and semantically focused than raw text
+- They strip noise (formatting artifacts, boilerplate) that can dilute embedding quality
+- The embedding model works better with clean, well-structured input
+
+If a chunk has no summary (e.g., legacy data), the raw `content` is used as fallback.
+
 ### ILIKE Safety
 
 The query string is escaped before use in `ILIKE` to prevent the characters `%`, `_`, and `\` from being interpreted as pattern wildcards.
@@ -63,10 +73,11 @@ Each result contains:
   datasetId: string;
   datasetName: string;
   content: string;
+  summary: string | null;    // AI-generated chunk summary
   sourcePage: number | null;
   sourceSection: string | null;
-  similarity: number;      // Combined score (0–1)
-  keywordMatch: boolean;   // True if the chunk matched via ILIKE
+  similarity: number;        // Combined score (0–1)
+  keywordMatch: boolean;     // True if the chunk matched via ILIKE
 }
 ```
 

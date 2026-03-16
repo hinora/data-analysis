@@ -1,12 +1,11 @@
-# Document Summarization & Map-Reduce Utilities
+# Map-Reduce Utilities & Metadata Generation
 
 ## Overview
 
-The project uses a **map-reduce** strategy to process documents of any size. The shared utilities in `lib/map-reduce.ts` provide character-aware batching, concurrency control, and both text summarization and metadata extraction pipelines.
+The project uses a **map-reduce** strategy to process documents of any size. The shared utilities in `lib/map-reduce.ts` provide character-aware batching, concurrency control, and metadata extraction pipelines.
 
 These utilities are consumed by:
-- **`tools.summarizeDocument`** — generates AI text summaries
-- **`metadata.generateMetadata`** — extracts unstructured metadata (topics, entities, domain, summary)
+- **`metadata.generateMetadata`** — extracts unstructured metadata (topics, entities, domain, summary, document index, chunk summaries)
 
 ## Shared Utilities (`lib/map-reduce.ts`)
 
@@ -17,94 +16,61 @@ These utilities are consumed by:
 | `runWithConcurrency` | Execute async tasks with a concurrency limit |
 | `summarizeTextBatch` | Summarize a single batch of text via `ai.generateText()` |
 | `reduceTextSummaries` | Recursively merge multiple summaries into one |
-| `extractMetadataBatch` | Extract partial metadata (topics, entities, domain, summary) from a text batch via `ai.generateJSON()` |
-| `mergePartialMetadata` | Merge multiple partial metadata results (dedup topics, sum entity counts, pick most common domain) |
+| `extractMetadataBatch` | Extract partial metadata (topics, entities, domain, summary, sections) from a text batch via `ai.generateJSON()` |
+| `mergePartialMetadata` | Merge multiple partial metadata results (dedup topics, sum entity counts, pick most common domain, concatenate sections) |
+| `generateChunkSummaries` | Generate AI summaries for chunks in batched groups |
 
-## Document Summarization (`tools.summarizeDocument`)
+## Chunk Summary Generation (`generateChunkSummaries`)
+
+Generates concise AI summaries for each text chunk. Summaries serve two purposes:
+
+1. **Better embeddings** — summaries are used as the text for vector embedding generation instead of raw content
+2. **Quick preview** — summaries provide a brief overview of each chunk for UI display and search results
 
 ```mermaid
 flowchart TD
-    A[All TextChunks for dataset] --> B{"combined text ≤ 12k chars?"}
-    B -- Yes --> C[Single AI call]
-    B -- No --> D["Split into batches by char limit (≤ 12k chars each)"]
-    D --> E1[Batch 1 → AI summary]
-    D --> E2[Batch 2 → AI summary]
-    D --> EN[Batch N → AI summary]
-    E1 --> F{Combined summaries fit in 12k chars?}
-    E2 --> F
-    EN --> F
-    F -- Yes --> G[Final reduce: merge into one summary]
-    F -- No --> H["Recursive reduce: re-batch summaries by char limit"]
-    H --> F
-    G --> I[Return final summary]
-    C --> I
+    A[All TextChunks with IDs] --> B[Group into batches of 5]
+    B --> C1["Batch 1 → AI generateJSON\n'Summarize each chunk in 1-2 sentences'"]
+    B --> C2["Batch 2 → AI generateJSON"]
+    B --> CN["Batch N → AI generateJSON"]
+    C1 --> D[Parse JSON array of summaries]
+    C2 --> D
+    CN --> D
+    D --> E["Map<chunkId, summary>"]
+    E --> F[Save to TextChunk.summary column]
+    E --> G[Used for embedding generation]
 ```
 
-### Parameters
+### Configuration
 
-| Parameter | Type | Default | Range | Description |
-|-----------|------|---------|-------|-------------|
-| `datasetId` | uuid | required | — | The text dataset to summarize |
-| `concurrency` | number | 1 | 1–10 | How many AI calls run in parallel |
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `groupSize` | 5 | Number of chunks per AI call |
 
-### Concurrency
-
-The `concurrency` parameter controls how many AI calls execute simultaneously during the map and reduce phases:
-
-- **`concurrency: 1`** (default) — Sequential processing. Safest option, lowest resource usage. Suitable for low-powered AI backends or rate-limited APIs.
-- **`concurrency: 3–5`** — Balanced parallelism. Good for local Ollama or moderate API rate limits.
-- **`concurrency: 10`** — Maximum parallelism. Use when the AI backend can handle many concurrent requests (e.g., cloud APIs with high rate limits).
-
-### Algorithm
-
-#### Character-Aware Batching
-
-Both the map and reduce phases use `splitIntoBatchesByChars` instead of a fixed count. The function accumulates items into a batch until adding the next item would exceed `MAX_CHARS_PER_BATCH`. This guarantees each batch stays within the AI context limit and eliminates content truncation.
-
-#### Map Phase
-1. Fetch **all** `TextChunk` records for the dataset (no limit), ordered by `orderIndex`
-2. Split chunks into batches by character length (each batch ≤ 12,000 chars of content)
-3. For each batch, concatenate chunk content and send to `ai.generateText()`
-4. Run batches respecting the `concurrency` limit
-
-#### Reduce Phase
-1. Collect all batch summaries
-2. If combined summaries fit within 12,000 characters, make a single final AI call to merge them
-3. If not, split summaries into character-aware sub-batches and recursively reduce until a single summary remains
-
-#### Fast Path
-If the total combined text of all chunks is ≤ 12,000 characters, a single AI call is made directly — no map-reduce overhead.
-
-### Response
-
-```typescript
-{
-  batchesUsed: number;   // How many map batches were processed
-  chunksUsed: number;    // Total chunks in the dataset
-  summary: string;       // The final merged summary
-  totalLength: number;   // Total character count of all chunks
-}
-```
+Each AI call receives up to 5 chunks (truncated to 2000 chars each) and returns a JSON array of summary strings.
 
 ## Unstructured Metadata Generation (`metadata.generateMetadata`)
 
-Previously limited to the first 50 chunks (3,000 chars excerpt), now uses the same map-reduce approach to cover the **entire** document.
+Uses a map-reduce approach to cover the **entire** document and build comprehensive metadata including a document index.
 
 ```mermaid
 flowchart TD
-    A[Paginated scan: ALL TextChunks] --> B[Split into char-aware batches]
-    B --> C1["Batch 1 → AI extractMetadataBatch()"]
-    B --> C2["Batch 2 → AI extractMetadataBatch()"]
-    B --> CN["Batch N → AI extractMetadataBatch()"]
+    A[Paginated scan: ALL TextChunks with IDs + orderIndex] --> B[Split into char-aware batches]
+    B --> C1["Batch 1 → AI extractMetadataBatch(chunkStart, chunkEnd)"]
+    B --> C2["Batch 2 → AI extractMetadataBatch(chunkStart, chunkEnd)"]
+    B --> CN["Batch N → AI extractMetadataBatch(chunkStart, chunkEnd)"]
     C1 --> D[Merge partial metadata]
     C2 --> D
     CN --> D
     D --> E{Multiple batch summaries?}
     E -- Yes --> F["reduceTextSummaries() → single summary"]
     E -- No --> G[Use single summary as-is]
-    F --> H[Final UnstructuredMetadata]
+    F --> H[Generate per-chunk summaries]
     G --> H
-    H --> I[Save to dataset.unstructuredMetadata]
+    H --> I[Save chunk summaries to DB]
+    I --> J[Build document index with chunkIds]
+    J --> K[Save to dataset.unstructuredMetadata]
+    K --> L[Generate embeddings from summaries]
 ```
 
 ### Per-Batch Extraction
@@ -113,7 +79,33 @@ Each batch produces a `PartialUnstructuredMetadata` with:
 - `documentSummary` — summary of that section
 - `keyTopics` — topics found in that section
 - `contentDomain` — domain classification
-- `entities` — named entities with counts
+- `entities` — named entities with counts (unrestricted types)
+- `sections` — logical sections identified within the batch, linked to chunk order index ranges
+
+### Entity Types
+
+Entity types are **not restricted** to predefined categories. The AI is free to use whatever entity type best describes each entity found in the text (e.g. person, organisation, location, date, monetary, product, event, regulation, technology, concept, metric, etc.).
+
+### Document Index
+
+The metadata includes a `documentIndex` — an array of section entries that map logical document sections to chunk order index ranges, supporting multiple levels like a book's table of contents. Each entry has:
+- `indexLabel` — hierarchical label (e.g. "1", "2", "2a", "2b", "2a-i")
+- `level` — nesting depth (0 = main section, 1 = sub-section, 2 = sub-sub-section, etc.)
+- `title` — section or topic title
+- `summary` — brief description of what the section covers
+- `chunkStart` — starting chunk orderIndex
+- `chunkEnd` — ending chunk orderIndex
+- `chunkIds` — array of TextChunk UUIDs that belong to this section
+
+Index labels are assigned automatically based on level:
+- Level 0: numeric (1, 2, 3, ...)
+- Level 1: parent number + lowercase letter (1a, 1b, 2a, ...)
+- Level 2: parent label + roman numeral (1a-i, 1a-ii, ...)
+- Level 3+: parent label + sequential number (1a-i-1, 1a-i-2, ...)
+
+The `chunkIds` field enables direct lookup of TextChunk records for each document section without needing orderIndex range queries.
+
+This index enables the AI to navigate documents using the `getChunks` tool to read specific sections.
 
 ### Merge Strategy (`mergePartialMetadata`)
 
@@ -123,8 +115,23 @@ Each batch produces a `PartialUnstructuredMetadata` with:
 | `keyTopics` | Deduplicated (case-insensitive), sorted alphabetically |
 | `entities` | Merged by name+type key, counts summed |
 | `contentDomain` | Most frequently reported domain wins |
+| `sections` | Concatenated in order (carry chunk index ranges from batches) |
 | `wordCount` | Computed from full paginated scan |
 | `chunkCount` | Total from DB count query |
+
+### Embedding Generation
+
+After chunk summaries are generated and saved, the embedding pipeline uses **summaries as the embedding text** instead of raw chunk content. This means:
+
+```typescript
+// In generateTextChunkEmbeddings:
+const texts = batch.map((c) => c.summary || c.content);
+```
+
+If a chunk has a summary, the summary is embedded. Otherwise, the raw content is used as fallback. This produces higher-quality embeddings because summaries are:
+- More concise and semantically focused
+- Free from formatting noise and boilerplate
+- Better suited for the embedding model's input window
 
 ## Constants
 
@@ -132,3 +139,4 @@ Each batch produces a `PartialUnstructuredMetadata` with:
 |----------|-------|---------|
 | `MAX_CHARS_PER_BATCH` | 12,000 | Character limit per batch (map and reduce) |
 | `PAGE_SIZE` (metadata) | 100 | DB pagination size for chunk loading |
+| `CHUNK_SUMMARY_GROUP_SIZE` | 5 | Chunks per AI call for summary generation |
