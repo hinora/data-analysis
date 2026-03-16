@@ -144,9 +144,9 @@ const StructuredMetadataView: React.FC<{
               <strong>{col.columnOriginal}</strong>
               <span style={{ color: "#94a3b8" }}> ({col.columnKey})</span>
               <div style={{ color: "#64748b" }}>{col.description}</div>
-              {col.exampleValues?.length > 0 && (
+              {(col.exampleValues?.length ?? 0) > 0 && (
                 <div style={{ color: "#94a3b8", fontSize: 11 }}>
-                  e.g. {col.exampleValues.slice(0, 3).join(", ")}
+                  e.g. {col.exampleValues?.slice(0, 3).join(", ")}
                 </div>
               )}
             </div>
@@ -194,7 +194,7 @@ const UnstructuredMetadataView: React.FC<{
             Key Topics
           </h4>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {m.keyTopics.map((topic: string) => (
+            {m.keyTopics?.map((topic: string) => (
               <span
                 key={topic}
                 style={{
@@ -257,13 +257,13 @@ const UnstructuredMetadataView: React.FC<{
         </div>
       )}
 
-      {m.entities?.length > 0 && (
+      {(m.entities?.length ?? 0) > 0 && (
         <div style={{ marginTop: 8 }}>
           <h4 style={{ fontSize: 13, fontWeight: 600, margin: "0 0 4px" }}>
             Entities
           </h4>
           {m.entities
-            .slice(0, 10)
+            ?.slice(0, 10)
             .map((ent: { name: string; type: string; count: number }) => (
               <span
                 key={`${ent.name}-${ent.type}`}
