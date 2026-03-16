@@ -147,7 +147,7 @@ flowchart LR
     Q[User Question] --> DT{Dataset Type?}
     DT -->|structured-table| ST[Structured Data Tools]
     DT -->|unstructured-text| UT[Unstructured Text Tools]
-    ST --> R1[sumField, avgField, count, filterByCondition, ...]
+    ST --> R1[aggregate, filterByCondition, sortByField, sampleData, ...]
     UT --> R2[semanticSearch, answerFromContext, getChunks]
 ```
 
@@ -160,33 +160,25 @@ The system prompt explicitly groups datasets by type and tells the AI:
 
 | Tool                | Action                     | Description                                        |
 |---------------------|----------------------------|----------------------------------------------------|
-| `aggregate`         | `tools.aggregate`          | Multi-field aggregation pipeline (limit/orderBy support, max 200 rows) |
-| `avgField`          | `tools.avgField`           | Average a numeric field with optional groupBy (max 200 grouped rows) |
+| `aggregate`         | `tools.aggregate`          | Multi-field aggregation pipeline with conditions, groupBy, orderBy (max 200 rows) |
 | `correlateFields`   | `tools.correlateFields`    | Pearson correlation between two numeric fields     |
-| `count`             | `tools.count`              | Count records with optional filters                |
-| `countAndGroup`     | `tools.countAndGroup`      | Count records grouped by field(s) (max 200 groups) |
 | `countDistinctValues` | `tools.countDistinctValues` | Count how many distinct values exist for a field |
 | `detectOutliers`    | `tools.detectOutliers`     | Identify records beyond 2 standard deviations      |
 | `filterByCondition` | `tools.filterByCondition`  | Filter by conditions (equals, range, contains, in) |
 | `getDistinctValues` | `tools.getDistinctValues`  | Get distinct values with counts                    |
-| `getMinMax`         | `tools.getMinMax`          | Get min/max values for a field                     |
 | `getPercentile`     | `tools.getPercentile`      | Get percentile values (P25, P50, P75, P99)         |
-| `getTopByField`     | `tools.getTopByField`      | Get top N records sorted by a field                |
 | `joinDatasets`      | `tools.joinDatasets`       | Join two datasets on a shared field                |
 | `pivotTable`        | `tools.pivotTable`         | Cross-tabulation by two categorical fields         |
-| `sortByField`       | `tools.sortByField`        | Sort records by field(s) with limit                |
-| `sumField`          | `tools.sumField`           | Sum a numeric field with optional groupBy (max 200 grouped rows) |
+| `sampleData`        | `tools.sampleData`         | Preview rows from a dataset (default: 10 rows)     |
+| `sortByField`       | `tools.sortByField`        | Sort and return records by field with limit         |
 
 ### Result Size Limits for Grouping Tools
 
-Aggregation tools that produce grouped results enforce a **hard cap of 200 rows** to prevent overwhelming the AI context window. This applies to:
+The `aggregate` tool produces grouped results and enforces a **hard cap of 200 rows** to prevent overwhelming the AI context window:
 
-- **`aggregate`** — supports `limit` (default 200) and `orderBy: { field, direction }` for sorting
-- **`sumField`** — supports `limit` (default 200) when `groupBy` is used; sorted by total DESC
-- **`avgField`** — supports `limit` (default 200) when `groupBy` is used; sorted by average DESC
-- **`countAndGroup`** — supports `limit` (default 200); sorted by count DESC
+- **`aggregate`** — supports `limit` (default 200), `orderBy: { field, direction }` for sorting, and rich `conditions` for pre-filtering
 
-All return `{ results, totalGroups, truncated }` metadata so the AI can inform the user when results are partial.
+It returns `{ results, totalGroups, truncated }` metadata so the AI can inform the user when results are partial.
 
 ```mermaid
 flowchart TD

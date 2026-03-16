@@ -8,7 +8,7 @@ Uploaded datasets (especially Vietnamese/European data) may store numeric values
 invalid input syntax for type numeric: "60,00"
 ```
 
-This affects all structured data tools that perform numeric operations: `sumField`, `avgField`, `aggregate`, `correlateFields`, `detectOutliers`, `getMinMax`, `getPercentile`, `getTopByField`, `sortByField`, `pivotTable`, `filterByCondition`.
+This affects all structured data tools that perform numeric operations: `aggregate`, `correlateFields`, `detectOutliers`, `getPercentile`, `sortByField`, `pivotTable`, `filterByCondition`.
 
 ## Solution
 

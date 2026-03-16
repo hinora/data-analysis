@@ -44,8 +44,8 @@ Edit the config construction in the consuming file (e.g. `sendMessage.action.ts`
 ```typescript
 const toolEnabledConfig = getDefaultToolEnabledConfig();
 // Disable specific tools:
-toolEnabledConfig.countAndGroup = false;
 toolEnabledConfig.pivotTable = false;
+toolEnabledConfig.joinDatasets = false;
 
 const TOOL_TO_ACTION = getEnabledToolActions(toolEnabledConfig);
 ```
@@ -61,17 +61,17 @@ automatically when the overrides are shared or centralised.
 
 Operate on `structured-table` datasets (CSV, Excel rows/columns):
 
-aggregate, avgField, correlateFields, count, countAndGroup,
-countDistinctValues, detectOutliers, filterByCondition, getDistinctValues,
-getMinMax, getPercentile, getTopByField, joinDatasets, pivotTable,
-sortByField, sumField
+aggregate, correlateFields, countDistinctValues, detectOutliers,
+filterByCondition, getDistinctValues, getPercentile, joinDatasets, pivotTable,
+sampleData, sortByField
 
-> **Note:** The `count` tool supports both simple key-value equality filters
-> (`filters`) and rich condition-based filtering (`conditions`) with operators:
-> `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains` (case-insensitive
-> substring match), and `in` (value in list). This allows the AI to count
-> records matching complex criteria (e.g. names containing a keyword) without
-> needing to fall back to `filterByCondition` + manual counting.
+> **Note:** The `aggregate` tool is the primary tool for all numeric aggregation
+> needs (sum, avg, min, max, count) with optional `groupBy`, `orderBy`, and
+> rich `conditions` filtering (operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`,
+> `contains`, `in`). Previously separate tools (`sumField`, `avgField`, `count`,
+> `countAndGroup`, `getMinMax`) have been consolidated into `aggregate`.
+> The `getTopByField` tool has been merged into `sortByField`.
+> A new `sampleData` tool has been added for previewing dataset rows.
 
 ### Unstructured Text Tools (`unstructured`)
 
