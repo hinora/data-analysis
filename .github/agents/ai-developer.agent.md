@@ -1,5 +1,5 @@
 ---
-description: 'AI agent for implementing features in Moleculer microservices project'
+description: 'AI agent for implementing features in the full-stack application (Moleculer microservices backend + Next.js frontend)'
 tools: [vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vscode/newWorkspace, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/createAndRunTask, execute/runInTerminal, read/getNotebookSummary, read/problems, read/readFile, read/readNotebookCellOutput, read/terminalSelection, read/terminalLastCommand, agent/runSubagent, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/searchResults, search/textSearch, search/usages, web/fetch, web/githubRepo, browser/openBrowserPage, dbcode.dbcode/dbcode-getConnections, dbcode.dbcode/dbcode-getDatabases, dbcode.dbcode/dbcode-getSchemas, dbcode.dbcode/dbcode-getTables, dbcode.dbcode/dbcode-executeQuery, todo]
 ---
 
@@ -8,18 +8,157 @@ tools: [vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vsco
 - Project structure: `docs/project-structure.md`
 - Type generation: `docs/type-generation.md`
 - Validation reference: `lib/broker/validation.ts`
+- API documentation: `docs/api/api.yaml`
+- Domain knowledge: `docs/domain-knowledge/**`
 
 ## Workflow Checklist
 
-After implementing actions or events You must to do these steps:
-1. Run type generation script
-2. Run `npm run lint:fix` in root (biome). If found issues, fix them and re-run.
-3. If REST endpoint added → update `docs/api/api.yaml` (OpenAPI)
-4. Add document for features we implemented in `docs/domain-knowledge/*.md` after implementation. Use mermaid diagrams if helpful. If the docs already exist, update them.
+After implementing changes you must do these steps:
+
+1. Run `npm run lint:fix` in root (biome). If found issues, fix them and re-run.
+2. **Backend only:** Run type generation script.
+3. **Backend only:** If REST endpoint added → update `docs/api/api.yaml` (OpenAPI).
+4. **Backend only:** Add document for features we implemented in `docs/domain-knowledge/*.md` after implementation. Use mermaid diagrams if helpful. If the docs already exist, update them.
 
 ---
 
-## Code Rules
+## Code Rules (Shared TypeScript)
+
+### Functions: Single Object Parameter
+
+```typescript
+// ✅ DO
+async function createUser(req: { email: string; name: string }): Promise<User>
+
+// ❌ DON'T
+async function createUser(email: string, name: string): Promise<User>
+```
+
+**Exceptions**: Simple utils (`max(a,b)`), callbacks, math operations.
+
+### Imports: Named Only
+
+```typescript
+// ✅ DO
+import { UserService, createUser } from './module';
+
+// ❌ DON'T
+import UserService from './module';
+import * as utils from './utils';
+```
+
+### Exports: Named Only (No Default)
+
+```typescript
+// ✅ DO
+export class UserService { }
+export { createUser } from './user';
+
+// ❌ DON'T
+export default class UserService { }
+export * from './user';
+```
+
+### Ordering: Alphabetical
+
+Sort alphabetically: object properties, interface members, enum values, class methods.
+
+```typescript
+// ✅ DO
+const user = { age: 30, email: 'a@b.com', name: 'John' };
+enum Role { ADMIN = 'admin', GUEST = 'guest', USER = 'user' }
+```
+
+**Exception**: Preserve `Promise.all()` destructure order.
+
+### Objects: Inline When Simple
+
+```typescript
+// ✅ Simple (≤4 props) → inline
+const point = { x: 10, y: 20 };
+
+// ✅ Complex (5+ props or nested) → multi-line
+const config = {
+  api: { baseUrl: '...', timeout: 5000 },
+  database: { host: 'localhost', port: 5432 },
+};
+```
+
+### JSDoc: No Type Annotations
+
+TypeScript provides types. Never use `{Type}` in JSDoc.
+
+```typescript
+// ✅ DO
+/**
+ * Creates a user.
+ * @param req - User creation request
+ * @returns Created user
+ * @example
+ * await createUser({ email: 'a@b.com', name: 'John' });
+ */
+async function createUser(req: CreateUserRequest): Promise<User>
+
+// ❌ DON'T - causes TS80004
+/** @param {CreateUserRequest} req */
+```
+
+### Async: Parallel When Possible
+
+```typescript
+// ✅ Independent operations → Promise.all()
+const [user, profile] = await Promise.all([getUser(id), getProfile(id)]);
+
+// ✅ Dependent operations → sequential
+const user = await createUser(req);
+const profile = await createProfile({ userId: user.id });
+```
+
+### Errors: Custom Classes with Context
+
+```typescript
+// ✅ DO
+throw new NotFoundError('User not found', 'User', userId);
+
+// ❌ DON'T
+throw new Error('Not found');
+```
+
+### Types: Strict (No `any`)
+
+```typescript
+// ✅ DO
+function process(data: unknown): User {
+  if (!isUser(data)) throw new ValidationError(...);
+  return data;
+}
+
+// ❌ DON'T
+function process(data: any): User { return data as User; }
+```
+
+### Constants: UPPER_SNAKE_CASE
+
+```typescript
+const MAX_RETRY_ATTEMPTS = 3;
+const CACHE_TTL_SECONDS = 3600;
+```
+
+### Naming Conventions
+
+| Type | Convention | Example |
+|------|------------|---------|
+| Functions | camelCase + verb | `createUser`, `validateEmail` |
+| Classes | PascalCase + noun | `UserService`, `HttpClient` |
+| Interfaces | PascalCase (no I prefix) | `User`, `ApiResponse` |
+| Booleans | is/has/can/should prefix | `isValid`, `hasPermission` |
+| Arrays | plural nouns | `users`, `accounts` |
+| Constants | UPPER_SNAKE_CASE | `MAX_RETRIES` |
+| Enums | PascalCase name, UPPER values | `UserRole.ADMIN` |
+
+---
+
+## Backend Rules (Moleculer Microservices)
 
 ### Unique Service Names (Critical)
 
@@ -223,134 +362,170 @@ interface AuthenticatedUser {
 
 **Client must send token** via `meta.token` when calling the action.
 
-### Functions: Single Object Parameter
+---
 
-```typescript
-// ✅ DO
-async function createUser(req: { email: string; name: string }): Promise<User>
+## Frontend Rules (Next.js)
 
-// ❌ DON'T
-async function createUser(email: string, name: string): Promise<User>
+### Project Structure
+
+```
+frontend/src/
+├── components/     # Reusable UI components
+├── hooks/          # React Query hooks for data fetching/mutations
+├── pages/          # Next.js pages
+├── styles/         # Global styles
+└── utils/          # Utility functions (auth, query, request)
 ```
 
-**Exceptions**: Simple utils (`max(a,b)`), callbacks, math operations.
+### Data Fetching with React Query
 
-### Imports: Named Only
+#### Query Hooks (GET requests)
 
-```typescript
-// ✅ DO
-import { UserService, createUser } from './module';
+Location: `frontend/src/hooks/use{Resource}.ts`
 
-// ❌ DON'T
-import UserService from './module';
-import * as utils from './utils';
-```
-
-### Exports: Named Only (No Default)
+Template: `frontend/src/hooks/useQueryTemplate.ts`
 
 ```typescript
-// ✅ DO
-export class UserService { }
-export { createUser } from './user';
+import { service } from "@/utils/request";
+import { type QueryFunction, useQuery } from "@tanstack/react-query";
 
-// ❌ DON'T
-export default class UserService { }
-export * from './user';
-```
+interface IResponse {
+  id: string;
+}
 
-### Ordering: Alphabetical
+interface IRequest {
+  param1?: string;
+}
 
-Sort alphabetically: object properties, interface members, enum values, class methods.
+export const QUERY_KEY = "resourceName";
 
-```typescript
-// ✅ DO
-const user = { age: 30, email: 'a@b.com', name: 'John' };
-enum Role { ADMIN = 'admin', GUEST = 'guest', USER = 'user' }
-```
+export const useGetResource = ({ param1 }: IRequest) => {
+  return useQuery({
+    queryKey: [QUERY_KEY, param1],
+    queryFn: queryFunction,
+    enabled: !!param1,
+  });
+};
 
-**Exception**: Preserve `Promise.all()` destructure order.
-
-### Objects: Inline When Simple
-
-```typescript
-// ✅ Simple (≤4 props) → inline
-const point = { x: 10, y: 20 };
-
-// ✅ Complex (5+ props or nested) → multi-line
-const config = {
-  api: { baseUrl: '...', timeout: 5000 },
-  database: { host: 'localhost', port: 5432 },
+const queryFunction: QueryFunction<IResponse, [string, string?]> = async ({
+  queryKey,
+}) => {
+  const [_key, param1] = queryKey;
+  const response = await service.get<IResponse>("/endpoint", {
+    params: { param1 },
+  });
+  return response.data;
 };
 ```
 
-### JSDoc: No Type Annotations
+#### Mutation Hooks (POST/PUT/DELETE requests)
 
-TypeScript provides types. Never use `{Type}` in JSDoc.
+Location: `frontend/src/hooks/use{Action}{Resource}.ts`
 
-```typescript
-// ✅ DO
-/**
- * Creates a user.
- * @param req - User creation request
- * @returns Created user
- * @example
- * await createUser({ email: 'a@b.com', name: 'John' });
- */
-async function createUser(req: CreateUserRequest): Promise<User>
-
-// ❌ DON'T - causes TS80004
-/** @param {CreateUserRequest} req */
-```
-
-### Async: Parallel When Possible
+Template: `frontend/src/hooks/useMutationTemplate.ts`
 
 ```typescript
-// ✅ Independent operations → Promise.all()
-const [user, profile] = await Promise.all([getUser(id), getProfile(id)]);
+import { QUERY_KEY } from "./useGetResource";
+import { queryClient } from "@/utils/query";
+import { service } from "@/utils/request";
+import { useMutation } from "@tanstack/react-query";
 
-// ✅ Dependent operations → sequential
-const user = await createUser(req);
-const profile = await createProfile({ userId: user.id });
-```
-
-### Errors: Custom Classes with Context
-
-```typescript
-// ✅ DO
-throw new NotFoundError('User not found', 'User', userId);
-
-// ❌ DON'T
-throw new Error('Not found');
-```
-
-### Types: Strict (No `any`)
-
-```typescript
-// ✅ DO
-function process(data: unknown): User {
-  if (!isUser(data)) throw new ValidationError(...);
-  return data;
+interface IResponse {
+  id: string;
 }
 
-// ❌ DON'T
-function process(data: any): User { return data as User; }
+interface IRequest {
+  bodyData: object;
+  param1?: string;
+}
+
+export const useCreateResource = () => {
+  return useMutation({
+    mutationFn: async ({ param1, bodyData }: IRequest): Promise<IResponse> => {
+      const response = await service.post<IResponse>("/endpoint", bodyData, {
+        params: { param1 },
+      });
+      return response.data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [QUERY_KEY, variables.param1],
+      });
+    },
+  });
+};
 ```
 
-### Constants: UPPER_SNAKE_CASE
+> **Important:** Always invalidate relevant query caches after mutations.
+
+#### Mutation Hook Usage Rules
+
+1. **Always destructure mutation hooks** - Never use directly:
+   ```typescript
+   // ❌ Wrong
+   const bookmarkMutation = useBookmarkBook();
+   bookmarkMutation.mutate(data);
+
+   // ✅ Correct
+   const { mutate: bookmarkBook, isPending: isBookmarking } = useBookmarkBook();
+   bookmarkBook(data);
+   ```
+
+2. **Never use async/await with mutations** - Use callbacks instead:
+   ```typescript
+   // ❌ Wrong
+   onSuccess: async (_data, variables) => {
+     await queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+   }
+
+   // ✅ Correct
+   onSuccess: (_data, variables) => {
+     queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+   }
+   ```
+
+### Component Guidelines
+
+#### File Organization
+
+| Type       | Location                   | Naming                           |
+| ---------- | -------------------------- | -------------------------------- |
+| Components | `frontend/src/components/` | `ComponentName.tsx` (PascalCase) |
+| Hooks      | `frontend/src/hooks/`      | `useHookName.ts` (camelCase)     |
+| Pages      | `frontend/src/pages/`      | `page-name.tsx` (kebab-case)     |
+
+#### Component Structure
 
 ```typescript
-const MAX_RETRY_ATTEMPTS = 3;
-const CACHE_TTL_SECONDS = 3600;
+interface ComponentNameProps {
+  id: string;
+  // other props
+}
+
+const ComponentName: React.FC<ComponentNameProps> = ({ id }) => {
+  // Use hooks for data fetching
+  const { data, isLoading, error } = useGetResource({ id });
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error loading data</div>;
+
+  return (
+    <div>
+      {/* Component content */}
+    </div>
+  );
+};
+
+export default ComponentName;
 ```
 
-### Naming Conventions
+- All components to render any data from API. Just need pass only IDs as props. Then fetch data inside component using React Query hooks. No worry about duplicate data fetching, React Query will handle caching.
 
-| Type | Convention | Example |
-|------|------------|---------|
-| Functions | camelCase + verb | `createUser`, `validateEmail` |
-| Classes | PascalCase + noun | `UserService`, `HttpClient` |
-| Interfaces | PascalCase (no I prefix) | `User`, `ApiResponse` |
-| Booleans | is/has/can/should prefix | `isValid`, `hasPermission` |
-| Arrays | plural nouns | `users`, `accounts` |
-| Constants | UPPER_SNAKE_CASE | `MAX_RETRIES` |
-| Enums | PascalCase name, UPPER values | `UserRole.ADMIN` |
+#### Best Practices
+
+1. **Functional components only** - No class components
+2. **TypeScript required** - Define interfaces for all props
+3. **Data fetching in components** - Pass IDs as props, fetch data inside using React Query hooks
+4. **Scoped styling** - Use CSS modules or styled-components
+5. **Composition** - Break large components into smaller, reusable sub-components
+6. **Consistent naming** - PascalCase for components, camelCase for files and hooks

@@ -164,23 +164,21 @@ before implementation:
 
 ### Developer Guidance Files
 
-Two agent files provide **binding** coding standards. They
-supplement this constitution with implementation-level rules:
+A single unified agent file provides **binding** coding standards
+for both backend and frontend. It supplements this constitution
+with implementation-level rules:
 
-- **`.github/agents/ai-developer.agent.md`** — Backend (Moleculer
-  microservices). Covers `defineAction`/`defineEvent` usage,
-  REST URL conventions, authentication patterns, code style
-  (named imports/exports, alphabetical ordering, single-object
-  params, strict types, error classes, parallel async). After
-  every implementation session: run type generation, run
-  `npm run lint:fix`, update OpenAPI if REST endpoints changed,
-  update `docs/domain-knowledge/` docs.
-- **`.github/agents/ai-developer-frontend.agent.md`** — Frontend
-  (Next.js). Covers React Query hooks (query/mutation templates),
-  component structure (functional only, TypeScript props, pass
-  IDs and fetch inside), hook destructuring rules, mutation
-  callback conventions, file organization. After every session:
-  run `npm run lint:fix`.
+- **`.github/agents/ai-developer.agent.md`** — Full-stack
+  (Moleculer microservices backend + Next.js frontend). Covers
+  shared TypeScript code style (named imports/exports, alphabetical
+  ordering, single-object params, strict types, error classes,
+  parallel async), backend rules (`defineAction`/`defineEvent`
+  usage, REST URL conventions, authentication patterns), and
+  frontend rules (React Query hooks, component structure, hook
+  destructuring, mutation callback conventions, file organization).
+  After every session: run `npm run lint:fix`; for backend
+  changes also run type generation, update OpenAPI if REST
+  endpoints changed, update `docs/domain-knowledge/` docs.
 
 When this constitution and a developer guidance file conflict,
 **this constitution takes precedence**.
@@ -271,10 +269,9 @@ above.
   research begins.
 - Complexity beyond what the constitution prescribes MUST be
   explicitly justified in the plan's Complexity Tracking section.
-- Developer guidance files
-  (`.github/agents/ai-developer.agent.md` for backend,
-  `.github/agents/ai-developer-frontend.agent.md` for frontend)
-  contain binding implementation-level rules that supplement
+- The developer guidance file
+  (`.github/agents/ai-developer.agent.md`)
+  contains binding implementation-level rules that supplement
   this constitution.
 - The `docs/` folder is the authoritative reference for project
   knowledge; changes to architecture or conventions MUST be
