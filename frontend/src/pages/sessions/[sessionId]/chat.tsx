@@ -214,6 +214,7 @@ export default function ChatPage() {
                         citedSources: null,
                         toolsUsed: null,
                         reasoningSteps: null,
+                        promptStats: null,
                         createdAt: new Date().toISOString(),
                       } satisfies ChatMessage
                     }

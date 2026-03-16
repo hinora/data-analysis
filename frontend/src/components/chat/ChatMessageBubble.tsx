@@ -69,6 +69,35 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
           />
         )}
 
+        {/* Prompt stats */}
+        {isAssistant && message.promptStats && (
+          <div
+            style={{
+              marginTop: "6px",
+              fontSize: "11px",
+              color: "#999",
+              display: "flex",
+              gap: "10px",
+              flexWrap: "wrap",
+            }}
+          >
+            <span title="Prompt tokens">
+              ↑ {message.promptStats.promptTokens}
+            </span>
+            <span title="Completion tokens">
+              ↓ {message.promptStats.completionTokens}
+            </span>
+            <span title="Total tokens">
+              Σ {message.promptStats.totalTokens}
+            </span>
+            <span title="Latency">
+              {message.promptStats.latencyMs >= 1000
+                ? `${(message.promptStats.latencyMs / 1000).toFixed(1)}s`
+                : `${message.promptStats.latencyMs}ms`}
+            </span>
+          </div>
+        )}
+
         {/* Timestamp */}
         <div
           style={{

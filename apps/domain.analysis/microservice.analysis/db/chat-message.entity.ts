@@ -35,6 +35,13 @@ export interface ToolUsage {
   toolName: string;
 }
 
+export interface PromptStats {
+  completionTokens: number;
+  latencyMs: number;
+  promptTokens: number;
+  totalTokens: number;
+}
+
 @Entity("chatMessages")
 @Index("idx_chatMessages_conversationId_createdAt", [
   "conversationId",
@@ -78,6 +85,9 @@ export class ChatMessage {
 
   @Column({ nullable: true, type: "jsonb" })
   reasoningSteps: string[] | null;
+
+  @Column({ nullable: true, type: "jsonb" })
+  promptStats: PromptStats | null;
 
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;

@@ -10,7 +10,11 @@ import { ChatMessage } from "./chat-message.entity";
 import { Conversation } from "./conversation.entity";
 import { Session } from "./session.entity";
 
-export type { CitedSource, ToolUsage } from "./chat-message.entity";
+export type {
+  CitedSource,
+  PromptStats,
+  ToolUsage,
+} from "./chat-message.entity";
 export { ChatMessage, MessageRole } from "./chat-message.entity";
 export { Conversation } from "./conversation.entity";
 export { Session, SessionStatus } from "./session.entity";

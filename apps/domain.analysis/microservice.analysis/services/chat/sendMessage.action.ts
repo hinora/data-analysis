@@ -17,7 +17,11 @@ import { createAIAdapter } from "core.lib/adapters/ai";
 import { defineAction } from "core.lib/broker";
 import { AILog, AILogStatus, AILogType } from "core.lib/database";
 import { dataSource } from "../../db";
-import type { CitedSource, ToolUsage } from "../../db/chat-message.entity";
+import type {
+  CitedSource,
+  PromptStats,
+  ToolUsage,
+} from "../../db/chat-message.entity";
 import { ChatMessage, MessageRole } from "../../db/chat-message.entity";
 import { Conversation } from "../../db/conversation.entity";
 import {
@@ -78,6 +82,7 @@ export interface StreamEventDone {
     conversationId: string;
     createdAt: Date;
     id: string;
+    promptStats: PromptStats | null;
     reasoningSteps: string[] | null;
     role: string;
     toolsUsed: ToolUsage[] | null;
@@ -884,11 +889,22 @@ async function processStream(
   const latencyMs = Date.now() - startTime;
 
   // ── Save assistant message ──────────────────────────────────────────
+  const promptStats: PromptStats | null =
+    totalPromptTokens > 0 || totalCompletionTokens > 0
+      ? {
+          completionTokens: totalCompletionTokens,
+          latencyMs,
+          promptTokens: totalPromptTokens,
+          totalTokens: totalPromptTokens + totalCompletionTokens,
+        }
+      : null;
+
   const assistantMessage = msgRepo.create({
     citedSources: citedSources.length > 0 ? citedSources : null,
     confidenceScore,
     content: finalContent,
     conversationId,
+    promptStats,
     reasoningSteps: reasoningSteps.length > 0 ? reasoningSteps : null,
     role: MessageRole.ASSISTANT,
     sessionId,
@@ -941,6 +957,7 @@ async function processStream(
       conversationId: savedMessage.conversationId,
       createdAt: savedMessage.createdAt,
       id: savedMessage.id,
+      promptStats: savedMessage.promptStats,
       reasoningSteps: savedMessage.reasoningSteps,
       role: savedMessage.role,
       toolsUsed: savedMessage.toolsUsed,

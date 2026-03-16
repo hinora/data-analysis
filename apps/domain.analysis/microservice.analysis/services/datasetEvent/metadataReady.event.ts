@@ -53,7 +53,7 @@ export default defineEvent<DatasetMetadataReadyPayload>({
           context: `Datasets: ${datasetContext}`,
           target: "session" as const,
         },
-        { timeout: 120000 },
+        { timeout: 600000 },
       );
 
       await ctx.call("session.renameSession", {

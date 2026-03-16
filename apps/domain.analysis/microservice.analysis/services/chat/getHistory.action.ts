@@ -26,6 +26,7 @@ export interface GetHistoryResult {
     conversationId: string;
     createdAt: Date;
     id: string;
+    promptStats: unknown | null;
     reasoningSteps: string[] | null;
     role: string;
     toolsUsed: unknown | null;
@@ -113,6 +114,7 @@ export default defineAction<GetHistoryParams, GetHistoryResult>({
         conversationId: m.conversationId,
         createdAt: m.createdAt,
         id: m.id,
+        promptStats: m.promptStats,
         reasoningSteps: m.reasoningSteps,
         role: m.role,
         toolsUsed: m.toolsUsed,

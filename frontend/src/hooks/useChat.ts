@@ -22,6 +22,13 @@ export interface ToolUsage {
   resultSummary: string;
 }
 
+export interface PromptStats {
+  completionTokens: number;
+  latencyMs: number;
+  promptTokens: number;
+  totalTokens: number;
+}
+
 export interface ChatMessage {
   id: string;
   conversationId: string;
@@ -31,6 +38,7 @@ export interface ChatMessage {
   citedSources: CitedSource[] | null;
   toolsUsed: ToolUsage[] | null;
   reasoningSteps: string[] | null;
+  promptStats: PromptStats | null;
   createdAt: string;
 }
 
