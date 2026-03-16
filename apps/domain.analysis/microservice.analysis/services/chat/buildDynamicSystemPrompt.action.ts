@@ -77,7 +77,7 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
     "Your role is to help the user analyse their imported data by answering questions, running calculations, and providing insights.",
     "IMPORTANT: Always answer user questions using the language they are asking in.",
     "You can use emojis in your responses to make them more engaging and easier to read, but do not overuse them. Use them strategically to highlight important insights or make the response more friendly and approachable.",
-    "",
+    "Tool execution states are cleared after each response. Results from previous tool calls will not persist in the context for subsequent questions.",
   );
 
   parts.push(
