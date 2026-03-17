@@ -127,19 +127,10 @@ Chunks are stored in the `textChunks` table:
 |--------|------|-------------|
 | `content` | text | The chunk text |
 | `embedding` | vector(768) | nomic-embed-text embedding |
-| `summary` | text (nullable) | AI-generated summary for semantic search |
 | `orderIndex` | int | Position in the original document |
 | `sourcePage` | int | Source page number (PDFs) |
 | `sourceSection` | text | Optional section identifier |
 | `datasetId` | uuid | FK to parent Dataset |
-
-### Chunk Summaries
-
-After chunking, the metadata generation pipeline generates AI summaries for each chunk. Summaries are:
-- 1-2 concise sentences per chunk
-- Generated in batches of 5 chunks per AI call for efficiency
-- Used as the text for vector embedding instead of raw content (improves semantic search quality)
-- Stored in the `summary` column of `textChunks`
 
 ## Usage
 

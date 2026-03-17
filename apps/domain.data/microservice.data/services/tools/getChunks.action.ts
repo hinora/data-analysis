@@ -90,7 +90,6 @@ export default defineAction<GetChunksParams, unknown>({
         content: c.content,
         sourcePage: c.sourcePage,
         sourceSection: c.sourceSection,
-        summary: c.summary,
       })),
       totalChunks,
       startIndex: chunks.length > 0 ? chunks[0].orderIndex : startIndex,
