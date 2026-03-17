@@ -20,5 +20,12 @@
     "types": ["node"]
   },
   "include": ["./**/*.ts"],
-  "exclude": ["node_modules", "dist", "__generated__"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "__generated__",
+    "testing/**",
+    "**/__tests__/**",
+    "**/*.test.ts"
+  ]
 }

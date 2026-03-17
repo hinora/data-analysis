@@ -1,0 +1,158 @@
+/**
+ * Tests for conversation/deleteConversation.action.ts
+ */
+
+import { AILog } from "core.lib/database";
+import {
+  clearTestDatabase,
+  createTestDataSource,
+  defineTest,
+  destroyTestDataSource,
+} from "core.lib/testing";
+import type { DataSource } from "typeorm";
+import { ChatMessage, MessageRole } from "../../../db/chat-message.entity";
+import { Conversation } from "../../../db/conversation.entity";
+import { Session, SessionStatus } from "../../../db/session.entity";
+
+let testDs: DataSource;
+
+jest.mock("../../../db", () => ({
+  get dataSource() {
+    return testDs;
+  },
+}));
+
+import deleteConversationAction from "../deleteConversation.action";
+
+beforeAll(async () => {
+  testDs = await createTestDataSource([
+    Session,
+    Conversation,
+    ChatMessage,
+    AILog,
+  ]);
+});
+
+afterAll(async () => {
+  await destroyTestDataSource(testDs);
+});
+
+beforeEach(async () => {
+  await clearTestDatabase(testDs, [AILog, ChatMessage, Conversation, Session]);
+});
+
+const SESSION_ID = "11111111-1111-4111-8111-111111111111";
+const CONVERSATION_ID = "22222222-2222-4222-8222-222222222222";
+
+describe("conversation.deleteConversation action", () => {
+  defineTest({
+    name: "should delete conversation and cascade to messages",
+    action: deleteConversationAction,
+    params: { id: CONVERSATION_ID },
+    db: () => testDs,
+    before: [
+      {
+        entity: Session,
+        data: [
+          {
+            id: SESSION_ID,
+            name: "Session",
+            status: SessionStatus.ACTIVE,
+            datasetCount: 1,
+            conversationCount: 1,
+          },
+        ],
+      },
+      {
+        entity: Conversation,
+        data: [
+          {
+            id: CONVERSATION_ID,
+            sessionId: SESSION_ID,
+            name: "To Delete",
+            systemPrompt: "",
+            messageCount: 1,
+          },
+        ],
+      },
+      {
+        entity: ChatMessage,
+        data: [
+          {
+            conversationId: CONVERSATION_ID,
+            sessionId: SESSION_ID,
+            role: MessageRole.USER,
+            content: "Hello",
+          },
+        ],
+      },
+    ],
+    assertResult: (result: any) => {
+      expect(result.success).toBe(true);
+      expect(result.id).toBe(CONVERSATION_ID);
+    },
+    after: [
+      {
+        entity: Conversation,
+        assert: (conversations) => {
+          expect(conversations).toHaveLength(0);
+        },
+      },
+      {
+        entity: ChatMessage,
+        assert: (messages) => {
+          expect(messages).toHaveLength(0);
+        },
+      },
+    ],
+  });
+
+  defineTest({
+    name: "should throw 404 when conversation not found",
+    action: deleteConversationAction,
+    params: { id: "00000000-0000-4000-8000-000000000000" },
+    db: () => testDs,
+    expectError: "Conversation not found",
+  });
+
+  defineTest({
+    name: "should decrement session conversation count",
+    action: deleteConversationAction,
+    params: { id: CONVERSATION_ID },
+    db: () => testDs,
+    before: [
+      {
+        entity: Session,
+        data: [
+          {
+            id: SESSION_ID,
+            name: "Session",
+            status: SessionStatus.ACTIVE,
+            datasetCount: 1,
+            conversationCount: 2,
+          },
+        ],
+      },
+      {
+        entity: Conversation,
+        data: [
+          {
+            id: CONVERSATION_ID,
+            sessionId: SESSION_ID,
+            name: "To Delete",
+            systemPrompt: "",
+            messageCount: 0,
+          },
+        ],
+      },
+    ],
+    after: [
+      {
+        entity: Session,
+        assert: (sessions) => {
+          expect(sessions[0].conversationCount).toBe(1);
+        },
+      },
+    ],
+  });
+});

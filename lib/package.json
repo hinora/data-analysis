@@ -17,7 +17,8 @@
     "./adapters/ai": "./adapters/ai/index.ts",
     "./adapters/file-parser": "./adapters/file-parser/index.ts",
     "./adapters/stock-data": "./adapters/stock-data/index.ts",
-    "./adapters/news": "./adapters/news/index.ts"
+    "./adapters/news": "./adapters/news/index.ts",
+    "./testing": "./testing/index.ts"
   },
   "scripts": {
     "build": "rm -rf ./dist && tsc --project .",

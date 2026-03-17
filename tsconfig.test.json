@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "core.lib/__generated__": ["lib/testing/stubs/generated-types"],
+      "core.lib/__generated__/*": ["lib/testing/stubs/generated-types"],
+      "core.lib/*": ["lib/*"],
+      "core.lib": ["lib/index.ts"]
+    }
+  },
+  "include": ["apps/**/*", "lib/**/*"]
+}
