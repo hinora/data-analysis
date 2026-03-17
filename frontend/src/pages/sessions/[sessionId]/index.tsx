@@ -12,7 +12,7 @@ import { useState } from "react";
 import DatasetDetailModal from "@/components/dataset/DatasetDetailModal";
 import DatasetList from "@/components/dataset/DatasetList";
 import ConversationList from "@/components/session/ConversationList";
-import { FileUpload } from "@/components/upload/FileUpload";
+import { DataImport } from "@/components/upload/DataImport";
 import {
   useCreateConversation,
   useDeleteConversation,
@@ -255,7 +255,7 @@ const SessionWorkspacePage: React.FC = () => {
           <h2 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 600 }}>
             Datasets
           </h2>
-          <FileUpload sessionId={session.id} />
+          <DataImport sessionId={session.id} />
           {datasetsLoading ? (
             <p style={{ color: "#94a3b8", fontSize: 13 }}>
               Loading datasets...

@@ -36,6 +36,8 @@ graph TB
 - HTTP entry point on port 3000
 - Routes all `/api/*` requests to internal services via auto-aliases
 - Dedicated file upload route at `POST /api/sessions/:sessionId/upload` (100MB limit)
+- URL import at `POST /api/sessions/:sessionId/import-url`
+- Web search at `POST /api/sessions/:sessionId/search-websites`
 - CORS, rate limiting (100 req/min), request body parsing
 - Health check at `GET /api/health`
 

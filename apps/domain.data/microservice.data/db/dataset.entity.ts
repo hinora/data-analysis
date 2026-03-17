@@ -23,6 +23,7 @@ import type { TextChunk } from "./text-chunk.entity";
 export enum FileType {
   CSV = "csv",
   PDF = "pdf",
+  URL = "url",
   XLSM = "xlsm",
 }
 

@@ -27,7 +27,7 @@ export interface Dataset {
   id: string;
   sessionId: string;
   name: string;
-  fileType: "csv" | "pdf" | "xlsm";
+  fileType: "csv" | "pdf" | "url" | "xlsm";
   datasetType: "structured-table" | "unstructured-text";
   metadataStatus: "pending" | "in-progress" | "ready" | "failed";
   rowCount: number;
@@ -39,6 +39,19 @@ export interface Dataset {
   structuredMetadata?: Record<string, unknown> | null;
   unstructuredMetadata?: Record<string, unknown> | null;
   relationships?: unknown[] | null;
+}
+
+export interface SearchWebsiteItem {
+  description: string;
+  keyword: string;
+  title: string;
+  url: string;
+}
+
+export interface SearchWebsitesResult {
+  keywords: string[];
+  results: SearchWebsiteItem[];
+  totalCount: number;
 }
 
 export interface UploadResult {
@@ -237,6 +250,52 @@ export const useRetryMetadata = () => {
       queryClient.invalidateQueries({
         queryKey: [DATASET_DETAIL_KEY, datasetId],
       });
+    },
+  });
+};
+
+export const useImportFromUrl = () => {
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      url,
+    }: {
+      sessionId: string;
+      url: string;
+    }) => {
+      const response = await service.post<UploadResult>(
+        `/sessions/${sessionId}/import-url`,
+        { url },
+      );
+      return response.data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [DATASET_LIST_KEY, variables.sessionId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [SESSION_DETAIL_KEY, variables.sessionId],
+      });
+    },
+  });
+};
+
+export const useSearchWebsites = () => {
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      keywords,
+      count,
+    }: {
+      sessionId: string;
+      keywords: string[];
+      count?: number;
+    }) => {
+      const response = await service.post<SearchWebsitesResult>(
+        `/sessions/${sessionId}/search-websites`,
+        { keywords, count },
+      );
+      return response.data;
     },
   });
 };
