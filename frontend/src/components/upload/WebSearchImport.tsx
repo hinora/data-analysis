@@ -79,7 +79,7 @@ export const WebSearchImport: React.FC<WebSearchImportProps> = ({
 
     const urls = Array.from(selectedUrls);
     const newImporting = new Set(importingUrls);
-    for (const u of urls) newImporting.add(u);
+    for (const url of urls) newImporting.add(url);
     setImportingUrls(newImporting);
 
     const errors: string[] = [];
