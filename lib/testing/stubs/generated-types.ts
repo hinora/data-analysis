@@ -15,10 +15,14 @@ import type { AuthenticatedUser } from "../broker/types";
 /**
  * TypedContext — fallback when generated types are not available.
  * Provides the same shape as the generated TypedContext but without
- * strict call/emit typing.
+ * strict call/emit typing. The `call` method returns `any` so that
+ * actions can destructure results without type errors during testing.
  */
 export interface TypedContext<P = unknown, M extends object = GenericObject>
-  extends MoleculerContext<P, M> {}
+  extends Omit<MoleculerContext<P, M>, "call"> {
+  // biome-ignore lint/suspicious/noExplicitAny: permissive call return for test stubs
+  call: (...args: any[]) => Promise<any>;
+}
 
 /**
  * Authenticated TypedContext with typed call method and authenticated user in meta.

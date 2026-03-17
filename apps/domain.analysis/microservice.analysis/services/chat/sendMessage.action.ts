@@ -451,28 +451,33 @@ export default defineAction<SendMessageParams, SendMessageResult>({
   },
 });
 
-// ── Orchestration loop (runs asynchronously) ────────────────────────────
+// ── Conversation preparation ────────────────────────────────────────────
 
-async function processStream(
-  ctx: TypedContext<SendMessageParams>,
-  stream: PassThrough,
-): Promise<void> {
+interface ConversationContext {
+  conversation: Conversation;
+  messages: AIMessageWithTools[];
+  sessionId: string;
+  systemPrompt: string;
+}
+
+/** Verify conversation, build system prompt, save user message, auto-rename, load history. */
+async function prepareConversation(req: {
+  ctx: TypedContext<SendMessageParams>;
+  stream: PassThrough;
+}): Promise<ConversationContext | null> {
+  const { ctx, stream } = req;
   const { content, conversationId } = ctx.params;
   const convRepo = dataSource.getRepository(Conversation);
   const msgRepo = dataSource.getRepository(ChatMessage);
-  const aiLogRepo = dataSource.getRepository(AILog);
 
   // ── Verify conversation exists ──────────────────────────────────────
   writeSSE(stream, { type: "status", message: "Verifying conversation…" });
 
   const conversation = await convRepo.findOneBy({ id: conversationId });
   if (!conversation) {
-    writeSSE(stream, {
-      type: "error",
-      message: "Conversation not found",
-    });
+    writeSSE(stream, { type: "error", message: "Conversation not found" });
     stream.end();
-    return;
+    return null;
   }
 
   const sessionId = conversation.sessionId;
@@ -495,42 +500,14 @@ async function processStream(
   await msgRepo.save(userMessage);
 
   // ── Auto-rename conversation on first message ───────────────────────
-  if (conversation.messageCount === 0) {
-    try {
-      writeSSE(stream, { type: "status", message: "Generating title…" });
-
-      // Build context: user question + dataset summary
-      const datasets = (await ctx.call("dataset.listDatasets", {
-        sessionId,
-      })) as Array<{ datasetType: string; name: string; rowCount: number }>;
-
-      const datasetSummary =
-        datasets.length > 0
-          ? `\nDatasets in session: ${datasets.map((d) => `${d.name} (${d.datasetType}, ${d.rowCount} rows)`).join(", ")}`
-          : "";
-
-      const nameContext = `User question: ${content}${datasetSummary}`;
-
-      const { name } = await ctx.call(
-        "chat.generateName",
-        { context: nameContext, target: "conversation" as const },
-        { timeout: 600000 },
-      );
-      await ctx.call("conversation.renameConversation", {
-        id: conversationId,
-        name,
-      });
-      ctx.broker.logger.info(
-        `Conversation ${conversationId} auto-renamed to "${name}"`,
-      );
-    } catch (renameErr: unknown) {
-      const msg =
-        renameErr instanceof Error ? renameErr.message : String(renameErr);
-      ctx.broker.logger.warn(
-        `Failed to auto-rename conversation ${conversationId}: ${msg}`,
-      );
-    }
-  }
+  await autoRenameConversation({
+    content,
+    conversation,
+    conversationId,
+    ctx,
+    sessionId,
+    stream,
+  });
 
   // ── Load conversation history ───────────────────────────────────────
   writeSSE(stream, { type: "status", message: "Loading history…" });
@@ -550,7 +527,314 @@ async function processStream(
       })),
   ];
 
-  // ── Tool definitions ────────────────────────────────────────────────
+  return { conversation, messages, sessionId, systemPrompt };
+}
+
+/** Auto-rename conversation on the first user message. */
+async function autoRenameConversation(req: {
+  content: string;
+  conversation: Conversation;
+  conversationId: string;
+  ctx: TypedContext<SendMessageParams>;
+  sessionId: string;
+  stream: PassThrough;
+}): Promise<void> {
+  const { content, conversation, conversationId, ctx, sessionId, stream } = req;
+  if (conversation.messageCount !== 0) return;
+
+  try {
+    writeSSE(stream, { type: "status", message: "Generating title…" });
+
+    const datasets = (await ctx.call("dataset.listDatasets", {
+      sessionId,
+    })) as Array<{ datasetType: string; name: string; rowCount: number }>;
+
+    const datasetSummary =
+      datasets.length > 0
+        ? `\nDatasets in session: ${datasets.map((d) => `${d.name} (${d.datasetType}, ${d.rowCount} rows)`).join(", ")}`
+        : "";
+
+    const nameContext = `User question: ${content}${datasetSummary}`;
+
+    const { name } = await ctx.call(
+      "chat.generateName",
+      { context: nameContext, target: "conversation" as const },
+      { timeout: 600000 },
+    );
+    await ctx.call("conversation.renameConversation", {
+      id: conversationId,
+      name,
+    });
+    ctx.broker.logger.info(
+      `Conversation ${conversationId} auto-renamed to "${name}"`,
+    );
+  } catch (renameErr: unknown) {
+    const msg =
+      renameErr instanceof Error ? renameErr.message : String(renameErr);
+    ctx.broker.logger.warn(
+      `Failed to auto-rename conversation ${conversationId}: ${msg}`,
+    );
+  }
+}
+
+// ── Orchestration types ─────────────────────────────────────────────────
+
+interface OrchestrationResult {
+  citedSources: CitedSource[];
+  completionTokens: number;
+  confidenceScore: number | null;
+  finalContent: string;
+  latencyMs: number;
+  promptTokens: number;
+  reasoningSteps: string[];
+  toolsUsed: ToolUsage[];
+}
+
+// ── Confidence extraction ───────────────────────────────────────────────
+
+function extractConfidenceScore(content: string): number | null {
+  const confidenceMatch = content.match(/confidence[:\s]*([0-9]*\.?[0-9]+)/i);
+  if (!confidenceMatch) return null;
+
+  const parsed = Number.parseFloat(confidenceMatch[1]);
+  if (parsed >= 0 && parsed <= 1) return parsed;
+  if (parsed > 1 && parsed <= 100) return parsed / 100;
+  return null;
+}
+
+// ── Sub-agent tool call handler ─────────────────────────────────────────
+
+async function handleSubAgentCall(req: {
+  ctx: TypedContext<SendMessageParams>;
+  fnArgs: Record<string, unknown>;
+  fnName: string;
+  messages: AIMessageWithTools[];
+  reasoningSteps: string[];
+  stream: PassThrough;
+  toolsUsed: ToolUsage[];
+}): Promise<{ completionTokens: number; promptTokens: number }> {
+  const { ctx, fnArgs, fnName, messages, reasoningSteps, stream, toolsUsed } =
+    req;
+  const subAgentPrompt = fnArgs.prompt as string;
+
+  if (!subAgentPrompt) {
+    const errMsg = "createSubAgent requires a prompt parameter.";
+    reasoningSteps.push(errMsg);
+    writeSSE(stream, {
+      type: "tool_end",
+      durationMs: 0,
+      resultPreview: errMsg,
+      success: false,
+      toolName: fnName,
+    });
+    messages.push({ content: errMsg, role: "tool", toolName: fnName });
+    return { completionTokens: 0, promptTokens: 0 };
+  }
+
+  try {
+    const subStart = Date.now();
+    const subResult = await runSubAgent({
+      ctx: ctx as unknown as {
+        broker: {
+          logger: {
+            info: (msg: string) => void;
+            warn: (msg: string) => void;
+          };
+        };
+        call: (
+          name: string,
+          params: Record<string, unknown>,
+        ) => Promise<unknown>;
+      },
+      prompt: subAgentPrompt,
+      stream,
+      systemPrompt: messages.find((m) => m.role === "system")?.content || "",
+    });
+    const subDuration = Date.now() - subStart;
+
+    toolsUsed.push(...subResult.toolsUsed);
+
+    const stepResult = `Sub-agent finished (${subDuration}ms)`;
+    reasoningSteps.push(stepResult);
+    writeSSE(stream, { type: "reasoning", step: stepResult });
+    writeSSE(stream, {
+      type: "tool_end",
+      durationMs: subDuration,
+      resultPreview: truncate(subResult.content, 200),
+      success: true,
+      toolName: fnName,
+    });
+    messages.push({
+      content: subResult.content,
+      role: "tool",
+      toolName: fnName,
+    });
+
+    return {
+      completionTokens: subResult.completionTokens,
+      promptTokens: subResult.promptTokens,
+    };
+  } catch (subErr: unknown) {
+    const errMsg = subErr instanceof Error ? subErr.message : String(subErr);
+    const stepFail = `Sub-agent failed: ${errMsg}`;
+    reasoningSteps.push(stepFail);
+    writeSSE(stream, { type: "reasoning", step: stepFail });
+    writeSSE(stream, {
+      type: "tool_end",
+      durationMs: 0,
+      resultPreview: truncate(errMsg, 200),
+      success: false,
+      toolName: fnName,
+    });
+    messages.push({
+      content: `Sub-agent failed: ${errMsg}`,
+      role: "tool",
+      toolName: fnName,
+    });
+    return { completionTokens: 0, promptTokens: 0 };
+  }
+}
+
+// ── Normal tool call handler (main agent) ───────────────────────────────
+
+async function handleNormalToolInLoop(req: {
+  citedSources: CitedSource[];
+  ctx: TypedContext<SendMessageParams>;
+  fnArgs: Record<string, unknown>;
+  fnName: string;
+  messages: AIMessageWithTools[];
+  reasoningSteps: string[];
+  stream: PassThrough;
+  toolsUsed: ToolUsage[];
+}): Promise<void> {
+  const {
+    citedSources,
+    ctx,
+    fnArgs,
+    fnName,
+    messages,
+    reasoningSteps,
+    stream,
+    toolsUsed,
+  } = req;
+  const actionName = TOOL_TO_ACTION[fnName];
+
+  if (!actionName) {
+    reasoningSteps.push(`Unknown tool: ${fnName} — skipped`);
+    writeSSE(stream, {
+      type: "tool_end",
+      durationMs: 0,
+      resultPreview: "Tool not available",
+      success: false,
+      toolName: fnName,
+    });
+    messages.push({
+      content: `Tool ${fnName} is not available.`,
+      role: "tool",
+      toolName: fnName,
+    });
+    return;
+  }
+
+  // ── Dataset type validation ──────────────────────────────────────
+  const typeMismatchError = await validateToolDatasetType(
+    fnName,
+    fnArgs,
+    ctx as unknown as {
+      call: (name: string, params: Record<string, unknown>) => Promise<unknown>;
+    },
+  );
+  if (typeMismatchError) {
+    reasoningSteps.push(typeMismatchError);
+    writeSSE(stream, {
+      type: "tool_end",
+      durationMs: 0,
+      resultPreview: truncate(typeMismatchError, 200),
+      success: false,
+      toolName: fnName,
+    });
+    messages.push({
+      content: typeMismatchError,
+      role: "tool",
+      toolName: fnName,
+    });
+    return;
+  }
+
+  try {
+    const toolStart = Date.now();
+    const result = await (
+      ctx as unknown as {
+        call: (
+          name: string,
+          params: Record<string, unknown>,
+        ) => Promise<unknown>;
+      }
+    ).call(actionName, fnArgs);
+    const toolDuration = Date.now() - toolStart;
+
+    const resultStr = formatToolResult(result);
+
+    toolsUsed.push({
+      parameters: fnArgs,
+      resultSummary: resultStr,
+      toolName: fnName,
+    });
+
+    const stepResult = `Tool ${fnName} returned (${toolDuration}ms)`;
+    reasoningSteps.push(stepResult);
+    writeSSE(stream, { type: "reasoning", step: stepResult });
+    writeSSE(stream, {
+      type: "tool_end",
+      durationMs: toolDuration,
+      resultPreview: truncate(resultStr, 200),
+      success: true,
+      toolName: fnName,
+    });
+
+    messages.push({ content: resultStr, role: "tool", toolName: fnName });
+
+    // Track cited sources
+    if (fnArgs.datasetId) {
+      const existing = citedSources.find(
+        (s) => s.datasetId === fnArgs.datasetId,
+      );
+      if (!existing) {
+        citedSources.push({
+          datasetId: fnArgs.datasetId as string,
+          datasetName: (fnArgs.datasetName as string) || "Unknown Dataset",
+          columnName: fnArgs.field as string | undefined,
+        });
+      }
+    }
+  } catch (toolErr: unknown) {
+    const errMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);
+    const stepFail = `Tool ${fnName} failed: ${errMsg}`;
+    reasoningSteps.push(stepFail);
+    writeSSE(stream, { type: "reasoning", step: stepFail });
+    writeSSE(stream, {
+      type: "tool_end",
+      durationMs: 0,
+      resultPreview: truncate(errMsg, 200),
+      success: false,
+      toolName: fnName,
+    });
+    messages.push({
+      content: `Tool ${fnName} failed: ${errMsg}`,
+      role: "tool",
+      toolName: fnName,
+    });
+  }
+}
+
+// ── AI orchestration loop ───────────────────────────────────────────────
+
+async function runOrchestrationLoop(req: {
+  ctx: TypedContext<SendMessageParams>;
+  messages: AIMessageWithTools[];
+  stream: PassThrough;
+}): Promise<OrchestrationResult> {
+  const { ctx, messages, stream } = req;
   const tools = getEnabledToolDefinitions(toolEnabledConfig);
   const ai = createAIAdapter();
 
@@ -564,7 +848,6 @@ async function processStream(
   let totalCompletionTokens = 0;
   const startTime = Date.now();
 
-  // ── AI orchestration loop ───────────────────────────────────────────
   writeSSE(stream, { type: "status", message: "Thinking…" });
 
   try {
@@ -573,10 +856,7 @@ async function processStream(
     while (iteration < MAX_TOOL_ITERATIONS) {
       iteration++;
 
-      writeSSE(stream, {
-        type: "reasoning",
-        step: `Cooking...`,
-      });
+      writeSSE(stream, { type: "reasoning", step: "Cooking..." });
 
       const isLastIteration = iteration > MAX_TOOL_ITERATIONS - 1;
 
@@ -599,7 +879,6 @@ async function processStream(
 
       // ── Tool calls ────────────────────────────────────────────────
       if (response.toolCalls && response.toolCalls.length > 0) {
-        // Reset content state for the next iteration
         finalContent = "";
         contentStreamedViaCallback = false;
 
@@ -623,209 +902,31 @@ async function processStream(
             parameters: fnArgs,
           });
 
-          // ── Sub-agent delegation ────────────────────────────────
           if (fnName === "createSubAgent") {
-            const subAgentPrompt = fnArgs.prompt as string;
-            if (!subAgentPrompt) {
-              const errMsg = "createSubAgent requires a prompt parameter.";
-              reasoningSteps.push(errMsg);
-              writeSSE(stream, {
-                type: "tool_end",
-                durationMs: 0,
-                resultPreview: errMsg,
-                success: false,
-                toolName: fnName,
-              });
-              messages.push({
-                content: errMsg,
-                role: "tool",
-                toolName: fnName,
-              });
-              continue;
-            }
-
-            try {
-              const subStart = Date.now();
-              const subResult = await runSubAgent({
-                ctx: ctx as unknown as {
-                  broker: {
-                    logger: {
-                      info: (msg: string) => void;
-                      warn: (msg: string) => void;
-                    };
-                  };
-                  call: (
-                    name: string,
-                    params: Record<string, unknown>,
-                  ) => Promise<unknown>;
-                },
-                prompt: subAgentPrompt,
-                stream,
-                systemPrompt:
-                  messages.find((m) => m.role === "system")?.content || "",
-              });
-              const subDuration = Date.now() - subStart;
-
-              totalPromptTokens += subResult.promptTokens;
-              totalCompletionTokens += subResult.completionTokens;
-              toolsUsed.push(...subResult.toolsUsed);
-
-              const stepResult = `Sub-agent finished (${subDuration}ms)`;
-              reasoningSteps.push(stepResult);
-              writeSSE(stream, { type: "reasoning", step: stepResult });
-              writeSSE(stream, {
-                type: "tool_end",
-                durationMs: subDuration,
-                resultPreview: truncate(subResult.content, 200),
-                success: true,
-                toolName: fnName,
-              });
-
-              messages.push({
-                content: subResult.content,
-                role: "tool",
-                toolName: fnName,
-              });
-            } catch (subErr: unknown) {
-              const errMsg =
-                subErr instanceof Error ? subErr.message : String(subErr);
-              const stepFail = `Sub-agent failed: ${errMsg}`;
-              reasoningSteps.push(stepFail);
-              writeSSE(stream, { type: "reasoning", step: stepFail });
-              writeSSE(stream, {
-                type: "tool_end",
-                durationMs: 0,
-                resultPreview: truncate(errMsg, 200),
-                success: false,
-                toolName: fnName,
-              });
-              messages.push({
-                content: `Sub-agent failed: ${errMsg}`,
-                role: "tool",
-                toolName: fnName,
-              });
-            }
+            const tokens = await handleSubAgentCall({
+              ctx,
+              fnArgs,
+              fnName,
+              messages,
+              reasoningSteps,
+              stream,
+              toolsUsed,
+            });
+            totalPromptTokens += tokens.promptTokens;
+            totalCompletionTokens += tokens.completionTokens;
             continue;
           }
 
-          // ── Normal tool execution ───────────────────────────────
-          const actionName = TOOL_TO_ACTION[fnName];
-
-          if (!actionName) {
-            reasoningSteps.push(`Unknown tool: ${fnName} — skipped`);
-            writeSSE(stream, {
-              type: "tool_end",
-              durationMs: 0,
-              resultPreview: "Tool not available",
-              success: false,
-              toolName: fnName,
-            });
-            messages.push({
-              content: `Tool ${fnName} is not available.`,
-              role: "tool",
-              toolName: fnName,
-            });
-            continue;
-          }
-
-          // ── Dataset type validation ──────────────────────────────
-          const typeMismatchError = await validateToolDatasetType(
-            fnName,
+          await handleNormalToolInLoop({
+            citedSources,
+            ctx,
             fnArgs,
-            ctx as unknown as {
-              call: (
-                name: string,
-                params: Record<string, unknown>,
-              ) => Promise<unknown>;
-            },
-          );
-          if (typeMismatchError) {
-            reasoningSteps.push(typeMismatchError);
-            writeSSE(stream, {
-              type: "tool_end",
-              durationMs: 0,
-              resultPreview: truncate(typeMismatchError, 200),
-              success: false,
-              toolName: fnName,
-            });
-            messages.push({
-              content: typeMismatchError,
-              role: "tool",
-              toolName: fnName,
-            });
-            continue;
-          }
-
-          try {
-            const toolStart = Date.now();
-            const result = await (
-              ctx as unknown as {
-                call: (
-                  name: string,
-                  params: Record<string, unknown>,
-                ) => Promise<unknown>;
-              }
-            ).call(actionName, fnArgs);
-            const toolDuration = Date.now() - toolStart;
-
-            const resultStr = formatToolResult(result);
-
-            toolsUsed.push({
-              parameters: fnArgs,
-              resultSummary: resultStr,
-              toolName: fnName,
-            });
-
-            const stepResult = `Tool ${fnName} returned (${toolDuration}ms)`;
-            reasoningSteps.push(stepResult);
-            writeSSE(stream, { type: "reasoning", step: stepResult });
-            writeSSE(stream, {
-              type: "tool_end",
-              durationMs: toolDuration,
-              resultPreview: truncate(resultStr, 200),
-              success: true,
-              toolName: fnName,
-            });
-
-            messages.push({
-              content: resultStr,
-              role: "tool",
-              toolName: fnName,
-            });
-
-            // Track cited sources
-            if (fnArgs.datasetId) {
-              const existing = citedSources.find(
-                (s) => s.datasetId === fnArgs.datasetId,
-              );
-              if (!existing) {
-                citedSources.push({
-                  datasetId: fnArgs.datasetId as string,
-                  datasetName:
-                    (fnArgs.datasetName as string) || "Unknown Dataset",
-                  columnName: fnArgs.field as string | undefined,
-                });
-              }
-            }
-          } catch (toolErr: unknown) {
-            const errMsg =
-              toolErr instanceof Error ? toolErr.message : String(toolErr);
-            const stepFail = `Tool ${fnName} failed: ${errMsg}`;
-            reasoningSteps.push(stepFail);
-            writeSSE(stream, { type: "reasoning", step: stepFail });
-            writeSSE(stream, {
-              type: "tool_end",
-              durationMs: 0,
-              resultPreview: truncate(errMsg, 200),
-              success: false,
-              toolName: fnName,
-            });
-            messages.push({
-              content: `Tool ${fnName} failed: ${errMsg}`,
-              role: "tool",
-              toolName: fnName,
-            });
-          }
+            fnName,
+            messages,
+            reasoningSteps,
+            stream,
+            toolsUsed,
+          });
         }
 
         // ── Self-reflection: prompt the AI to verify data relevance ──
@@ -837,7 +938,7 @@ async function processStream(
             "3. Do you need to fetch additional data from other sections or datasets?\n" +
             "If the data is insufficient or irrelevant, use more tools to gather better information. " +
             "If the data is sufficient, provide your final answer.",
-          role: "user",
+          role: "system",
         });
 
         writeSSE(stream, {
@@ -867,24 +968,11 @@ async function processStream(
         continue;
       }
 
-      // Send final content as a single delta only if it wasn't already streamed
       if (finalContent && !contentStreamedViaCallback) {
         writeSSE(stream, { type: "content_delta", delta: finalContent });
       }
 
-      // Extract confidence score
-      const confidenceMatch = finalContent.match(
-        /confidence[:\s]*([0-9]*\.?[0-9]+)/i,
-      );
-      if (confidenceMatch) {
-        const parsed = Number.parseFloat(confidenceMatch[1]);
-        if (parsed >= 0 && parsed <= 1) {
-          confidenceScore = parsed;
-        } else if (parsed > 1 && parsed <= 100) {
-          confidenceScore = parsed / 100;
-        }
-      }
-
+      confidenceScore = extractConfidenceScore(finalContent);
       break;
     }
 
@@ -901,55 +989,78 @@ async function processStream(
     writeSSE(stream, { type: "content_delta", delta: finalContent });
   }
 
-  const latencyMs = Date.now() - startTime;
+  return {
+    citedSources,
+    completionTokens: totalCompletionTokens,
+    confidenceScore,
+    finalContent,
+    latencyMs: Date.now() - startTime,
+    promptTokens: totalPromptTokens,
+    reasoningSteps,
+    toolsUsed,
+  };
+}
 
-  // ── Save assistant message ──────────────────────────────────────────
+// ── Save results & finalize stream ──────────────────────────────────────
+
+async function saveAndFinalize(req: {
+  content: string;
+  conversationId: string;
+  result: OrchestrationResult;
+  sessionId: string;
+  stream: PassThrough;
+}): Promise<void> {
+  const { content, conversationId, result, sessionId, stream } = req;
+  const convRepo = dataSource.getRepository(Conversation);
+  const msgRepo = dataSource.getRepository(ChatMessage);
+  const aiLogRepo = dataSource.getRepository(AILog);
+  const ai = createAIAdapter();
+
   const promptStats: PromptStats | null =
-    totalPromptTokens > 0 || totalCompletionTokens > 0
+    result.promptTokens > 0 || result.completionTokens > 0
       ? {
-          completionTokens: totalCompletionTokens,
-          latencyMs,
-          promptTokens: totalPromptTokens,
-          totalTokens: totalPromptTokens + totalCompletionTokens,
+          completionTokens: result.completionTokens,
+          latencyMs: result.latencyMs,
+          promptTokens: result.promptTokens,
+          totalTokens: result.promptTokens + result.completionTokens,
         }
       : null;
 
   const assistantMessage = msgRepo.create({
-    citedSources: citedSources.length > 0 ? citedSources : null,
-    confidenceScore,
-    content: finalContent,
+    citedSources: result.citedSources.length > 0 ? result.citedSources : null,
+    confidenceScore: result.confidenceScore,
+    content: result.finalContent,
     conversationId,
     promptStats,
-    reasoningSteps: reasoningSteps.length > 0 ? reasoningSteps : null,
+    reasoningSteps:
+      result.reasoningSteps.length > 0 ? result.reasoningSteps : null,
     role: MessageRole.ASSISTANT,
     sessionId,
-    toolsUsed: toolsUsed.length > 0 ? toolsUsed : null,
+    toolsUsed: result.toolsUsed.length > 0 ? result.toolsUsed : null,
   });
   const savedMessage = await msgRepo.save(assistantMessage);
 
-  // ── Update conversation ─────────────────────────────────────────────
   await convRepo.increment({ id: conversationId }, "messageCount", 2);
 
-  // ── Log AI interaction ──────────────────────────────────────────────
   await aiLogRepo.save(
     aiLogRepo.create({
-      completionTokens: totalCompletionTokens,
-      confidenceScore,
+      completionTokens: result.completionTokens,
+      confidenceScore: result.confidenceScore,
       conversationId,
-      iterationCount: reasoningSteps.length,
-      latencyMs,
+      iterationCount: result.reasoningSteps.length,
+      latencyMs: result.latencyMs,
       messageId: savedMessage.id,
       model:
         ai.getConfig?.()?.defaultModel || process.env.OLLAMA_MODEL || "unknown",
       promptSent: content,
-      promptTokens: totalPromptTokens,
+      promptTokens: result.promptTokens,
       provider: process.env.AI_PROVIDER || "ollama",
-      responseReceived: finalContent,
+      responseReceived: result.finalContent,
       sessionId,
       status: AILogStatus.SUCCESS,
       toolCalls:
-        toolsUsed.length > 0
-          ? toolsUsed.map((t, i) => ({
+        result.toolsUsed.length > 0
+          ? result.toolsUsed.map((t, i) => ({
               durationMs: 0,
               iterationIndex: i,
               parameters: t.parameters,
@@ -957,12 +1068,11 @@ async function processStream(
               toolName: t.toolName,
             }))
           : null,
-      totalTokens: totalPromptTokens + totalCompletionTokens,
+      totalTokens: result.promptTokens + result.completionTokens,
       type: AILogType.CHAT,
     }),
   );
 
-  // ── Final "done" event with the saved message ───────────────────────
   writeSSE(stream, {
     type: "done",
     message: {
@@ -980,4 +1090,26 @@ async function processStream(
   });
 
   stream.end();
+}
+
+// ── Orchestration entry point (runs asynchronously) ─────────────────────
+
+async function processStream(
+  ctx: TypedContext<SendMessageParams>,
+  stream: PassThrough,
+): Promise<void> {
+  const prepared = await prepareConversation({ ctx, stream });
+  if (!prepared) return;
+
+  const { messages, sessionId } = prepared;
+
+  const result = await runOrchestrationLoop({ ctx, messages, stream });
+
+  await saveAndFinalize({
+    content: ctx.params.content,
+    conversationId: ctx.params.conversationId,
+    result,
+    sessionId,
+    stream,
+  });
 }
