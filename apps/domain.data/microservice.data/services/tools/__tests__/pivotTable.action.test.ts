@@ -95,12 +95,36 @@ const SEED_DATASET = {
 const SEED_RECORDS = {
   entity: DataRecord,
   data: [
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { region: "North", quarter: "Q1", revenue: "100" } },
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { region: "North", quarter: "Q2", revenue: "200" } },
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { region: "South", quarter: "Q1", revenue: "150" } },
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { region: "South", quarter: "Q2", revenue: "250" } },
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { region: "North", quarter: "Q1", revenue: "50" } },
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { region: "South", quarter: "Q1", revenue: "100" } },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { region: "North", quarter: "Q1", revenue: "100" },
+    },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { region: "North", quarter: "Q2", revenue: "200" },
+    },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { region: "South", quarter: "Q1", revenue: "150" },
+    },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { region: "South", quarter: "Q2", revenue: "250" },
+    },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { region: "North", quarter: "Q1", revenue: "50" },
+    },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { region: "South", quarter: "Q1", revenue: "100" },
+    },
   ],
 };
 
@@ -127,8 +151,12 @@ describe("tools.pivotTable action", () => {
       expect(result.columns).toContain("Q2");
       expect(result.results).toHaveLength(2);
 
-      const north = result.results.find((r: Record<string, unknown>) => r.region === "North");
-      const south = result.results.find((r: Record<string, unknown>) => r.region === "South");
+      const north = result.results.find(
+        (r: Record<string, unknown>) => r.region === "North",
+      );
+      const south = result.results.find(
+        (r: Record<string, unknown>) => r.region === "South",
+      );
       expect(north).toBeDefined();
       expect(south).toBeDefined();
       // North Q1: 100 + 50 = 150, North Q2: 200
@@ -156,7 +184,9 @@ describe("tools.pivotTable action", () => {
     assertResult: (result: any) => {
       expect(result.aggregation).toBe("count");
       expect(result.results).toHaveLength(2);
-      const north = result.results.find((r: Record<string, unknown>) => r.region === "North");
+      const north = result.results.find(
+        (r: Record<string, unknown>) => r.region === "North",
+      );
       // North has 2 Q1 entries, 1 Q2 entry
       expect(Number(north!.Q1)).toBe(2);
       expect(Number(north!.Q2)).toBe(1);

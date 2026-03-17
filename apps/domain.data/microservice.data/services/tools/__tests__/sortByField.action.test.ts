@@ -103,9 +103,21 @@ describe("tools.sortByField action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "C", price: "30" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "A", price: "10" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "B", price: "20" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "C", price: "30" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "A", price: "10" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "B", price: "20" },
+          },
         ],
       },
     ],
@@ -122,7 +134,12 @@ describe("tools.sortByField action", () => {
   defineTest({
     name: "should sort string field descending",
     action: sortByFieldAction,
-    params: { datasetId: DATASET_ID, field: "name", order: "DESC", numeric: false },
+    params: {
+      datasetId: DATASET_ID,
+      field: "name",
+      order: "DESC",
+      numeric: false,
+    },
     db: () => testDs,
     callStubs: {
       "dataset.getDataset": { id: DATASET_ID },
@@ -163,9 +180,21 @@ describe("tools.sortByField action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Alice", price: "10" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Charlie", price: "30" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Bob", price: "20" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Alice", price: "10" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Charlie", price: "30" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Bob", price: "20" },
+          },
         ],
       },
     ],
@@ -223,9 +252,21 @@ describe("tools.sortByField action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "C", price: "30" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "A", price: "10" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "B", price: "20" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "C", price: "30" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "A", price: "10" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "B", price: "20" },
+          },
         ],
       },
     ],

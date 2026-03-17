@@ -2,9 +2,7 @@
  * Tests for tools/webFetch.action.ts
  */
 
-import {
-  createTestContext,
-} from "core.lib/testing";
+import { createTestContext } from "core.lib/testing";
 
 const mockPage = {
   setRequestInterception: jest.fn(),

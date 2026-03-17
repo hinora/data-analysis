@@ -95,11 +95,31 @@ const SEED_DATASET = {
 const SEED_RECORDS = {
   entity: DataRecord,
   data: [
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Apple", category: "Fruit", price: "1.50" } },
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Banana", category: "Fruit", price: "0.75" } },
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Carrot", category: "Vegetable", price: "2.00" } },
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Donut", category: "Snack", price: "3.50" } },
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Eggplant", category: "Vegetable", price: "4.00" } },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { name: "Apple", category: "Fruit", price: "1.50" },
+    },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { name: "Banana", category: "Fruit", price: "0.75" },
+    },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { name: "Carrot", category: "Vegetable", price: "2.00" },
+    },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { name: "Donut", category: "Snack", price: "3.50" },
+    },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { name: "Eggplant", category: "Vegetable", price: "4.00" },
+    },
   ],
 };
 
@@ -116,7 +136,11 @@ describe("tools.filterByCondition action", () => {
     before: [SEED_FILE, SEED_DATASET, SEED_RECORDS],
     assertResult: (result: any) => {
       expect(result.count).toBe(2);
-      expect(result.results.every((r: Record<string, unknown>) => r.category === "Fruit")).toBe(true);
+      expect(
+        result.results.every(
+          (r: Record<string, unknown>) => r.category === "Fruit",
+        ),
+      ).toBe(true);
     },
   });
 
@@ -132,7 +156,11 @@ describe("tools.filterByCondition action", () => {
     before: [SEED_FILE, SEED_DATASET, SEED_RECORDS],
     assertResult: (result: any) => {
       expect(result.count).toBe(3);
-      expect(result.results.every((r: Record<string, unknown>) => r.category !== "Fruit")).toBe(true);
+      expect(
+        result.results.every(
+          (r: Record<string, unknown>) => r.category !== "Fruit",
+        ),
+      ).toBe(true);
     },
   });
 

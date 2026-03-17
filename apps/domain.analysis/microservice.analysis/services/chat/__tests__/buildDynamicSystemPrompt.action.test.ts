@@ -2,9 +2,7 @@
  * Tests for chat/buildDynamicSystemPrompt.action.ts
  */
 
-import {
-  createTestContext,
-} from "core.lib/testing";
+import { createTestContext } from "core.lib/testing";
 
 import buildDynamicSystemPromptAction from "../buildDynamicSystemPrompt.action";
 
@@ -21,10 +19,21 @@ describe("chat.buildDynamicSystemPrompt action", () => {
             fileType: "csv",
             rowCount: 100,
             columnMappings: [
-              { camelCase: "revenue", original: "Revenue", detectedType: "number", description: "Total revenue" },
-              { camelCase: "region", original: "Region", detectedType: "string" },
+              {
+                camelCase: "revenue",
+                original: "Revenue",
+                detectedType: "number",
+                description: "Total revenue",
+              },
+              {
+                camelCase: "region",
+                original: "Region",
+                detectedType: "string",
+              },
             ],
-            structuredMetadata: { datasetDescription: "Quarterly sales figures" },
+            structuredMetadata: {
+              datasetDescription: "Quarterly sales figures",
+            },
           },
         ],
       },

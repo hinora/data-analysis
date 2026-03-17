@@ -109,11 +109,31 @@ describe("tools.correlateFields action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { x: "1", y: "2" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { x: "2", y: "4" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { x: "3", y: "6" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { x: "4", y: "8" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { x: "5", y: "10" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { x: "1", y: "2" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { x: "2", y: "4" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { x: "3", y: "6" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { x: "4", y: "8" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { x: "5", y: "10" },
+          },
         ],
       },
     ],
@@ -141,11 +161,31 @@ describe("tools.correlateFields action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { x: "1", y: "10" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { x: "2", y: "8" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { x: "3", y: "6" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { x: "4", y: "4" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { x: "5", y: "2" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { x: "1", y: "10" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { x: "2", y: "8" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { x: "3", y: "6" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { x: "4", y: "4" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { x: "5", y: "2" },
+          },
         ],
       },
     ],
@@ -168,8 +208,16 @@ describe("tools.correlateFields action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Alice", y: "10" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Bob", y: "20" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Alice", y: "10" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Bob", y: "20" },
+          },
         ],
       },
     ],

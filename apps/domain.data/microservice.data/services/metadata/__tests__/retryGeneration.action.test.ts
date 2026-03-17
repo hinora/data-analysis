@@ -150,7 +150,8 @@ describe("metadata.retryGeneration action", () => {
         ],
       },
     ],
-    expectError: "Can only retry metadata generation for datasets with 'failed' status",
+    expectError:
+      "Can only retry metadata generation for datasets with 'failed' status",
   });
 
   defineTest({
@@ -179,6 +180,7 @@ describe("metadata.retryGeneration action", () => {
         ],
       },
     ],
-    expectError: "Can only retry metadata generation for datasets with 'failed' status",
+    expectError:
+      "Can only retry metadata generation for datasets with 'failed' status",
   });
 });

@@ -95,12 +95,36 @@ const SEED_DATASET = {
 const SEED_RECORDS = {
   entity: DataRecord,
   data: [
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { region: "North", product: "A", revenue: "100" } },
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { region: "North", product: "B", revenue: "200" } },
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { region: "South", product: "A", revenue: "150" } },
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { region: "South", product: "B", revenue: "250" } },
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { region: "North", product: "A", revenue: "50" } },
-    { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { region: "South", product: "A", revenue: "300" } },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { region: "North", product: "A", revenue: "100" },
+    },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { region: "North", product: "B", revenue: "200" },
+    },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { region: "South", product: "A", revenue: "150" },
+    },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { region: "South", product: "B", revenue: "250" },
+    },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { region: "North", product: "A", revenue: "50" },
+    },
+    {
+      datasetId: DATASET_ID,
+      sessionId: SESSION_ID,
+      data: { region: "South", product: "A", revenue: "300" },
+    },
   ],
 };
 
@@ -136,8 +160,12 @@ describe("tools.aggregate action", () => {
     assertResult: (result: any) => {
       expect(result.results).toHaveLength(2);
       expect(result.totalGroups).toBe(2);
-      const north = result.results.find((r: Record<string, unknown>) => r.region === "North");
-      const south = result.results.find((r: Record<string, unknown>) => r.region === "South");
+      const north = result.results.find(
+        (r: Record<string, unknown>) => r.region === "North",
+      );
+      const south = result.results.find(
+        (r: Record<string, unknown>) => r.region === "South",
+      );
       expect(north).toBeDefined();
       expect(south).toBeDefined();
     },
@@ -156,7 +184,9 @@ describe("tools.aggregate action", () => {
     before: [SEED_FILE, SEED_DATASET, SEED_RECORDS],
     assertResult: (result: any) => {
       expect(result.results).toHaveLength(2);
-      const north = result.results.find((r: Record<string, unknown>) => r.region === "North");
+      const north = result.results.find(
+        (r: Record<string, unknown>) => r.region === "North",
+      );
       expect(Number(north?.product_count)).toBe(3);
     },
   });

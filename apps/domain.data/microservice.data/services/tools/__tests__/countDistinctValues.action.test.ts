@@ -103,11 +103,31 @@ describe("tools.countDistinctValues action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "A", value: "10" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "B", value: "20" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "A", value: "30" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "C", value: "40" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "B", value: "50" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "A", value: "10" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "B", value: "20" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "A", value: "30" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "C", value: "40" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "B", value: "50" },
+          },
         ],
       },
     ],
@@ -162,8 +182,16 @@ describe("tools.countDistinctValues action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "A" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "B" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "A" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "B" },
+          },
         ],
       },
     ],

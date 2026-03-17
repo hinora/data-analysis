@@ -170,8 +170,16 @@ describe("tools.getPercentile action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Alice" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Bob" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Alice" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Bob" },
+          },
         ],
       },
     ],

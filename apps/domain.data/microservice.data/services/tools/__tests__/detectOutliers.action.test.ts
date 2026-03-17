@@ -100,7 +100,12 @@ describe("tools.detectOutliers action", () => {
   defineTest({
     name: "should detect outliers using z-score method",
     action: detectOutliersAction,
-    params: { datasetId: DATASET_ID, field: "value", method: "zscore", threshold: 2 },
+    params: {
+      datasetId: DATASET_ID,
+      field: "value",
+      method: "zscore",
+      threshold: 2,
+    },
     db: () => testDs,
     callStubs: { "dataset.getDataset": { id: DATASET_ID } },
     before: [
@@ -114,8 +119,16 @@ describe("tools.detectOutliers action", () => {
             sessionId: SESSION_ID,
             data: { value: String(10 + i) },
           })),
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { value: "1000" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { value: "-500" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { value: "1000" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { value: "-500" },
+          },
         ],
       },
     ],
@@ -140,8 +153,16 @@ describe("tools.detectOutliers action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Alice" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Bob" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Alice" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Bob" },
+          },
         ],
       },
     ],

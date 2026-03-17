@@ -2,9 +2,7 @@
  * Tests for tools/webSearch.action.ts
  */
 
-import {
-  createTestContext,
-} from "core.lib/testing";
+import { createTestContext } from "core.lib/testing";
 
 const mockWebSearch = jest.fn();
 
@@ -27,8 +25,17 @@ describe("tools.webSearch action", () => {
     mockWebSearch.mockResolvedValueOnce({
       web: {
         results: [
-          { title: "Result 1", description: "Description 1", url: "https://example.com/1", page_age: "2d" },
-          { title: "Result 2", description: "Description 2", url: "https://example.com/2" },
+          {
+            title: "Result 1",
+            description: "Description 1",
+            url: "https://example.com/1",
+            page_age: "2d",
+          },
+          {
+            title: "Result 2",
+            description: "Description 2",
+            url: "https://example.com/2",
+          },
         ],
       },
     });

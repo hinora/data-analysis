@@ -103,9 +103,21 @@ describe("tools.sampleData action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Alice", age: "30" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Bob", age: "25" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Charlie", age: "35" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Alice", age: "30" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Bob", age: "25" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Charlie", age: "35" },
+          },
         ],
       },
     ],
@@ -161,9 +173,21 @@ describe("tools.sampleData action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Alice", age: "30" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Bob", age: "25" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { name: "Charlie", age: "35" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Alice", age: "30" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Bob", age: "25" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { name: "Charlie", age: "35" },
+          },
         ],
       },
     ],

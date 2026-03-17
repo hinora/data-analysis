@@ -103,11 +103,31 @@ describe("tools.getDistinctValues action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "A" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "B" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "A" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "A" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "B" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "A" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "B" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "A" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "A" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "B" },
+          },
         ],
       },
     ],
@@ -168,9 +188,21 @@ describe("tools.getDistinctValues action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "A" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "B" } },
-          { datasetId: DATASET_ID, sessionId: SESSION_ID, data: { category: "C" } },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "A" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "B" },
+          },
+          {
+            datasetId: DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { category: "C" },
+          },
         ],
       },
     ],

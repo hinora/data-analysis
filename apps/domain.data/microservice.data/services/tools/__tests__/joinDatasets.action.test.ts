@@ -130,12 +130,32 @@ describe("tools.joinDatasets action", () => {
         entity: DataRecord,
         data: [
           // Left dataset: Orders
-          { datasetId: LEFT_DATASET_ID, sessionId: SESSION_ID, data: { userId: "1", product: "Laptop" } },
-          { datasetId: LEFT_DATASET_ID, sessionId: SESSION_ID, data: { userId: "2", product: "Phone" } },
-          { datasetId: LEFT_DATASET_ID, sessionId: SESSION_ID, data: { userId: "3", product: "Tablet" } },
+          {
+            datasetId: LEFT_DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { userId: "1", product: "Laptop" },
+          },
+          {
+            datasetId: LEFT_DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { userId: "2", product: "Phone" },
+          },
+          {
+            datasetId: LEFT_DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { userId: "3", product: "Tablet" },
+          },
           // Right dataset: Users
-          { datasetId: RIGHT_DATASET_ID, sessionId: SESSION_ID, data: { id: "1", name: "Alice" } },
-          { datasetId: RIGHT_DATASET_ID, sessionId: SESSION_ID, data: { id: "2", name: "Bob" } },
+          {
+            datasetId: RIGHT_DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { id: "1", name: "Alice" },
+          },
+          {
+            datasetId: RIGHT_DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { id: "2", name: "Bob" },
+          },
         ],
       },
     ],
@@ -200,11 +220,31 @@ describe("tools.joinDatasets action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: LEFT_DATASET_ID, sessionId: SESSION_ID, data: { userId: "1", product: "Laptop" } },
-          { datasetId: LEFT_DATASET_ID, sessionId: SESSION_ID, data: { userId: "2", product: "Phone" } },
-          { datasetId: LEFT_DATASET_ID, sessionId: SESSION_ID, data: { userId: "3", product: "Tablet" } },
-          { datasetId: RIGHT_DATASET_ID, sessionId: SESSION_ID, data: { id: "1", name: "Alice" } },
-          { datasetId: RIGHT_DATASET_ID, sessionId: SESSION_ID, data: { id: "2", name: "Bob" } },
+          {
+            datasetId: LEFT_DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { userId: "1", product: "Laptop" },
+          },
+          {
+            datasetId: LEFT_DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { userId: "2", product: "Phone" },
+          },
+          {
+            datasetId: LEFT_DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { userId: "3", product: "Tablet" },
+          },
+          {
+            datasetId: RIGHT_DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { id: "1", name: "Alice" },
+          },
+          {
+            datasetId: RIGHT_DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { id: "2", name: "Bob" },
+          },
         ],
       },
     ],
@@ -265,8 +305,16 @@ describe("tools.joinDatasets action", () => {
       {
         entity: DataRecord,
         data: [
-          { datasetId: LEFT_DATASET_ID, sessionId: SESSION_ID, data: { userId: "999", product: "Laptop" } },
-          { datasetId: RIGHT_DATASET_ID, sessionId: SESSION_ID, data: { id: "1", name: "Alice" } },
+          {
+            datasetId: LEFT_DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { userId: "999", product: "Laptop" },
+          },
+          {
+            datasetId: RIGHT_DATASET_ID,
+            sessionId: SESSION_ID,
+            data: { id: "1", name: "Alice" },
+          },
         ],
       },
     ],
