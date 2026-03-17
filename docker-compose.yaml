@@ -13,6 +13,19 @@ services:
       - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
     restart: unless-stopped
 
+  postgres-test:
+    image: postgres:16
+    container_name: postgres-test
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   jaeger:
     image: jaegertracing/all-in-one:1.65.0
     container_name: jaeger
@@ -35,3 +48,4 @@ services:
 
 volumes:
   postgres_data:
+  postgres_test_data:

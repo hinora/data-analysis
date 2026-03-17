@@ -35,9 +35,10 @@ export default defineAction<GetConversationParams, unknown>({
       );
     }
 
-    const { systemPrompt } = await ctx.call("chat.buildDynamicSystemPrompt", {
+    const promptResult = (await ctx.call("chat.buildDynamicSystemPrompt", {
       sessionId: conversation.sessionId,
-    });
+    })) as { systemPrompt: string };
+    const { systemPrompt } = promptResult;
 
     await convRepo.update({ id }, { systemPrompt });
 
