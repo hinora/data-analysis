@@ -189,7 +189,6 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
     "When working with unstructured documents:",
     "- After semanticSearch or getChunks, review whether the retrieved content actually answers the question.",
     "- If the retrieved chunks are not relevant enough, try different search queries or browse different sections of the document index.",
-    "- Each chunk has an AI-generated summary — use these summaries to quickly assess relevance before reading full content.",
     "",
   );
 
