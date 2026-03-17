@@ -20,7 +20,7 @@ tags:
   - name: Chat
     description: AI-powered chat messaging
   - name: Upload
-    description: File upload for sessions
+    description: File upload, URL import, and web search import for sessions
 
 paths:
   /health:
@@ -251,6 +251,146 @@ paths:
           description: Invalid file type, file too large, or duplicate file
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /sessions/{sessionId}/import-url:
+    post:
+      tags: [Upload]
+      summary: Import data from a URL
+      description: |
+        Fetches web page content from a URL using headless Chrome (Puppeteer),
+        chunks the text semantically, and imports it as an unstructured-text dataset.
+        1. Validates URL format and protocol (HTTP/HTTPS only)
+        2. Fetches page content via tools.webFetch (Puppeteer)
+        3. Computes SHA-256 hash of URL + content for duplicate detection
+        4. Creates OriginalFile record (storagePath = URL)
+        5. Semantic-chunks the content and stores as TextChunks
+        6. Emits metadata.generateMetadata event
+        7. Updates session datasetCount
+      operationId: importFromUrl
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: "URL of the web page to import"
+      responses:
+        "200":
+          description: URL content imported successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  originalFileId:
+                    type: string
+                    format: uuid
+                  datasets:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+                        datasetType:
+                          type: string
+                          enum: [unstructured-text]
+                        rowCount:
+                          type: integer
+                        columnCount:
+                          type: integer
+                          nullable: true
+        "400":
+          description: Invalid URL, unsupported protocol, or missing sessionId
+        "409":
+          description: URL has already been imported to this session
+        "422":
+          description: Failed to fetch URL content or URL returned empty content
+
+  /sessions/{sessionId}/search-websites:
+    post:
+      tags: [Upload]
+      summary: Search websites by keywords
+      description: |
+        Accepts one or more search keywords, queries the Brave Search API for each,
+        and returns a deduplicated list of website results. The user can then
+        select which websites to import via the import-url endpoint.
+      operationId: searchWebsites
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keywords]
+              properties:
+                keywords:
+                  type: array
+                  items:
+                    type: string
+                    minLength: 1
+                  minItems: 1
+                  maxItems: 10
+                  description: "Search keywords (max 10)"
+                count:
+                  type: integer
+                  minimum: 1
+                  maximum: 20
+                  default: 5
+                  description: "Number of results per keyword (default: 5, max: 20)"
+      responses:
+        "200":
+          description: Search results returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keywords:
+                    type: array
+                    items:
+                      type: string
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        title:
+                          type: string
+                        url:
+                          type: string
+                          format: uri
+                        description:
+                          type: string
+                        keyword:
+                          type: string
+                          description: "The keyword that produced this result"
+                  totalCount:
+                    type: integer
+        "400":
+          description: Invalid sessionId or missing keywords
 
   # ── Conversations ─────────────────────────────────────────
 

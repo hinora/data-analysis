@@ -142,7 +142,7 @@ apps/
 
 | Service | Actions | Description |
 |---------|---------|-------------|
-| upload | uploadFile | File upload with hash dedup, parsing (CSV/PDF/XLSM) |
+| upload | uploadFile, importFromUrl, searchWebsites | File upload with hash dedup, parsing (CSV/PDF/XLSM), URL import, web search |
 | dataset | listDatasets, getDataset, previewDataset, renameDataset, deleteDataset | Dataset CRUD and preview |
 | metadata | retryGeneration | Metadata regeneration trigger |
 | sessionData | *(event-only)* | Handles `sessionData.sessionDeleted` cascade cleanup |
