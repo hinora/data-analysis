@@ -7,6 +7,7 @@ tools: [vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vsco
 
 - Project structure: `docs/project-structure.md`
 - Type generation: `docs/type-generation.md`
+- Testing guide: `docs/testing.md`
 - Validation reference: `lib/broker/validation.ts`
 - API documentation: `docs/api/api.yaml`
 - Domain knowledge: `docs/domain-knowledge/**`
@@ -15,10 +16,12 @@ tools: [vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vsco
 
 After implementing changes you must do these steps:
 
-1. Run `npm run lint:fix` in root (biome). If found issues, fix them and re-run.
-2. **Backend only:** Run type generation script.
-3. **Backend only:** If REST endpoint added → update `docs/api/api.yaml` (OpenAPI).
-4. **Backend only:** Add document for features we implemented in `docs/domain-knowledge/*.md` after implementation. Use mermaid diagrams if helpful. If the docs already exist, update them.
+1. **Backend only:** Add or update tests for every changed action/event — see [`docs/testing.md`](../../docs/testing.md) for how to write tests.
+2. Run tests: `npm test` (or `npx jest path/to/file.test.ts` for a single file).
+3. Run `npm run lint:fix` in root (biome). If found issues, fix them and re-run.
+4. **Backend only:** Run type generation script.
+5. **Backend only:** If REST endpoint added → update `docs/api/api.yaml` (OpenAPI).
+6. **Backend only:** Add document for features we implemented in `docs/domain-knowledge/*.md` after implementation. Use mermaid diagrams if helpful. If the docs already exist, update them.
 
 ---
 
