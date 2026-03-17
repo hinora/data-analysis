@@ -52,7 +52,10 @@ export const UrlImport: React.FC<UrlImportProps> = ({ sessionId }) => {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleImport();
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleImport();
+            }
           }}
           placeholder="https://example.com/data-page"
           disabled={importFromUrl.isPending}
