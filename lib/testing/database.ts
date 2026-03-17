@@ -18,7 +18,7 @@ import { DataSource, type EntitySchema } from "typeorm";
 
 type EntityClass = EntitySchema | (new (...args: unknown[]) => unknown);
 
-const DEFAULT_PG_URI = "postgresql://postgres:postgres@localhost:5432/postgres";
+const DEFAULT_PG_URI = "postgresql://postgres:postgres@localhost:5433/postgres";
 
 function getAdminUri(): string {
   return process.env.TEST_PG_URI || DEFAULT_PG_URI;
