@@ -21,6 +21,8 @@ tags:
     description: AI-powered chat messaging
   - name: Upload
     description: File upload, URL import, and web search import for sessions
+  - name: Auth
+    description: User authentication, registration, and profile management
 
 paths:
   /health:
@@ -622,7 +624,154 @@ paths:
                   and a `data:` line containing a JSON object with a `type`
                   field matching the event name.
 
+  # ── Auth ────────────────────────────────────────────────────
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, nickName]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 6
+                nickName:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+      responses:
+        "200":
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "409":
+          description: Email already exists
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email and password
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid email or password
+        "403":
+          description: Account is deactivated
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: Reset request acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  success:
+                    type: boolean
+
+  /auth/profile:
+    get:
+      tags: [Auth]
+      summary: Get authenticated user profile
+      operationId: getProfile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Authentication required
+    put:
+      tags: [Auth]
+      summary: Update authenticated user profile
+      operationId: updateProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nickName:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                photo:
+                  type: string
+                  maxLength: 500
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdatedUserProfile"
+        "401":
+          description: Authentication required
+        "404":
+          description: User not found
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   parameters:
     SessionId:
       name: id
@@ -781,3 +930,74 @@ components:
           type: object
         resultSummary:
           type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT authentication token
+        user:
+          $ref: "#/components/schemas/AuthUser"
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        nickName:
+          type: string
+        isActive:
+          type: boolean
+        isVerified:
+          type: boolean
+        photo:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        nickName:
+          type: string
+        isActive:
+          type: boolean
+        isVerified:
+          type: boolean
+        photo:
+          type: string
+
+    UpdatedUserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        nickName:
+          type: string
+        isActive:
+          type: boolean
+        isVerified:
+          type: boolean
+        photo:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
