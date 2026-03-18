@@ -54,7 +54,7 @@ const config: Config = {
     "!**/sendMessage.action.ts",
     "!**/buildDynamicSystemPrompt.action.ts",
     // Exclude tool actions (require complex SQL/data setup)
-    "!**/services/tools/**",
+    "!**/services/tools/*.action.ts",
     // Exclude upload/metadata event handlers (require file I/O)
     "!**/services/upload/**",
     "!**/services/metadata/**",
@@ -76,7 +76,6 @@ const config: Config = {
     "!**/lib/fs/**",
     "!**/lib/moleculer/**",
     "!**/lib/types/**",
-    "!**/map-reduce.ts",
     "!**/text-chunker.ts",
     // Exclude Moleculer configuration files
     "!**/moleculer.config.ts",
@@ -87,7 +86,6 @@ const config: Config = {
     // Exclude adapter types (no logic)
     "!**/adapters/ai/types.ts",
     // Exclude lib utilities that need full infrastructure
-    "!**/text-chunk-pagination.ts",
   ],
 };
 
