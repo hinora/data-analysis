@@ -24,6 +24,17 @@ jest.mock("../../../db", () => ({
 
 import semanticSearchAction from "../semanticSearch.action";
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const TEST_META = {
+  user: {
+    id: TEST_USER_ID,
+    email: "test@example.com",
+    isActive: true,
+    isVerified: true,
+    nickName: "Test User",
+  },
+};
+
 beforeEach(() => {
   jest.clearAllMocks();
 });
@@ -32,9 +43,10 @@ describe("tools.semanticSearch action", () => {
   it("should throw error when neither sessionId nor datasetId provided", async () => {
     const ctx = createTestContext({
       params: { query: "test query" },
+      meta: TEST_META,
     });
 
-    await expect(semanticSearchAction.handler(ctx)).rejects.toThrow(
+    await expect(semanticSearchAction.handler(ctx as any)).rejects.toThrow(
       "At least one of sessionId or datasetId must be provided",
     );
   });
@@ -50,12 +62,13 @@ describe("tools.semanticSearch action", () => {
         query: "test query",
         datasetId: "44444444-4444-4444-8444-444444444444",
       },
+      meta: TEST_META,
       callStubs: {
         "dataset.getDataset": { id: "44444444-4444-4444-8444-444444444444" },
       },
     });
 
-    const result: any = await semanticSearchAction.handler(ctx);
+    const result: any = await semanticSearchAction.handler(ctx as any);
 
     expect(result.count).toBe(0);
     expect(result.results).toHaveLength(0);
@@ -102,12 +115,13 @@ describe("tools.semanticSearch action", () => {
         datasetId: "44444444-4444-4444-8444-444444444444",
         topK: 5,
       },
+      meta: TEST_META,
       callStubs: {
         "dataset.getDataset": { id: "44444444-4444-4444-8444-444444444444" },
       },
     });
 
-    const result: any = await semanticSearchAction.handler(ctx);
+    const result: any = await semanticSearchAction.handler(ctx as any);
 
     expect(result.count).toBe(2);
     expect(result.query).toBe("test query");
@@ -154,12 +168,13 @@ describe("tools.semanticSearch action", () => {
         sessionId: "11111111-1111-4111-8111-111111111111",
         topK: 5,
       },
+      meta: TEST_META,
       callStubs: {
         "session.getSession": { id: "11111111-1111-4111-8111-111111111111" },
       },
     });
 
-    const result: any = await semanticSearchAction.handler(ctx);
+    const result: any = await semanticSearchAction.handler(ctx as any);
 
     expect(result.count).toBe(1);
     const item = result.results[0];

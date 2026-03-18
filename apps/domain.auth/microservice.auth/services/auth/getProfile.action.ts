@@ -5,8 +5,8 @@
  * Requires authentication — uses ctx.meta.user.id to look up the user.
  */
 
-import { Errors } from "moleculer";
 import { type AuthenticatedContext, defineAction } from "core.lib/broker";
+import { Errors } from "moleculer";
 import { dataSource, sanitizeUser, User } from "../../db";
 
 export type GetProfileParams = Record<string, never>;

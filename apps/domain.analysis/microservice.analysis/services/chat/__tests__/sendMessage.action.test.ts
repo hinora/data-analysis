@@ -68,6 +68,7 @@ import sendMessageAction from "../sendMessage.action";
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const CONVERSATION_ID = "22222222-2222-4222-8222-222222222222";
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
 const entities = [Session, Conversation, ChatMessage, AILog];
 
@@ -152,6 +153,7 @@ async function seedConversation(opts?: {
       status: SessionStatus.ACTIVE,
       datasetCount: 0,
       conversationCount: 1,
+      userId: TEST_USER_ID,
     }),
   );
 
@@ -194,7 +196,15 @@ function createCtx(params: { content: string; conversationId: string }) {
 
   const ctx = {
     params,
-    meta: {} as Record<string, unknown>,
+    meta: {
+      user: {
+        id: TEST_USER_ID,
+        email: "test@example.com",
+        isActive: true,
+        isVerified: true,
+        nickName: "Test User",
+      },
+    } as Record<string, unknown>,
     call: callMock,
     emit: jest.fn(),
     broadcast: jest.fn(),

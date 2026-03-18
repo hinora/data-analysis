@@ -462,7 +462,7 @@ interface ConversationContext {
 
 /** Verify conversation, build system prompt, save user message, auto-rename, load history. */
 async function prepareConversation(req: {
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   stream: PassThrough;
 }): Promise<ConversationContext | null> {
   const { ctx, stream } = req;
@@ -485,9 +485,9 @@ async function prepareConversation(req: {
   // ── Build system prompt ─────────────────────────────────────────────
   writeSSE(stream, { type: "status", message: "Building context…" });
 
-  const { systemPrompt } = await ctx.call("chat.buildDynamicSystemPrompt", {
+  const { systemPrompt } = (await ctx.call("chat.buildDynamicSystemPrompt", {
     sessionId,
-  });
+  })) as { systemPrompt: string };
   await convRepo.update({ id: conversationId }, { systemPrompt });
 
   // ── Save user message ───────────────────────────────────────────────
@@ -535,7 +535,7 @@ async function autoRenameConversation(req: {
   content: string;
   conversation: Conversation;
   conversationId: string;
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   sessionId: string;
   stream: PassThrough;
 }): Promise<void> {
@@ -556,11 +556,11 @@ async function autoRenameConversation(req: {
 
     const nameContext = `User question: ${content}${datasetSummary}`;
 
-    const { name } = await ctx.call(
+    const { name } = (await ctx.call(
       "chat.generateName",
       { context: nameContext, target: "conversation" as const },
       { timeout: 600000 },
-    );
+    )) as { name: string };
     await ctx.call("conversation.renameConversation", {
       id: conversationId,
       name,
@@ -605,7 +605,7 @@ function extractConfidenceScore(content: string): number | null {
 // ── Sub-agent tool call handler ─────────────────────────────────────────
 
 async function handleSubAgentCall(req: {
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   fnArgs: Record<string, unknown>;
   fnName: string;
   messages: AIMessageWithTools[];
@@ -699,7 +699,7 @@ async function handleSubAgentCall(req: {
 
 async function handleNormalToolInLoop(req: {
   citedSources: CitedSource[];
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   fnArgs: Record<string, unknown>;
   fnName: string;
   messages: AIMessageWithTools[];
@@ -830,7 +830,7 @@ async function handleNormalToolInLoop(req: {
 // ── AI orchestration loop ───────────────────────────────────────────────
 
 async function runOrchestrationLoop(req: {
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   messages: AIMessageWithTools[];
   stream: PassThrough;
 }): Promise<OrchestrationResult> {
@@ -1095,7 +1095,7 @@ async function saveAndFinalize(req: {
 // ── Orchestration entry point (runs asynchronously) ─────────────────────
 
 async function processStream(
-  ctx: TypedContext<SendMessageParams>,
+  ctx: AuthenticatedContext<SendMessageParams>,
   stream: PassThrough,
 ): Promise<void> {
   const prepared = await prepareConversation({ ctx, stream });

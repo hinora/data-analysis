@@ -14,6 +14,17 @@ jest.mock("brave-search", () => ({
 
 import webSearchAction from "../webSearch.action";
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const TEST_META = {
+  user: {
+    id: TEST_USER_ID,
+    email: "test@example.com",
+    isActive: true,
+    isVerified: true,
+    nickName: "Test User",
+  },
+};
+
 beforeEach(() => {
   jest.clearAllMocks();
 });
@@ -42,9 +53,10 @@ describe("tools.webSearch action", () => {
 
     const ctx = createTestContext({
       params: { query: "test query", count: 5 },
+      meta: TEST_META,
     });
 
-    const result = await webSearchAction.handler(ctx);
+    const result = await webSearchAction.handler(ctx as any);
 
     expect(result.query).toBe("test query");
     expect(result.count).toBe(2);
@@ -63,9 +75,10 @@ describe("tools.webSearch action", () => {
 
     const ctx = createTestContext({
       params: { query: "test query" },
+      meta: TEST_META,
     });
 
-    await expect(webSearchAction.handler(ctx)).rejects.toThrow(
+    await expect(webSearchAction.handler(ctx as any)).rejects.toThrow(
       "BRAVE_API_KEY environment variable is not configured",
     );
   });
@@ -85,9 +98,10 @@ describe("tools.webSearch action", () => {
 
     const ctx = createTestContext({
       params: { query: "test", count: 2 },
+      meta: TEST_META,
     });
 
-    const result = await webSearchAction.handler(ctx);
+    const result = await webSearchAction.handler(ctx as any);
     expect(result.count).toBe(2);
     expect(result.results).toHaveLength(2);
   });
@@ -99,9 +113,10 @@ describe("tools.webSearch action", () => {
 
     const ctx = createTestContext({
       params: { query: "obscure query" },
+      meta: TEST_META,
     });
 
-    const result = await webSearchAction.handler(ctx);
+    const result = await webSearchAction.handler(ctx as any);
     expect(result.count).toBe(0);
     expect(result.results).toHaveLength(0);
   });

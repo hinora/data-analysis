@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import type { ReactNode } from "react";
-import { getToken } from "@/utils/auth";
 import { useLogout } from "@/hooks/useAuth";
+import { getToken } from "@/utils/auth";
 
 interface LayoutProps {
   children: ReactNode;

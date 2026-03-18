@@ -23,6 +23,17 @@ jest.mock("../../../db", () => ({
 
 import getHistoryAction from "../getHistory.action";
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const TEST_META = {
+  user: {
+    id: TEST_USER_ID,
+    email: "test@example.com",
+    isActive: true,
+    isVerified: true,
+    nickName: "Test User",
+  },
+};
+
 beforeAll(async () => {
   testDs = await createTestDataSource([Session, Conversation, ChatMessage]);
 });
@@ -43,6 +54,7 @@ describe("chat.getHistory action", () => {
     name: "should return messages for a conversation",
     action: getHistoryAction,
     params: { conversationId: CONVERSATION_ID },
+    meta: TEST_META,
     db: () => testDs,
     before: [
       {
@@ -54,6 +66,7 @@ describe("chat.getHistory action", () => {
             status: SessionStatus.ACTIVE,
             datasetCount: 1,
             conversationCount: 1,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -100,6 +113,7 @@ describe("chat.getHistory action", () => {
     name: "should throw 404 when conversation not found",
     action: getHistoryAction,
     params: { conversationId: "00000000-0000-4000-8000-000000000000" },
+    meta: TEST_META,
     db: () => testDs,
     expectError: "Conversation not found",
   });
@@ -108,6 +122,7 @@ describe("chat.getHistory action", () => {
     name: "should support pagination",
     action: getHistoryAction,
     params: { conversationId: CONVERSATION_ID, page: 1, limit: 1 },
+    meta: TEST_META,
     db: () => testDs,
     before: [
       {
@@ -119,6 +134,7 @@ describe("chat.getHistory action", () => {
             status: SessionStatus.ACTIVE,
             datasetCount: 1,
             conversationCount: 1,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -163,6 +179,7 @@ describe("chat.getHistory action", () => {
     name: "should filter out system messages when excludeSystem is true",
     action: getHistoryAction,
     params: { conversationId: CONVERSATION_ID, excludeSystem: true },
+    meta: TEST_META,
     db: () => testDs,
     before: [
       {
@@ -174,6 +191,7 @@ describe("chat.getHistory action", () => {
             status: SessionStatus.ACTIVE,
             datasetCount: 1,
             conversationCount: 1,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -226,6 +244,7 @@ describe("chat.getHistory action", () => {
     name: "should return messages with all fields",
     action: getHistoryAction,
     params: { conversationId: CONVERSATION_ID },
+    meta: TEST_META,
     db: () => testDs,
     before: [
       {
@@ -237,6 +256,7 @@ describe("chat.getHistory action", () => {
             status: SessionStatus.ACTIVE,
             datasetCount: 1,
             conversationCount: 1,
+            userId: TEST_USER_ID,
           },
         ],
       },

@@ -6,16 +6,16 @@
  */
 
 import * as bcrypt from "bcryptjs";
+import type { Context } from "core.lib/broker";
+import { defineAction } from "core.lib/broker";
 import * as jwt from "jsonwebtoken";
 import { Errors } from "moleculer";
-import { defineAction } from "core.lib/broker";
-import type { Context } from "core.lib/broker";
 import { dataSource, sanitizeUser, User } from "../../db";
 
 const JWT_SECRET =
-  process.env.JWT_SECRET ||
-  "data-analysis-secret-key-change-in-production";
-const JWT_EXPIRY = process.env.JWT_EXPIRY || "7d";
+  process.env.JWT_SECRET || "data-analysis-secret-key-change-in-production";
+const JWT_EXPIRY = (process.env.JWT_EXPIRY ||
+  "7d") as jwt.SignOptions["expiresIn"];
 
 export interface LoginParams {
   email: string;

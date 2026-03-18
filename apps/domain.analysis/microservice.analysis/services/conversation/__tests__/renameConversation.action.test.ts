@@ -23,6 +23,17 @@ jest.mock("../../../db", () => ({
 
 import renameConversationAction from "../renameConversation.action";
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const TEST_META = {
+  user: {
+    id: TEST_USER_ID,
+    email: "test@example.com",
+    isActive: true,
+    isVerified: true,
+    nickName: "Test User",
+  },
+};
+
 beforeAll(async () => {
   testDs = await createTestDataSource([Session, Conversation, ChatMessage]);
 });
@@ -43,6 +54,7 @@ describe("conversation.renameConversation action", () => {
     name: "should rename an existing conversation",
     action: renameConversationAction,
     params: { id: CONVERSATION_ID, name: "New Name" },
+    meta: TEST_META,
     db: () => testDs,
     before: [
       {
@@ -54,6 +66,7 @@ describe("conversation.renameConversation action", () => {
             status: SessionStatus.ACTIVE,
             datasetCount: 1,
             conversationCount: 1,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -87,6 +100,7 @@ describe("conversation.renameConversation action", () => {
     name: "should trim whitespace from name",
     action: renameConversationAction,
     params: { id: CONVERSATION_ID, name: "  Trimmed Name  " },
+    meta: TEST_META,
     db: () => testDs,
     before: [
       {
@@ -98,6 +112,7 @@ describe("conversation.renameConversation action", () => {
             status: SessionStatus.ACTIVE,
             datasetCount: 1,
             conversationCount: 1,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -123,6 +138,7 @@ describe("conversation.renameConversation action", () => {
     name: "should throw 404 when conversation not found",
     action: renameConversationAction,
     params: { id: "00000000-0000-4000-8000-000000000000", name: "New" },
+    meta: TEST_META,
     db: () => testDs,
     expectError: "Conversation not found",
   });

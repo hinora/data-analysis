@@ -21,6 +21,8 @@ jest.mock("../../../db", () => ({
 
 import deleteSessionAction from "../deleteSession.action";
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
 beforeAll(async () => {
   testDs = await createTestDataSource([Session]);
 });
@@ -40,6 +42,15 @@ describe("session.deleteSession action", () => {
     name: "should delete a session and emit event",
     action: deleteSessionAction,
     params: { id: SESSION_ID },
+    meta: {
+      user: {
+        id: TEST_USER_ID,
+        email: "test@example.com",
+        nickName: "Test User",
+        isActive: true,
+        isVerified: true,
+      },
+    },
     db: () => testDs,
     before: [
       {
@@ -48,6 +59,7 @@ describe("session.deleteSession action", () => {
           {
             id: SESSION_ID,
             name: "To Delete",
+            userId: TEST_USER_ID,
             status: SessionStatus.EMPTY,
             datasetCount: 0,
             conversationCount: 0,
@@ -73,6 +85,15 @@ describe("session.deleteSession action", () => {
     name: "should throw 404 when session not found",
     action: deleteSessionAction,
     params: { id: "00000000-0000-4000-8000-000000000000" },
+    meta: {
+      user: {
+        id: TEST_USER_ID,
+        email: "test@example.com",
+        nickName: "Test User",
+        isActive: true,
+        isVerified: true,
+      },
+    },
     db: () => testDs,
     expectError: "Session not found",
   });

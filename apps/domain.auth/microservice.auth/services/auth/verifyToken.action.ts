@@ -6,15 +6,14 @@
  * No REST endpoint — internal use only.
  */
 
+import type { Context } from "core.lib/broker";
+import { defineAction } from "core.lib/broker";
 import * as jwt from "jsonwebtoken";
 import { Errors } from "moleculer";
-import { defineAction } from "core.lib/broker";
-import type { Context } from "core.lib/broker";
 import { dataSource, sanitizeUser, User } from "../../db";
 
 const JWT_SECRET =
-  process.env.JWT_SECRET ||
-  "data-analysis-secret-key-change-in-production";
+  process.env.JWT_SECRET || "data-analysis-secret-key-change-in-production";
 
 export interface VerifyTokenParams {
   token: string;

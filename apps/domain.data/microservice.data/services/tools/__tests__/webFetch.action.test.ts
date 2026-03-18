@@ -30,6 +30,17 @@ jest.mock("puppeteer", () => ({
 
 import webFetchAction from "../webFetch.action";
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const TEST_META = {
+  user: {
+    id: TEST_USER_ID,
+    email: "test@example.com",
+    isActive: true,
+    isVerified: true,
+    nickName: "Test User",
+  },
+};
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockPage.title.mockResolvedValue("Test Page");
@@ -41,9 +52,10 @@ describe("tools.webFetch action", () => {
   it("should fetch a web page and return content", async () => {
     const ctx = createTestContext({
       params: { url: "https://example.com" },
+      meta: TEST_META,
     });
 
-    const result = await webFetchAction.handler(ctx);
+    const result = await webFetchAction.handler(ctx as any);
 
     expect(result.url).toBe("https://example.com");
     expect(result.title).toBe("Test Page");
@@ -55,17 +67,21 @@ describe("tools.webFetch action", () => {
   it("should throw error for invalid URL", async () => {
     const ctx = createTestContext({
       params: { url: "not-a-url" },
+      meta: TEST_META,
     });
 
-    await expect(webFetchAction.handler(ctx)).rejects.toThrow("Invalid URL");
+    await expect(webFetchAction.handler(ctx as any)).rejects.toThrow(
+      "Invalid URL",
+    );
   });
 
   it("should throw error for non-HTTP protocols", async () => {
     const ctx = createTestContext({
       params: { url: "ftp://example.com/file" },
+      meta: TEST_META,
     });
 
-    await expect(webFetchAction.handler(ctx)).rejects.toThrow(
+    await expect(webFetchAction.handler(ctx as any)).rejects.toThrow(
       "Only http and https URLs are supported",
     );
   });
@@ -76,9 +92,10 @@ describe("tools.webFetch action", () => {
 
     const ctx = createTestContext({
       params: { url: "https://example.com", maxLength: 100 },
+      meta: TEST_META,
     });
 
-    const result = await webFetchAction.handler(ctx);
+    const result = await webFetchAction.handler(ctx as any);
 
     expect(result.truncated).toBe(true);
     expect(result.content.length).toBe(100);
@@ -88,9 +105,10 @@ describe("tools.webFetch action", () => {
   it("should wait for selector when specified", async () => {
     const ctx = createTestContext({
       params: { url: "https://example.com", waitForSelector: "#content" },
+      meta: TEST_META,
     });
 
-    await webFetchAction.handler(ctx);
+    await webFetchAction.handler(ctx as any);
 
     expect(mockPage.waitForSelector).toHaveBeenCalledWith(
       "#content",
@@ -103,9 +121,10 @@ describe("tools.webFetch action", () => {
 
     const ctx = createTestContext({
       params: { url: "https://example.com" },
+      meta: TEST_META,
     });
 
-    await expect(webFetchAction.handler(ctx)).rejects.toThrow(
+    await expect(webFetchAction.handler(ctx as any)).rejects.toThrow(
       "Failed to fetch page",
     );
     expect(mockBrowser.close).toHaveBeenCalled();

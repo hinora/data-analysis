@@ -19,9 +19,7 @@ export default function App({ Component, pageProps }: AppProps) {
 
   useEffect(() => {
     const token = getToken();
-    const isPublicPath = PUBLIC_PATHS.some(
-      (path) => router.pathname === path,
-    );
+    const isPublicPath = PUBLIC_PATHS.some((path) => router.pathname === path);
 
     if (!token && !isPublicPath) {
       router.replace("/login");

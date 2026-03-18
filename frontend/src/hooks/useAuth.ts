@@ -5,9 +5,9 @@
  */
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { getToken, removeToken, setToken } from "@/utils/auth";
 import { queryClient } from "@/utils/query";
 import { service } from "@/utils/request";
-import { getToken, removeToken, setToken } from "@/utils/auth";
 
 // --- Types ---
 

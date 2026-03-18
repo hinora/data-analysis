@@ -21,6 +21,8 @@ jest.mock("../../../db", () => ({
 
 import renameSessionAction from "../renameSession.action";
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
 beforeAll(async () => {
   testDs = await createTestDataSource([Session]);
 });
@@ -40,6 +42,15 @@ describe("session.renameSession action", () => {
     name: "should rename an existing session",
     action: renameSessionAction,
     params: { id: SESSION_ID, name: "New Name" },
+    meta: {
+      user: {
+        id: TEST_USER_ID,
+        email: "test@example.com",
+        nickName: "Test User",
+        isActive: true,
+        isVerified: true,
+      },
+    },
     db: () => testDs,
     before: [
       {
@@ -48,6 +59,7 @@ describe("session.renameSession action", () => {
           {
             id: SESSION_ID,
             name: "Old Name",
+            userId: TEST_USER_ID,
             status: SessionStatus.EMPTY,
             datasetCount: 0,
             conversationCount: 0,
@@ -74,6 +86,15 @@ describe("session.renameSession action", () => {
     name: "should throw 404 when session not found",
     action: renameSessionAction,
     params: { id: "00000000-0000-4000-8000-000000000000", name: "New" },
+    meta: {
+      user: {
+        id: TEST_USER_ID,
+        email: "test@example.com",
+        nickName: "Test User",
+        isActive: true,
+        isVerified: true,
+      },
+    },
     db: () => testDs,
     expectError: "Session not found",
   });

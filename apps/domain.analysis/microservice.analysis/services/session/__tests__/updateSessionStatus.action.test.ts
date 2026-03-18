@@ -21,6 +21,8 @@ jest.mock("../../../db", () => ({
 
 import updateSessionStatusAction from "../updateSessionStatus.action";
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
 beforeAll(async () => {
   testDs = await createTestDataSource([Session]);
 });
@@ -48,6 +50,7 @@ describe("session.updateSessionStatus action", () => {
           {
             id: SESSION_ID,
             name: "Test",
+            userId: TEST_USER_ID,
             status: SessionStatus.EMPTY,
             datasetCount: 0,
             conversationCount: 0,
@@ -83,6 +86,7 @@ describe("session.updateSessionStatus action", () => {
           {
             id: SESSION_ID,
             name: "Test",
+            userId: TEST_USER_ID,
             status: SessionStatus.HAS_DATA,
             datasetCount: 2,
             conversationCount: 0,
@@ -115,6 +119,7 @@ describe("session.updateSessionStatus action", () => {
           {
             id: SESSION_ID,
             name: "Test",
+            userId: TEST_USER_ID,
             status: SessionStatus.HAS_DATA,
             datasetCount: 1,
             conversationCount: 0,
@@ -144,6 +149,7 @@ describe("session.updateSessionStatus action", () => {
           {
             id: SESSION_ID,
             name: "Test",
+            userId: TEST_USER_ID,
             status: SessionStatus.HAS_DATA,
             datasetCount: 1,
             conversationCount: 0,
@@ -179,6 +185,7 @@ describe("session.updateSessionStatus action", () => {
           {
             id: SESSION_ID,
             name: "Test",
+            userId: TEST_USER_ID,
             status: SessionStatus.ACTIVE,
             datasetCount: 1,
             conversationCount: 2,
@@ -208,6 +215,7 @@ describe("session.updateSessionStatus action", () => {
           {
             id: SESSION_ID,
             name: "Test",
+            userId: TEST_USER_ID,
             status: SessionStatus.EMPTY,
             datasetCount: 0,
             conversationCount: 0,
@@ -232,6 +240,7 @@ describe("session.updateSessionStatus action", () => {
           {
             id: SESSION_ID,
             name: "Test",
+            userId: TEST_USER_ID,
             status: SessionStatus.HAS_DATA,
             datasetCount: 1,
             conversationCount: 0,
@@ -266,6 +275,7 @@ describe("session.updateSessionStatus action", () => {
           {
             id: SESSION_ID,
             name: "Test",
+            userId: TEST_USER_ID,
             status: SessionStatus.ACTIVE,
             datasetCount: 3,
             conversationCount: 1,

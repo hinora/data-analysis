@@ -21,6 +21,8 @@ jest.mock("../../../db", () => ({
 
 import listAction from "../list.action";
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
 beforeAll(async () => {
   testDs = await createTestDataSource([Session]);
 });
@@ -38,6 +40,15 @@ describe("session.list action", () => {
     name: "should return empty list when no sessions exist",
     action: listAction,
     params: {},
+    meta: {
+      user: {
+        id: TEST_USER_ID,
+        email: "test@example.com",
+        nickName: "Test User",
+        isActive: true,
+        isVerified: true,
+      },
+    },
     db: () => testDs,
     assertResult: (result) => {
       expect(result.data).toHaveLength(0);
@@ -51,6 +62,15 @@ describe("session.list action", () => {
     name: "should return paginated sessions sorted by createdAt DESC",
     action: listAction,
     params: { page: 1, limit: 10 },
+    meta: {
+      user: {
+        id: TEST_USER_ID,
+        email: "test@example.com",
+        nickName: "Test User",
+        isActive: true,
+        isVerified: true,
+      },
+    },
     db: () => testDs,
     before: [
       {
@@ -58,12 +78,14 @@ describe("session.list action", () => {
         data: [
           {
             name: "First Session",
+            userId: TEST_USER_ID,
             status: SessionStatus.EMPTY,
             datasetCount: 0,
             conversationCount: 0,
           },
           {
             name: "Second Session",
+            userId: TEST_USER_ID,
             status: SessionStatus.HAS_DATA,
             datasetCount: 1,
             conversationCount: 0,
@@ -84,6 +106,15 @@ describe("session.list action", () => {
     name: "should respect pagination parameters",
     action: listAction,
     params: { page: 2, limit: 1 },
+    meta: {
+      user: {
+        id: TEST_USER_ID,
+        email: "test@example.com",
+        nickName: "Test User",
+        isActive: true,
+        isVerified: true,
+      },
+    },
     db: () => testDs,
     before: [
       {
@@ -91,12 +122,14 @@ describe("session.list action", () => {
         data: [
           {
             name: "Session A",
+            userId: TEST_USER_ID,
             status: SessionStatus.EMPTY,
             datasetCount: 0,
             conversationCount: 0,
           },
           {
             name: "Session B",
+            userId: TEST_USER_ID,
             status: SessionStatus.EMPTY,
             datasetCount: 0,
             conversationCount: 0,
@@ -117,6 +150,15 @@ describe("session.list action", () => {
     name: "should use default pagination when not specified",
     action: listAction,
     params: {},
+    meta: {
+      user: {
+        id: TEST_USER_ID,
+        email: "test@example.com",
+        nickName: "Test User",
+        isActive: true,
+        isVerified: true,
+      },
+    },
     db: () => testDs,
     assertResult: (result) => {
       expect(result.page).toBe(1);

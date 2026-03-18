@@ -50,14 +50,11 @@ const ResetPasswordPage: React.FC = () => {
         onError: (err: unknown) => {
           const message =
             (err as { response?: { data?: { message?: string } } })?.response
-              ?.data?.message ??
-            "Failed to reset password. Please try again.";
+              ?.data?.message ?? "Failed to reset password. Please try again.";
           setError(message);
         },
         onSuccess: (data) => {
-          setSuccess(
-            data.message ?? "Password has been reset successfully.",
-          );
+          setSuccess(data.message ?? "Password has been reset successfully.");
           setPassword("");
           setConfirmPassword("");
         },

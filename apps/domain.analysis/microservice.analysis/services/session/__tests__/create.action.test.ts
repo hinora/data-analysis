@@ -21,6 +21,8 @@ jest.mock("../../../db", () => ({
 
 import createAction from "../create.action";
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
 beforeAll(async () => {
   testDs = await createTestDataSource([Session]);
 });
@@ -38,6 +40,15 @@ describe("session.create action", () => {
     name: "should create a session with a custom name",
     action: createAction,
     params: { name: "My Test Session" },
+    meta: {
+      user: {
+        id: TEST_USER_ID,
+        email: "test@example.com",
+        nickName: "Test User",
+        isActive: true,
+        isVerified: true,
+      },
+    },
     db: () => testDs,
     assertResult: (result) => {
       expect(result.name).toBe("My Test Session");
@@ -46,6 +57,7 @@ describe("session.create action", () => {
       expect(result.conversationCount).toBe(0);
       expect(result.id).toBeDefined();
       expect(result.createdAt).toBeDefined();
+      expect(result.userId).toBe(TEST_USER_ID);
     },
     after: [
       {
@@ -54,6 +66,7 @@ describe("session.create action", () => {
           expect(sessions).toHaveLength(1);
           expect(sessions[0].name).toBe("My Test Session");
           expect(sessions[0].status).toBe(SessionStatus.EMPTY);
+          expect(sessions[0].userId).toBe(TEST_USER_ID);
         },
       },
     ],
@@ -63,6 +76,15 @@ describe("session.create action", () => {
     name: "should auto-generate a name when none is provided",
     action: createAction,
     params: {},
+    meta: {
+      user: {
+        id: TEST_USER_ID,
+        email: "test@example.com",
+        nickName: "Test User",
+        isActive: true,
+        isVerified: true,
+      },
+    },
     db: () => testDs,
     assertResult: (result) => {
       expect(result.name).toMatch(/^Session — /);
@@ -74,6 +96,15 @@ describe("session.create action", () => {
     name: "should have proper action schema",
     action: createAction,
     params: {},
+    meta: {
+      user: {
+        id: TEST_USER_ID,
+        email: "test@example.com",
+        nickName: "Test User",
+        isActive: true,
+        isVerified: true,
+      },
+    },
     assertResult: () => {
       expect(createAction.params).toEqual({
         name: { type: "string", optional: true, min: 1, max: 200 },

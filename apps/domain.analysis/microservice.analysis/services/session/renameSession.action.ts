@@ -26,7 +26,10 @@ export default defineAction<RenameSessionParams, Session>({
   async handler(ctx: AuthenticatedContext<RenameSessionParams>) {
     const repo = dataSource.getRepository(Session);
 
-    const session = await repo.findOneBy({ id: ctx.params.id, userId: ctx.meta.user.id });
+    const session = await repo.findOneBy({
+      id: ctx.params.id,
+      userId: ctx.meta.user.id,
+    });
 
     if (!session) {
       throw new Errors.MoleculerClientError(

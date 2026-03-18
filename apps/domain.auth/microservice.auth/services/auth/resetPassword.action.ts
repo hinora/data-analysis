@@ -6,9 +6,9 @@
  */
 
 import * as bcrypt from "bcryptjs";
-import { Errors } from "moleculer";
-import { defineAction } from "core.lib/broker";
 import type { Context } from "core.lib/broker";
+import { defineAction } from "core.lib/broker";
+import { Errors } from "moleculer";
 import { MoreThan } from "typeorm";
 import { dataSource, User } from "../../db";
 

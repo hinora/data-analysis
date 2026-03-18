@@ -7,8 +7,8 @@
  */
 
 import * as crypto from "node:crypto";
-import { defineAction } from "core.lib/broker";
 import type { Context } from "core.lib/broker";
+import { defineAction } from "core.lib/broker";
 import { dataSource, User } from "../../db";
 
 const RESET_TOKEN_EXPIRY_HOURS = 1;

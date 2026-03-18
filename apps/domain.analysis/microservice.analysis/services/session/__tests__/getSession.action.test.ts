@@ -21,6 +21,8 @@ jest.mock("../../../db", () => ({
 
 import getSessionAction from "../getSession.action";
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
 beforeAll(async () => {
   testDs = await createTestDataSource([Session]);
 });
@@ -40,6 +42,15 @@ describe("session.getSession action", () => {
     name: "should return a session when found",
     action: getSessionAction,
     params: { id: SESSION_ID },
+    meta: {
+      user: {
+        id: TEST_USER_ID,
+        email: "test@example.com",
+        nickName: "Test User",
+        isActive: true,
+        isVerified: true,
+      },
+    },
     db: () => testDs,
     before: [
       {
@@ -48,6 +59,7 @@ describe("session.getSession action", () => {
           {
             id: SESSION_ID,
             name: "Test Session",
+            userId: TEST_USER_ID,
             status: SessionStatus.HAS_DATA,
             datasetCount: 2,
             conversationCount: 1,
@@ -68,6 +80,15 @@ describe("session.getSession action", () => {
     name: "should throw 404 when session not found",
     action: getSessionAction,
     params: { id: "00000000-0000-4000-8000-000000000000" },
+    meta: {
+      user: {
+        id: TEST_USER_ID,
+        email: "test@example.com",
+        nickName: "Test User",
+        isActive: true,
+        isVerified: true,
+      },
+    },
     db: () => testDs,
     expectError: "Session not found",
   });

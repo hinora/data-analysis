@@ -23,6 +23,17 @@ jest.mock("../../../db", () => ({
 
 import getConversationAction from "../getConversation.action";
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const TEST_META = {
+  user: {
+    id: TEST_USER_ID,
+    email: "test@example.com",
+    isActive: true,
+    isVerified: true,
+    nickName: "Test User",
+  },
+};
+
 beforeAll(async () => {
   testDs = await createTestDataSource([Session, Conversation, ChatMessage]);
 });
@@ -43,6 +54,7 @@ describe("conversation.getConversation action", () => {
     name: "should return conversation with updated system prompt",
     action: getConversationAction,
     params: { id: CONVERSATION_ID },
+    meta: TEST_META,
     db: () => testDs,
     callStubs: {
       "chat.buildDynamicSystemPrompt": {
@@ -59,6 +71,7 @@ describe("conversation.getConversation action", () => {
             status: SessionStatus.ACTIVE,
             datasetCount: 1,
             conversationCount: 1,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -94,6 +107,7 @@ describe("conversation.getConversation action", () => {
     name: "should throw 404 when conversation not found",
     action: getConversationAction,
     params: { id: "00000000-0000-4000-8000-000000000000" },
+    meta: TEST_META,
     db: () => testDs,
     callStubs: {
       "chat.buildDynamicSystemPrompt": { systemPrompt: "" },
