@@ -113,7 +113,7 @@ export const WebSearchImport: React.FC<WebSearchImportProps> = ({
   const results: SearchWebsiteItem[] = searchWebsites.data?.results ?? [];
 
   return (
-    <div>
+    <div style={{ overflow: "hidden" }}>
       {/* Keyword Input */}
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <input

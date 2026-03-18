@@ -250,7 +250,12 @@ const SessionWorkspacePage: React.FC = () => {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
         {/* Datasets Panel */}
         <div
-          style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 16 }}
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 8,
+            padding: 16,
+            minWidth: 0,
+          }}
         >
           <h2 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 600 }}>
             Datasets
@@ -274,7 +279,12 @@ const SessionWorkspacePage: React.FC = () => {
 
         {/* Conversations Panel */}
         <div
-          style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 16 }}
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 8,
+            padding: 16,
+            minWidth: 0,
+          }}
         >
           <div
             style={{
