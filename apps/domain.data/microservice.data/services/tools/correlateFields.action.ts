@@ -4,8 +4,7 @@
  * Calculate Pearson correlation coefficient between two numeric fields.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { dataSource, getTableName } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
 import {
@@ -21,13 +20,14 @@ export interface CorrelateFieldsParams {
 }
 
 export default defineAction<CorrelateFieldsParams, unknown>({
+  authentication: true,
   params: {
     datasetId: { type: "uuid" },
     field1: { type: "string" },
     field2: { type: "string" },
   },
 
-  async handler(ctx: TypedContext<CorrelateFieldsParams>) {
+  async handler(ctx: AuthenticatedContext<CorrelateFieldsParams>) {
     const { datasetId, field1, field2 } = ctx.params;
     await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);

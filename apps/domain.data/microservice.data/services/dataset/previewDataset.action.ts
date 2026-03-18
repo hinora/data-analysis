@@ -4,8 +4,7 @@
  * Return first N rows with original and camelCase column headers and detected types.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
@@ -17,6 +16,7 @@ export interface PreviewDatasetParams {
 }
 
 export default defineAction<PreviewDatasetParams, unknown>({
+  authentication: true,
   rest: "GET /:id/preview",
 
   params: {
@@ -32,7 +32,7 @@ export default defineAction<PreviewDatasetParams, unknown>({
     },
   },
 
-  async handler(ctx: TypedContext<PreviewDatasetParams>) {
+  async handler(ctx: AuthenticatedContext<PreviewDatasetParams>) {
     const { id, limit = 50 } = ctx.params;
     const datasetRepo = dataSource.getRepository(Dataset);
     const recordRepo = dataSource.getRepository(DataRecord);

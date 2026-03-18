@@ -1,0 +1,13 @@
+{
+  "name": "microservice.auth",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "nodemon --watch . --watch ../../../lib --ext ts,json --exec ts-node app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js",
+    "generate:types": "npm run generate:types --prefix ../../../ -- --microservice microservice.auth"
+  },
+  "dependencies": {
+    "core.lib": "file:../../../lib"
+  }
+}

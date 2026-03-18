@@ -5,8 +5,7 @@
  * The data microservice listens for this event to delete datasets, records, chunks, etc.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import { Session } from "../../db/session.entity";
@@ -21,16 +20,17 @@ export interface DeleteSessionResult {
 }
 
 export default defineAction<DeleteSessionParams, DeleteSessionResult>({
+  authentication: true,
   rest: "DELETE /:id",
 
   params: {
     id: { type: "uuid" },
   },
 
-  async handler(ctx: TypedContext<DeleteSessionParams>) {
+  async handler(ctx: AuthenticatedContext<DeleteSessionParams>) {
     const repo = dataSource.getRepository(Session);
 
-    const session = await repo.findOneBy({ id: ctx.params.id });
+    const session = await repo.findOneBy({ id: ctx.params.id, userId: ctx.meta.user.id });
 
     if (!session) {
       throw new Errors.MoleculerClientError(

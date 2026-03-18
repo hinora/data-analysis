@@ -4,8 +4,7 @@
  * Returns datasets for a given session with summary fields.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { Dataset } from "../../db/dataset.entity";
 
@@ -14,13 +13,14 @@ export interface ListDatasetsParams {
 }
 
 export default defineAction<ListDatasetsParams, Dataset[]>({
+  authentication: true,
   rest: "GET /",
 
   params: {
     sessionId: { type: "uuid" },
   },
 
-  async handler(ctx: TypedContext<ListDatasetsParams>) {
+  async handler(ctx: AuthenticatedContext<ListDatasetsParams>) {
     const repo = dataSource.getRepository(Dataset);
 
     const datasets = await repo.find({

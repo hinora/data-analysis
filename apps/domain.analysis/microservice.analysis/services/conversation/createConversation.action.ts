@@ -7,8 +7,7 @@
  * The system prompt is stored as the first ChatMessage and on the Conversation.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import { Conversation } from "../../db/conversation.entity";
@@ -42,6 +41,7 @@ function generateConversationName(): string {
 
 export default defineAction<CreateConversationParams, CreateConversationResult>(
   {
+    authentication: true,
     rest: "POST /",
 
     params: {
@@ -49,7 +49,7 @@ export default defineAction<CreateConversationParams, CreateConversationResult>(
       name: { type: "string", optional: true, min: 1, max: 500 },
     },
 
-    async handler(ctx: TypedContext<CreateConversationParams>) {
+    async handler(ctx: AuthenticatedContext<CreateConversationParams>) {
       const { sessionId } = ctx.params;
       const sessionRepo = dataSource.getRepository(Session);
       const convRepo = dataSource.getRepository(Conversation);

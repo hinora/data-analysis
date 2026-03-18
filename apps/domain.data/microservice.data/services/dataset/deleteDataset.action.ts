@@ -5,8 +5,7 @@
  * Updates session datasetCount.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { AILog } from "core.lib/database";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
@@ -20,13 +19,14 @@ export interface DeleteDatasetParams {
 }
 
 export default defineAction<DeleteDatasetParams, unknown>({
+  authentication: true,
   rest: "DELETE /:id",
 
   params: {
     id: { type: "uuid" },
   },
 
-  async handler(ctx: TypedContext<DeleteDatasetParams>) {
+  async handler(ctx: AuthenticatedContext<DeleteDatasetParams>) {
     const { id } = ctx.params;
     const repo = dataSource.getRepository(Dataset);
 

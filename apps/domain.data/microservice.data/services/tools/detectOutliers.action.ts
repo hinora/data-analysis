@@ -4,8 +4,7 @@
  * Detect outliers using IQR method for a numeric field.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { dataSource, getTableName } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
 import {
@@ -22,6 +21,7 @@ export interface DetectOutliersParams {
 }
 
 export default defineAction<DetectOutliersParams, unknown>({
+  authentication: true,
   params: {
     datasetId: { type: "uuid" },
     field: { type: "string" },
@@ -34,7 +34,7 @@ export default defineAction<DetectOutliersParams, unknown>({
     threshold: { type: "number", optional: true, default: 1.5 },
   },
 
-  async handler(ctx: TypedContext<DetectOutliersParams>) {
+  async handler(ctx: AuthenticatedContext<DetectOutliersParams>) {
     const { datasetId, field, method = "iqr", threshold = 1.5 } = ctx.params;
     await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);

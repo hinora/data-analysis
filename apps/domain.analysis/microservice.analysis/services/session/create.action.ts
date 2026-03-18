@@ -5,8 +5,7 @@
  * one in the format "Session — MMM DD, YYYY HH:mm".
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { Session, SessionStatus } from "../../db/session.entity";
 
@@ -18,6 +17,7 @@ export interface CreateSessionResult {
   id: string;
   name: string;
   status: SessionStatus;
+  userId: string;
   datasetCount: number;
   conversationCount: number;
   createdAt: Date;
@@ -38,18 +38,20 @@ function generateSessionName(): string {
 }
 
 export default defineAction<CreateSessionParams, CreateSessionResult>({
+  authentication: true,
   rest: "POST /",
 
   params: {
     name: { type: "string", optional: true, min: 1, max: 200 },
   },
 
-  async handler(ctx: TypedContext<CreateSessionParams>) {
+  async handler(ctx: AuthenticatedContext<CreateSessionParams>) {
     const repo = dataSource.getRepository(Session);
 
     const session = repo.create({
       name: ctx.params.name || generateSessionName(),
       status: SessionStatus.EMPTY,
+      userId: ctx.meta.user.id,
       datasetCount: 0,
       conversationCount: 0,
     });

@@ -4,8 +4,7 @@
  * Rename a conversation with validation.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import { Conversation } from "../../db/conversation.entity";
@@ -16,6 +15,7 @@ export interface RenameConversationParams {
 }
 
 export default defineAction<RenameConversationParams, unknown>({
+  authentication: true,
   rest: "PATCH /:id/rename",
 
   params: {
@@ -23,7 +23,7 @@ export default defineAction<RenameConversationParams, unknown>({
     name: { type: "string", min: 1, max: 500 },
   },
 
-  async handler(ctx: TypedContext<RenameConversationParams>) {
+  async handler(ctx: AuthenticatedContext<RenameConversationParams>) {
     const { id, name } = ctx.params;
     const repo = dataSource.getRepository(Conversation);
 

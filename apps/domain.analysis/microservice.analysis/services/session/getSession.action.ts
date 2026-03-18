@@ -4,8 +4,7 @@
  * Returns full session details by ID.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import { Session } from "../../db/session.entity";
@@ -15,16 +14,17 @@ export interface GetSessionParams {
 }
 
 export default defineAction<GetSessionParams, Session>({
+  authentication: true,
   rest: "GET /:id",
 
   params: {
     id: { type: "uuid" },
   },
 
-  async handler(ctx: TypedContext<GetSessionParams>) {
+  async handler(ctx: AuthenticatedContext<GetSessionParams>) {
     const repo = dataSource.getRepository(Session);
 
-    const session = await repo.findOneBy({ id: ctx.params.id });
+    const session = await repo.findOneBy({ id: ctx.params.id, userId: ctx.meta.user.id });
 
     if (!session) {
       throw new Errors.MoleculerClientError(

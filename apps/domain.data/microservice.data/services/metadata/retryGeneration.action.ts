@@ -4,8 +4,7 @@
  * Re-triggers metadata generation for datasets with status "failed".
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import { Dataset, MetadataStatus } from "../../db/dataset.entity";
@@ -20,13 +19,14 @@ export interface RetryGenerationResult {
 }
 
 export default defineAction<RetryGenerationParams, RetryGenerationResult>({
+  authentication: true,
   rest: "POST /:datasetId/retry",
 
   params: {
     datasetId: { type: "uuid" },
   },
 
-  async handler(ctx: TypedContext<RetryGenerationParams>) {
+  async handler(ctx: AuthenticatedContext<RetryGenerationParams>) {
     const repo = dataSource.getRepository(Dataset);
 
     const dataset = await repo.findOneBy({ id: ctx.params.datasetId });

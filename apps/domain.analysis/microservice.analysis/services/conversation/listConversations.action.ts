@@ -4,8 +4,7 @@
  * Returns conversations for a session with summary metadata.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { Conversation } from "../../db/conversation.entity";
 
@@ -14,13 +13,14 @@ export interface ListConversationsParams {
 }
 
 export default defineAction<ListConversationsParams, Conversation[]>({
+  authentication: true,
   rest: "GET /",
 
   params: {
     sessionId: { type: "uuid" },
   },
 
-  async handler(ctx: TypedContext<ListConversationsParams>) {
+  async handler(ctx: AuthenticatedContext<ListConversationsParams>) {
     const repo = dataSource.getRepository(Conversation);
 
     const conversations = await repo.find({

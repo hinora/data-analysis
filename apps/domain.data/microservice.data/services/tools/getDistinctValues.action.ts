@@ -4,8 +4,7 @@
  * Get distinct values with counts for a field.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
 
@@ -19,6 +18,7 @@ const DEFAULT_LIMIT = 2000;
 const MAX_LIMIT = 2000;
 
 export default defineAction<GetDistinctValuesParams, unknown>({
+  authentication: true,
   params: {
     datasetId: { type: "uuid" },
     field: { type: "string" },
@@ -31,7 +31,7 @@ export default defineAction<GetDistinctValuesParams, unknown>({
     },
   },
 
-  async handler(ctx: TypedContext<GetDistinctValuesParams>) {
+  async handler(ctx: AuthenticatedContext<GetDistinctValuesParams>) {
     const { datasetId, field } = ctx.params;
     const limit = Math.min(ctx.params.limit || DEFAULT_LIMIT, MAX_LIMIT);
     await ctx.call("dataset.getDataset", { id: datasetId });

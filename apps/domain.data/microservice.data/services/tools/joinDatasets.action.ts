@@ -4,8 +4,7 @@
  * Join two datasets on matching fields.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { dataSource, getTableName } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
 
@@ -19,6 +18,7 @@ export interface JoinDatasetsParams {
 }
 
 export default defineAction<JoinDatasetsParams, unknown>({
+  authentication: true,
   params: {
     leftDatasetId: { type: "uuid" },
     rightDatasetId: { type: "uuid" },
@@ -40,7 +40,7 @@ export default defineAction<JoinDatasetsParams, unknown>({
     },
   },
 
-  async handler(ctx: TypedContext<JoinDatasetsParams>) {
+  async handler(ctx: AuthenticatedContext<JoinDatasetsParams>) {
     const {
       leftDatasetId,
       rightDatasetId,

@@ -12,10 +12,9 @@
 
 import { PassThrough } from "node:stream";
 import { encode as toonEncode } from "@toon-format/toon";
-import type { TypedContext } from "core.lib/__generated__";
 import type { AIMessageWithTools } from "core.lib/adapters/ai";
 import { createAIAdapter } from "core.lib/adapters/ai";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { AILog, AILogStatus, AILogType } from "core.lib/database";
 import { dataSource } from "../../db";
 import type {
@@ -421,6 +420,7 @@ async function runSubAgent(req: {
 // ── Action ──────────────────────────────────────────────────────────────
 
 export default defineAction<SendMessageParams, SendMessageResult>({
+  authentication: true,
   rest: "POST /messages",
 
   params: {
@@ -428,7 +428,7 @@ export default defineAction<SendMessageParams, SendMessageResult>({
     conversationId: { type: "uuid" },
   },
 
-  async handler(ctx: TypedContext<SendMessageParams>) {
+  async handler(ctx: AuthenticatedContext<SendMessageParams>) {
     // Tell moleculer-web to treat the response as an SSE stream.
     (ctx.meta as Record<string, unknown>).$responseType = "text/event-stream";
     (ctx.meta as Record<string, unknown>).$responseHeaders = {

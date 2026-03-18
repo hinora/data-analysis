@@ -4,8 +4,7 @@
  * Return full conversation details including system prompt.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import { Conversation } from "../../db/conversation.entity";
@@ -15,13 +14,14 @@ export interface GetConversationParams {
 }
 
 export default defineAction<GetConversationParams, unknown>({
+  authentication: true,
   rest: "GET /:id",
 
   params: {
     id: { type: "uuid" },
   },
 
-  async handler(ctx: TypedContext<GetConversationParams>) {
+  async handler(ctx: AuthenticatedContext<GetConversationParams>) {
     const { id } = ctx.params;
     const convRepo = dataSource.getRepository(Conversation);
 

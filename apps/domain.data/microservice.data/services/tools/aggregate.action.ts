@@ -7,8 +7,7 @@
  * countAndGroup, getMinMax, count) have been consolidated here.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
 import {
@@ -42,6 +41,7 @@ export interface AggregateParams {
 }
 
 export default defineAction<AggregateParams, unknown>({
+  authentication: true,
   params: {
     aggregations: {
       type: "array",
@@ -91,7 +91,7 @@ export default defineAction<AggregateParams, unknown>({
     },
   },
 
-  async handler(ctx: TypedContext<AggregateParams>) {
+  async handler(ctx: AuthenticatedContext<AggregateParams>) {
     const {
       aggregations,
       conditions,

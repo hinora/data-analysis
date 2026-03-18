@@ -4,8 +4,7 @@
  * Rename a dataset with validation.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import { Dataset } from "../../db/dataset.entity";
@@ -16,6 +15,7 @@ export interface RenameDatasetParams {
 }
 
 export default defineAction<RenameDatasetParams, unknown>({
+  authentication: true,
   rest: "PATCH /:id/rename",
 
   params: {
@@ -23,7 +23,7 @@ export default defineAction<RenameDatasetParams, unknown>({
     name: { type: "string", min: 1, max: 200 },
   },
 
-  async handler(ctx: TypedContext<RenameDatasetParams>) {
+  async handler(ctx: AuthenticatedContext<RenameDatasetParams>) {
     const { id, name } = ctx.params;
     const repo = dataSource.getRepository(Dataset);
 

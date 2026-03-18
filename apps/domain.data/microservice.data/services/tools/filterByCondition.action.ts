@@ -4,8 +4,7 @@
  * Filter records by conditions (equals, range, contains, in).
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
 import { getNumericCastExpr, isFieldNumeric } from "./numericFieldUtils";
@@ -23,6 +22,7 @@ export interface FilterByConditionParams {
 }
 
 export default defineAction<FilterByConditionParams, unknown>({
+  authentication: true,
   params: {
     datasetId: { type: "uuid" },
     conditions: {
@@ -49,7 +49,7 @@ export default defineAction<FilterByConditionParams, unknown>({
     },
   },
 
-  async handler(ctx: TypedContext<FilterByConditionParams>) {
+  async handler(ctx: AuthenticatedContext<FilterByConditionParams>) {
     const { datasetId, conditions, limit = 100 } = ctx.params;
     await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);

@@ -4,8 +4,7 @@
  * Delete a conversation with cascade deletion of ChatMessages and AILogs.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { AILog } from "core.lib/database";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
@@ -18,13 +17,14 @@ export interface DeleteConversationParams {
 }
 
 export default defineAction<DeleteConversationParams, unknown>({
+  authentication: true,
   rest: "DELETE /:id",
 
   params: {
     id: { type: "uuid" },
   },
 
-  async handler(ctx: TypedContext<DeleteConversationParams>) {
+  async handler(ctx: AuthenticatedContext<DeleteConversationParams>) {
     const { id } = ctx.params;
     const convRepo = dataSource.getRepository(Conversation);
 

@@ -5,8 +5,7 @@
  * Useful for numeric fields or high-cardinality fields where you only need the count.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
 
@@ -16,12 +15,13 @@ export interface CountDistinctValuesParams {
 }
 
 export default defineAction<CountDistinctValuesParams, unknown>({
+  authentication: true,
   params: {
     datasetId: { type: "uuid" },
     field: { type: "string" },
   },
 
-  async handler(ctx: TypedContext<CountDistinctValuesParams>) {
+  async handler(ctx: AuthenticatedContext<CountDistinctValuesParams>) {
     const { datasetId, field } = ctx.params;
     await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);

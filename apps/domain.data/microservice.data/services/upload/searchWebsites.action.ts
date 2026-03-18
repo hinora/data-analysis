@@ -6,8 +6,7 @@
  * select which websites to import via the importFromUrl action.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 
 export interface SearchWebsitesParams {
@@ -36,6 +35,7 @@ const MAX_COUNT = 20;
 const MAX_KEYWORDS = 10;
 
 export default defineAction<SearchWebsitesParams, SearchWebsitesResult>({
+  authentication: true,
   rest: "POST /:sessionId/search-websites",
 
   params: {
@@ -56,7 +56,7 @@ export default defineAction<SearchWebsitesParams, SearchWebsitesResult>({
     sessionId: { type: "string", min: 1 },
   },
 
-  async handler(ctx: TypedContext<SearchWebsitesParams>) {
+  async handler(ctx: AuthenticatedContext<SearchWebsitesParams>) {
     const { keywords, sessionId, count = DEFAULT_COUNT } = ctx.params;
     const logger = ctx.broker.logger;
 

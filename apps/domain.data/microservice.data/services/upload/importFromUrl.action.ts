@@ -8,9 +8,8 @@
  */
 
 import * as crypto from "node:crypto";
-import type { TypedContext } from "core.lib/__generated__";
 import { semanticChunkText } from "core.lib/adapters/file-parser";
-import { defineAction } from "core.lib/broker";
+import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import {
@@ -42,6 +41,7 @@ const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default defineAction<ImportFromUrlParams, ImportFromUrlResult>({
+  authentication: true,
   rest: "POST /:sessionId/import-url",
 
   params: {
@@ -49,7 +49,7 @@ export default defineAction<ImportFromUrlParams, ImportFromUrlResult>({
     url: { type: "string", min: 1 },
   },
 
-  async handler(ctx: TypedContext<ImportFromUrlParams>) {
+  async handler(ctx: AuthenticatedContext<ImportFromUrlParams>) {
     const { sessionId, url } = ctx.params;
     const logger = ctx.broker.logger;
 
