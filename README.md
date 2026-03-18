@@ -1,6 +1,6 @@
 # Data Analysis Platform
 
-A microservice-based **agentic data analysis** platform built with [Moleculer](https://moleculer.services/) and TypeScript. Upload datasets (CSV, PDF, XLSM), manage analysis sessions and conversations, and interact with your data through an AI-powered chat interface that orchestrates 25 analysis tools automatically.
+A microservice-based **agentic data analysis** platform built with [Moleculer](https://moleculer.services/) and TypeScript. Upload datasets (CSV, PDF, XLSM), manage analysis sessions and conversations, and interact with your data through an AI-powered chat interface that orchestrates 16 analysis tools automatically.
 
 ## Architecture
 
@@ -37,7 +37,7 @@ graph TB
 | **Frontend** | Next.js 16 app with React Query and Markdown rendering |
 | **microservice.proxy** | API gateway (moleculer-web) — routes HTTP to internal services, file upload (100 MB), CORS, rate limiting |
 | **microservice.analysis** | Session & conversation management, AI chat orchestration with tool-calling loop (max 10 iterations) |
-| **microservice.data** | File upload & parsing, dataset CRUD, AI metadata generation, 25 data analysis tool actions |
+| **microservice.data** | File upload & parsing, dataset CRUD, AI metadata generation, 16 data analysis tool actions |
 | **core.lib** | Shared library — broker, config, AI adapters, file-parser adapters, codegen, database |
 
 ## Tech Stack
@@ -118,15 +118,15 @@ Manages AI analysis sessions, conversations, and the chat orchestration loop.
 
 ### microservice.data
 
-Handles file upload, parsing, AI metadata generation, and 25 data analysis tools.
+Handles file upload, parsing, AI metadata generation, and 16 data analysis tools.
 
 | Service | Key Actions | Description |
 |---------|-------------|-------------|
-| **upload** | `uploadFile` | File upload with hash dedup, parsing (CSV/PDF/XLSM) |
+| **upload** | `uploadFile`, `importFromUrl`, `searchWebsites` | File upload with hash dedup, parsing (CSV/PDF/XLSM), URL import via web fetch, website discovery via Brave Search |
 | **dataset** | `listDatasets`, `getDataset`, `previewDataset`, `renameDataset`, `deleteDataset` | Dataset CRUD and preview |
 | **metadata** | `retryGeneration` | Triggers AI metadata regeneration; `generateMetadata` event handler produces column descriptions, summaries, embeddings |
 | **sessionData** | *(event listener)* | Receives `sessionData.sessionDeleted` — cascade-deletes datasets, files, chunks |
-| **tools** | 16 structured + 9 unstructured actions | Data analysis tools callable by the AI chat loop |
+| **tools** | 11 structured + 2 unstructured + 2 web + 1 meta | Data analysis tools callable by the AI chat loop |
 
 **Database:** `data_db` (PostgreSQL + pgvector) — entities: OriginalFile, Dataset, DataRecord, TextChunk, AILog
 
@@ -135,34 +135,36 @@ Handles file upload, parsing, AI metadata generation, and 25 data analysis tools
 | Tool | Description |
 |------|-------------|
 | `aggregate` | Multi-field aggregation pipeline (limit/orderBy, max 200 rows) |
-| `avgField` | Average a numeric field with optional groupBy |
 | `correlateFields` | Pearson correlation between two numeric fields |
-| `count` | Count records with equality filters or rich conditions |
-| `countAndGroup` | Count records grouped by field(s) |
 | `countDistinctValues` | Count distinct values for a field |
 | `detectOutliers` | Records beyond 2 standard deviations |
 | `filterByCondition` | Filter by conditions (eq, gt, contains, in, etc.) |
 | `getDistinctValues` | Distinct values with counts |
-| `getMinMax` | Min/max values for a field |
 | `getPercentile` | Percentile values (P25, P50, P75, P99) |
-| `getTopByField` | Top N records sorted by a field |
 | `joinDatasets` | Join two datasets on a shared field |
 | `pivotTable` | Cross-tabulation by two categorical fields |
+| `sampleData` | Random sample of records from a dataset |
 | `sortByField` | Sort records by field(s) with limit |
-| `sumField` | Sum a numeric field with optional groupBy |
 
 #### Unstructured Text Tools (for `unstructured-text` datasets)
 
 | Tool | Description |
 |------|-------------|
-| `compareDocuments` | Compare content/themes across text datasets |
-| `extractEntities` | Extract people, orgs, dates, locations, monetary values |
-| `extractKeyTopics` | Identify main topics and themes |
-| `findSimilarChunks` | Find semantically similar text passages |
+| `getChunks` | Retrieve text chunks from a document |
 | `semanticSearch` | Vector similarity search across text chunks |
-| `sentimentAnalysis` | Determine sentiment of text passages |
-| `summarizeDocument` | Map-reduce summarization for documents of any size |
-| `timelineExtraction` | Extract and order date-referenced events |
+
+#### Web Tools
+
+| Tool | Description |
+|------|-------------|
+| `webFetch` | Fetch and extract content from a web URL |
+| `webSearch` | Search the web using Brave Search API |
+
+#### Meta Tools
+
+| Tool | Description |
+|------|-------------|
+| `createSubAgent` | Spawn a sub-agent for delegated analysis tasks |
 
 ### microservice.example
 
@@ -182,7 +184,7 @@ Demo/scaffold microservice showing patterns (user CRUD, event-driven notificatio
 │   ├── domain.analysis/
 │   │   └── microservice.analysis/   # Sessions, conversations, AI chat
 │   ├── domain.data/
-│   │   └── microservice.data/       # Upload, datasets, metadata, 25 tools
+│   │   └── microservice.data/       # Upload, datasets, metadata, 16 tools
 │   ├── domain.example/
 │   │   └── microservice.example/    # Reference / starter microservice
 │   └── domain.platform/
@@ -335,16 +337,23 @@ See [docs/configuration.md](docs/configuration.md) for the full reference.
 | [Session Management](docs/domain-knowledge/session-management.md) | Session lifecycle and status transitions |
 | [Conversation Management](docs/domain-knowledge/conversation-management.md) | Conversation CRUD and system prompt construction |
 | [Chat System](docs/domain-knowledge/chat-system.md) | AI tool-calling orchestration, message protocol |
+| [Chat Streaming](docs/domain-knowledge/chat-streaming.md) | Real-time chat streaming implementation |
 | [Dataset Events](docs/domain-knowledge/dataset-events.md) | Cross-service event flow for uploads and metadata |
 | [Tool Configuration](docs/domain-knowledge/tool-configuration.md) | Centralized tool registry, enabling/disabling tools |
 | [Document Summarization](docs/domain-knowledge/document-summarization.md) | Map-reduce summarization for large documents |
 | [Text Chunking](docs/domain-knowledge/text-chunking.md) | LangChain text splitting with word-boundary awareness |
+| [Hybrid Semantic Search](docs/domain-knowledge/hybrid-semantic-search.md) | Vector similarity search with pgvector |
 | [Gemini Adapter](docs/domain-knowledge/gemini-adapter.md) | Google Gemini AI integration and tool-calling flow |
 | [AI Logging](docs/domain-knowledge/ai-logging.md) | Audit trail for all AI interactions |
+| [AI Naming](docs/domain-knowledge/ai-naming.md) | AI-generated naming conventions |
+| [Agent Self-Reflection](docs/domain-knowledge/agent-self-reflection.md) | Agent self-reflection patterns |
+| [Sub-Agent Delegation](docs/domain-knowledge/sub-agent-delegation.md) | Sub-agent delegation patterns |
+| [URL & Web Search Import](docs/domain-knowledge/url-and-web-search-import.md) | URL import and web search features |
 | [XLSM Parsing](docs/domain-knowledge/xlsm-parsing.md) | Excel parsing with merged cells and multi-row headers |
 | [Numeric Comma Handling](docs/domain-knowledge/numeric-comma-handling.md) | European/Vietnamese comma-decimal format support |
 | [Timezone Handling](docs/domain-knowledge/timezone-handling.md) | UTC enforcement to prevent double-offset bugs |
 | [Query Param Validation](docs/domain-knowledge/query-param-validation.md) | Type coercion for HTTP query parameters |
+| [Jaeger Tracing](docs/domain-knowledge/jaeger-tracing.md) | Distributed tracing setup and integration |
 
 ## License
 
