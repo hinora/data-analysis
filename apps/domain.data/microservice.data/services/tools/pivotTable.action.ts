@@ -4,7 +4,8 @@
  * Create a pivot table (cross-tabulation) from a dataset.
  */
 
-import { type AuthenticatedContext, defineAction } from "core.lib/broker";
+import type { TypedContext } from "core.lib/__generated__";
+import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
 import {
@@ -22,7 +23,6 @@ export interface PivotTableParams {
 }
 
 export default defineAction<PivotTableParams, unknown>({
-  authentication: true,
   params: {
     datasetId: { type: "uuid" },
     rowField: { type: "string" },
@@ -36,7 +36,7 @@ export default defineAction<PivotTableParams, unknown>({
     },
   },
 
-  async handler(ctx: AuthenticatedContext<PivotTableParams>) {
+  async handler(ctx: TypedContext<PivotTableParams>) {
     const {
       datasetId,
       rowField,

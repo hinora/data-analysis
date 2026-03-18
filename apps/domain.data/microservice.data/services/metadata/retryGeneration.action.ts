@@ -40,6 +40,9 @@ export default defineAction<RetryGenerationParams, RetryGenerationResult>({
       );
     }
 
+    // Verify session belongs to the authenticated user
+    await ctx.call("session.getSession", { id: dataset.sessionId });
+
     if (dataset.metadataStatus !== MetadataStatus.FAILED) {
       throw new Errors.MoleculerClientError(
         "Can only retry metadata generation for datasets with 'failed' status",

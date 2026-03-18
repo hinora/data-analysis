@@ -24,6 +24,7 @@ import type {
 } from "../../db/chat-message.entity";
 import { ChatMessage, MessageRole } from "../../db/chat-message.entity";
 import { Conversation } from "../../db/conversation.entity";
+import { Session } from "../../db/session.entity";
 import {
   getDefaultToolEnabledConfig,
   getEnabledToolActions,
@@ -475,6 +476,18 @@ async function prepareConversation(req: {
 
   const conversation = await convRepo.findOneBy({ id: conversationId });
   if (!conversation) {
+    writeSSE(stream, { type: "error", message: "Conversation not found" });
+    stream.end();
+    return null;
+  }
+
+  // Verify session belongs to the authenticated user
+  const sessionRepo = dataSource.getRepository(Session);
+  const session = await sessionRepo.findOneBy({
+    id: conversation.sessionId,
+    userId: ctx.meta.user.id,
+  });
+  if (!session) {
     writeSSE(stream, { type: "error", message: "Conversation not found" });
     stream.end();
     return null;

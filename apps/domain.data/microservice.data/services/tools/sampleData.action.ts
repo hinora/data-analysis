@@ -6,7 +6,8 @@
  * and representative values before performing analysis.
  */
 
-import { type AuthenticatedContext, defineAction } from "core.lib/broker";
+import type { TypedContext } from "core.lib/__generated__";
+import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
 
@@ -19,7 +20,6 @@ export interface SampleDataParams {
 }
 
 export default defineAction<SampleDataParams, unknown>({
-  authentication: true,
   params: {
     datasetId: { type: "uuid" },
     limit: {
@@ -32,7 +32,7 @@ export default defineAction<SampleDataParams, unknown>({
     },
   },
 
-  async handler(ctx: AuthenticatedContext<SampleDataParams>) {
+  async handler(ctx: TypedContext<SampleDataParams>) {
     const { datasetId, limit = DEFAULT_LIMIT } = ctx.params;
     await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);

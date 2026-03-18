@@ -9,7 +9,8 @@
  */
 
 import { createAIAdapter } from "core.lib/adapters/ai";
-import { type AuthenticatedContext, defineAction } from "core.lib/broker";
+import type { TypedContext } from "core.lib/__generated__";
+import { defineAction } from "core.lib/broker";
 import { AILog, AILogPurpose, AILogStatus, AILogType } from "core.lib/database";
 import { dataSource } from "../../db";
 
@@ -48,14 +49,12 @@ const PROMPTS: Record<GenerateNameParams["target"], string> = {
 };
 
 export default defineAction<GenerateNameParams, GenerateNameResult>({
-  authentication: true,
-
   params: {
     context: { type: "string", min: 1, max: 5000 },
     target: { type: "enum", values: ["session", "conversation"] },
   },
 
-  async handler(ctx: AuthenticatedContext<GenerateNameParams>) {
+  async handler(ctx: TypedContext<GenerateNameParams>) {
     const { context, target } = ctx.params;
     const ai = createAIAdapter();
     const aiLogRepo = dataSource.getRepository(AILog);

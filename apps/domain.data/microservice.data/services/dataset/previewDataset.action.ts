@@ -47,6 +47,9 @@ export default defineAction<PreviewDatasetParams, unknown>({
       );
     }
 
+    // Verify session belongs to the authenticated user
+    await ctx.call("session.getSession", { id: dataset.sessionId });
+
     const records = await recordRepo.find({
       where: { datasetId: id },
       take: limit,

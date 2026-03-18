@@ -40,6 +40,9 @@ export default defineAction<DeleteDatasetParams, unknown>({
       );
     }
 
+    // Verify session belongs to the authenticated user
+    await ctx.call("session.getSession", { id: dataset.sessionId });
+
     // Cascade delete related records
     await dataSource.getRepository(DataRecord).delete({ datasetId: id });
     await dataSource.getRepository(TextChunk).delete({ datasetId: id });

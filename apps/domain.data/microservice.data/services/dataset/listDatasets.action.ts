@@ -21,6 +21,9 @@ export default defineAction<ListDatasetsParams, Dataset[]>({
   },
 
   async handler(ctx: AuthenticatedContext<ListDatasetsParams>) {
+    // Verify session belongs to the authenticated user
+    await ctx.call("session.getSession", { id: ctx.params.sessionId });
+
     const repo = dataSource.getRepository(Dataset);
 
     const datasets = await repo.find({

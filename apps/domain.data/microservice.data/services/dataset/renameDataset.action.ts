@@ -37,6 +37,9 @@ export default defineAction<RenameDatasetParams, unknown>({
       );
     }
 
+    // Verify session belongs to the authenticated user
+    await ctx.call("session.getSession", { id: dataset.sessionId });
+
     dataset.name = name.trim();
     const saved = await repo.save(dataset);
 

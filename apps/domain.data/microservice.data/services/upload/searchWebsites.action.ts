@@ -69,6 +69,9 @@ export default defineAction<SearchWebsitesParams, SearchWebsitesResult>({
       );
     }
 
+    // Verify session belongs to the authenticated user
+    await ctx.call("session.getSession", { id: sessionId });
+
     logger.info(
       `[searchWebsites] keywords=${JSON.stringify(keywords)}, count=${count} for session ${sessionId}`,
     );

@@ -35,6 +35,9 @@ export default defineAction<GetDatasetParams, Dataset>({
       );
     }
 
+    // Verify session belongs to the authenticated user
+    await ctx.call("session.getSession", { id: dataset.sessionId });
+
     return dataset;
   },
 });

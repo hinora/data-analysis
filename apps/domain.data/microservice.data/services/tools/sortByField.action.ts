@@ -4,7 +4,8 @@
  * Sort and return records by a specified field.
  */
 
-import { type AuthenticatedContext, defineAction } from "core.lib/broker";
+import type { TypedContext } from "core.lib/__generated__";
+import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
 import {
@@ -22,7 +23,6 @@ export interface SortByFieldParams {
 }
 
 export default defineAction<SortByFieldParams, unknown>({
-  authentication: true,
   params: {
     datasetId: { type: "uuid" },
     field: { type: "string" },
@@ -43,7 +43,7 @@ export default defineAction<SortByFieldParams, unknown>({
     numeric: { type: "boolean", optional: true },
   },
 
-  async handler(ctx: AuthenticatedContext<SortByFieldParams>) {
+  async handler(ctx: TypedContext<SortByFieldParams>) {
     const {
       datasetId,
       field,

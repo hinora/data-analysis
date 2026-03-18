@@ -9,7 +9,8 @@
  */
 
 import { createAIAdapter } from "core.lib/adapters/ai";
-import { type AuthenticatedContext, defineAction } from "core.lib/broker";
+import type { TypedContext } from "core.lib/__generated__";
+import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 
@@ -43,7 +44,6 @@ interface RawRow {
 }
 
 export default defineAction<SemanticSearchParams, unknown>({
-  authentication: true,
   params: {
     datasetId: { type: "uuid", optional: true },
     query: { type: "string", min: 1 },
@@ -58,7 +58,7 @@ export default defineAction<SemanticSearchParams, unknown>({
     },
   },
 
-  async handler(ctx: AuthenticatedContext<SemanticSearchParams>) {
+  async handler(ctx: TypedContext<SemanticSearchParams>) {
     const { sessionId, query, topK = 5, datasetId } = ctx.params;
 
     // Require at least one of sessionId or datasetId

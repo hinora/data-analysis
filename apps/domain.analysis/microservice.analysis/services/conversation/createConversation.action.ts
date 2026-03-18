@@ -54,8 +54,11 @@ export default defineAction<CreateConversationParams, CreateConversationResult>(
       const sessionRepo = dataSource.getRepository(Session);
       const convRepo = dataSource.getRepository(Conversation);
 
-      // Verify session exists
-      const session = await sessionRepo.findOneBy({ id: sessionId });
+      // Verify session exists and belongs to the authenticated user
+      const session = await sessionRepo.findOneBy({
+        id: sessionId,
+        userId: ctx.meta.user.id,
+      });
       if (!session) {
         throw new Errors.MoleculerClientError(
           "Session not found",

@@ -63,6 +63,9 @@ export default defineAction<ImportFromUrlParams, ImportFromUrlResult>({
       );
     }
 
+    // Verify session belongs to the authenticated user
+    await ctx.call("session.getSession", { id: sessionId });
+
     // Validate URL
     let parsed: URL;
     try {

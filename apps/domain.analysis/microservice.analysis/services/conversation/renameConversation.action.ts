@@ -8,6 +8,7 @@ import { type AuthenticatedContext, defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import { Conversation } from "../../db/conversation.entity";
+import { Session } from "../../db/session.entity";
 
 export interface RenameConversationParams {
   id: string;
@@ -29,6 +30,21 @@ export default defineAction<RenameConversationParams, unknown>({
 
     const conversation = await repo.findOneBy({ id });
     if (!conversation) {
+      throw new Errors.MoleculerClientError(
+        "Conversation not found",
+        404,
+        "CONVERSATION_NOT_FOUND",
+        { id },
+      );
+    }
+
+    // Verify session belongs to the authenticated user
+    const sessionRepo = dataSource.getRepository(Session);
+    const session = await sessionRepo.findOneBy({
+      id: conversation.sessionId,
+      userId: ctx.meta.user.id,
+    });
+    if (!session) {
       throw new Errors.MoleculerClientError(
         "Conversation not found",
         404,

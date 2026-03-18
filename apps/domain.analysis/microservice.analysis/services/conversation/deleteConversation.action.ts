@@ -38,6 +38,21 @@ export default defineAction<DeleteConversationParams, unknown>({
       );
     }
 
+    // Verify session belongs to the authenticated user
+    const sessionRepo = dataSource.getRepository(Session);
+    const session = await sessionRepo.findOneBy({
+      id: conversation.sessionId,
+      userId: ctx.meta.user.id,
+    });
+    if (!session) {
+      throw new Errors.MoleculerClientError(
+        "Conversation not found",
+        404,
+        "CONVERSATION_NOT_FOUND",
+        { id },
+      );
+    }
+
     // Cascade delete
     await dataSource.getRepository(ChatMessage).delete({ conversationId: id });
     await dataSource.getRepository(AILog).delete({ conversationId: id });
@@ -45,7 +60,6 @@ export default defineAction<DeleteConversationParams, unknown>({
 
     // Update session conversation count
     try {
-      const sessionRepo = dataSource.getRepository(Session);
       await sessionRepo.decrement(
         { id: conversation.sessionId },
         "conversationCount",

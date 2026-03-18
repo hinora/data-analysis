@@ -7,7 +7,8 @@
  */
 
 import { BraveSearch } from "brave-search";
-import { type AuthenticatedContext, defineAction } from "core.lib/broker";
+import type { TypedContext } from "core.lib/__generated__";
+import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 
 const MAX_RESULTS = 20;
@@ -35,7 +36,6 @@ export interface WebSearchResult {
 }
 
 export default defineAction<WebSearchParams, WebSearchResult>({
-  authentication: true,
   params: {
     count: {
       default: DEFAULT_COUNT,
@@ -55,7 +55,7 @@ export default defineAction<WebSearchParams, WebSearchResult>({
     searchLang: { optional: true, type: "string" },
   },
 
-  async handler(ctx: AuthenticatedContext<WebSearchParams>) {
+  async handler(ctx: TypedContext<WebSearchParams>) {
     const {
       count = DEFAULT_COUNT,
       country,

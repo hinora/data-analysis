@@ -4,7 +4,8 @@
  * Calculate percentile values for a numeric field.
  */
 
-import { type AuthenticatedContext, defineAction } from "core.lib/broker";
+import type { TypedContext } from "core.lib/__generated__";
+import { defineAction } from "core.lib/broker";
 import { dataSource, getTableName } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
 import {
@@ -20,7 +21,6 @@ export interface GetPercentileParams {
 }
 
 export default defineAction<GetPercentileParams, unknown>({
-  authentication: true,
   params: {
     datasetId: { type: "uuid" },
     field: { type: "string" },
@@ -32,7 +32,7 @@ export default defineAction<GetPercentileParams, unknown>({
     },
   },
 
-  async handler(ctx: AuthenticatedContext<GetPercentileParams>) {
+  async handler(ctx: TypedContext<GetPercentileParams>) {
     const {
       datasetId,
       field,

@@ -6,7 +6,8 @@
  * content, making it suitable for SPAs and JS-heavy websites.
  */
 
-import { type AuthenticatedContext, defineAction } from "core.lib/broker";
+import type { TypedContext } from "core.lib/__generated__";
+import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import puppeteer from "puppeteer";
 
@@ -31,7 +32,6 @@ export interface WebFetchResult {
 }
 
 export default defineAction<WebFetchParams, WebFetchResult>({
-  authentication: true,
   params: {
     maxLength: {
       default: DEFAULT_MAX_LENGTH,
@@ -53,7 +53,7 @@ export default defineAction<WebFetchParams, WebFetchResult>({
     waitForSelector: { optional: true, type: "string" },
   },
 
-  async handler(ctx: AuthenticatedContext<WebFetchParams>) {
+  async handler(ctx: TypedContext<WebFetchParams>) {
     const {
       maxLength = DEFAULT_MAX_LENGTH,
       timeout = DEFAULT_TIMEOUT_MS,

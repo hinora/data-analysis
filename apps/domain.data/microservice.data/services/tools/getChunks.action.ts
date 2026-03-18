@@ -5,7 +5,8 @@
  * Enables the AI to "read" specific parts of a document referenced by the document index.
  */
 
-import { type AuthenticatedContext, defineAction } from "core.lib/broker";
+import type { TypedContext } from "core.lib/__generated__";
+import { defineAction } from "core.lib/broker";
 import { Between, type FindOperator } from "typeorm";
 import { dataSource } from "../../db";
 import { TextChunk } from "../../db/text-chunk.entity";
@@ -18,7 +19,6 @@ export interface GetChunksParams {
 }
 
 export default defineAction<GetChunksParams, unknown>({
-  authentication: true,
   params: {
     datasetId: { type: "uuid" },
     startIndex: {
@@ -44,7 +44,7 @@ export default defineAction<GetChunksParams, unknown>({
     },
   },
 
-  async handler(ctx: AuthenticatedContext<GetChunksParams>) {
+  async handler(ctx: TypedContext<GetChunksParams>) {
     const { datasetId, startIndex = 0, endIndex, limit = 20 } = ctx.params;
 
     await ctx.call("dataset.getDataset", { id: datasetId });

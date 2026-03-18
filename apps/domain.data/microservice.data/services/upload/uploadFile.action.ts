@@ -111,6 +111,10 @@ export default defineAction<UploadFileParams, UploadFileResult>({
         { sessionId },
       );
     }
+
+    // Verify session belongs to the authenticated user
+    await ctx.call("session.getSession", { id: sessionId });
+
     const filename = (multipart.filename ||
       meta.filename ||
       "unknown") as string;
