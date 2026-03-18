@@ -1,5 +1,5 @@
 import axios from "axios";
-import { removeToken } from "./auth";
+import { getToken, removeToken } from "./auth";
 
 // create an axios instance
 const service = axios.create({
@@ -16,13 +16,10 @@ service.interceptors.request.use(
     config.headers = config.headers ?? {};
 
     // let each request carry token
-    // ['X-Token'] is a custom headers key
-    // please modify it according to the actual situation
-    // const token = getToken();
-    // if (token) {
-    //   config.headers = config.headers ?? {};
-    //   config.headers.Authorization = `Bearer ${token}`;
-    // }
+    const token = getToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     if (!config.headers["Content-Type"]) {
       config.headers["Content-Type"] = "application/json";
     }

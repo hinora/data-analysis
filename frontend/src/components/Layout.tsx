@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import type { ReactNode } from "react";
+import { getToken } from "@/utils/auth";
+import { useLogout } from "@/hooks/useAuth";
 
 interface LayoutProps {
   children: ReactNode;
@@ -8,8 +10,24 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter();
+  const token = getToken();
+  const isLoggedIn = !!token;
+  const { mutate: logout } = useLogout();
 
-  const navItems = [{ href: "/sessions", label: "Sessions" }];
+  const navItems = [
+    { href: "/sessions", label: "Sessions" },
+    ...(isLoggedIn
+      ? [{ href: "/profile", label: "Profile" }]
+      : [{ href: "/login", label: "Login" }]),
+  ];
+
+  const handleLogout = () => {
+    logout(undefined, {
+      onSuccess: () => {
+        router.push("/login");
+      },
+    });
+  };
 
   return (
     <div
@@ -45,7 +63,7 @@ export default function Layout({ children }: LayoutProps) {
           >
             Data Analysis
           </Link>
-          <nav style={{ display: "flex", gap: 16 }}>
+          <nav style={{ display: "flex", gap: 16, flex: 1 }}>
             {navItems.map((item) => (
               <Link
                 key={item.href}
@@ -68,6 +86,23 @@ export default function Layout({ children }: LayoutProps) {
               </Link>
             ))}
           </nav>
+          {isLoggedIn && (
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                backgroundColor: "transparent",
+                border: "1px solid #d1d5db",
+                borderRadius: 6,
+                color: "#4b5563",
+                cursor: "pointer",
+                fontSize: 13,
+                padding: "4px 12px",
+              }}
+            >
+              Logout
+            </button>
+          )}
         </div>
       </header>
       <main style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
