@@ -242,8 +242,8 @@ const CACHE_TTL_SECONDS = 3600;
 
 ### Microservice Actions: Use `defineAction`
 
-- We are microservice based on Moleculer. Always build the system flow microservice rules.
-- If the action is too complex, split logic into service methods called from the action handler. Or split into multiple actions.
+- This is a microservice-based platform built with Moleculer. Always follow microservice architecture patterns.
+- If the action is too complex, split logic into service methods called from the action handler, or split into multiple actions.
 
 ### Microservice Events: Use `defineEvent`
 
@@ -511,7 +511,7 @@ const ComponentName: React.FC<ComponentNameProps> = ({ id }) => {
 export default ComponentName;
 ```
 
-- All components to render any data from API. Just need pass only IDs as props. Then fetch data inside component using React Query hooks. No worry about duplicate data fetching, React Query will handle caching.
+- Components should fetch their own data from the API. Pass only IDs as props, then fetch data inside the component using React Query hooks. React Query handles caching, so duplicate data fetching is not a concern.
 
 ### Best Practices
 
