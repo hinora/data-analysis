@@ -7,6 +7,8 @@ import searchWebsitesAction from "../searchWebsites.action";
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 
+const SESSION_STUB = { id: SESSION_ID, name: "Test Session" };
+
 const SEARCH_RESULTS_A = {
   count: 2,
   query: "keyword1",
@@ -50,6 +52,7 @@ describe("upload.searchWebsites action", () => {
       keywords: ["keyword1"],
     },
     callStubs: {
+      "session.getSession": SESSION_STUB,
       "tools.webSearch": SEARCH_RESULTS_A,
     },
     assertResult: (result) => {
@@ -70,6 +73,7 @@ describe("upload.searchWebsites action", () => {
       keywords: ["keyword1", "keyword2"],
     },
     callStubs: {
+      "session.getSession": SESSION_STUB,
       "tools.webSearch": (params: { query: string }) => {
         if (params.query === "keyword1") return SEARCH_RESULTS_A;
         if (params.query === "keyword2") return SEARCH_RESULTS_B;
@@ -111,6 +115,7 @@ describe("upload.searchWebsites action", () => {
       keywords: ["failing-keyword", "keyword1"],
     },
     callStubs: {
+      "session.getSession": SESSION_STUB,
       "tools.webSearch": (params: { query: string }) => {
         if (params.query === "failing-keyword") {
           throw new Error("API key invalid");
@@ -133,6 +138,7 @@ describe("upload.searchWebsites action", () => {
       keywords: ["bad-keyword"],
     },
     callStubs: {
+      "session.getSession": SESSION_STUB,
       "tools.webSearch": () => {
         throw new Error("API unavailable");
       },
@@ -152,6 +158,7 @@ describe("upload.searchWebsites action", () => {
       count: 10,
     },
     callStubs: {
+      "session.getSession": SESSION_STUB,
       "tools.webSearch": (params: { query: string; count: number }) => {
         expect(params.count).toBe(10);
         return { count: 0, query: params.query, results: [] };

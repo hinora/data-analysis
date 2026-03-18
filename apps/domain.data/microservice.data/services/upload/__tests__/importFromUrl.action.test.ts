@@ -62,6 +62,8 @@ const MOCK_CONTENT =
   "The content is long enough to create at least one text chunk for testing purposes.";
 const MOCK_TITLE = "Test Page Title";
 
+const SESSION_STUB = { id: SESSION_ID, name: "Test Session" };
+
 describe("upload.importFromUrl action", () => {
   defineTest({
     name: "should import content from a URL and create dataset with text chunks",
@@ -72,6 +74,7 @@ describe("upload.importFromUrl action", () => {
     },
     db: () => testDs,
     callStubs: {
+      "session.getSession": SESSION_STUB,
       "tools.webFetch": {
         content: MOCK_CONTENT,
         title: MOCK_TITLE,
@@ -140,6 +143,9 @@ describe("upload.importFromUrl action", () => {
       sessionId: SESSION_ID,
       url: "not-a-url",
     },
+    callStubs: {
+      "session.getSession": SESSION_STUB,
+    },
     expectError: "Invalid URL",
   });
 
@@ -149,6 +155,9 @@ describe("upload.importFromUrl action", () => {
     params: {
       sessionId: SESSION_ID,
       url: "ftp://example.com/file",
+    },
+    callStubs: {
+      "session.getSession": SESSION_STUB,
     },
     expectError: "Only http and https URLs are supported",
   });
@@ -161,6 +170,7 @@ describe("upload.importFromUrl action", () => {
       url: MOCK_URL,
     },
     callStubs: {
+      "session.getSession": SESSION_STUB,
       "tools.webFetch": {
         content: "",
         title: "",
@@ -181,6 +191,7 @@ describe("upload.importFromUrl action", () => {
     },
     db: () => testDs,
     callStubs: {
+      "session.getSession": SESSION_STUB,
       "tools.webFetch": {
         content: MOCK_CONTENT,
         title: MOCK_TITLE,
@@ -220,6 +231,7 @@ describe("upload.importFromUrl action", () => {
       url: MOCK_URL,
     },
     callStubs: {
+      "session.getSession": SESSION_STUB,
       "tools.webFetch": () => {
         throw new Error("Connection timeout");
       },
@@ -236,6 +248,7 @@ describe("upload.importFromUrl action", () => {
     },
     db: () => testDs,
     callStubs: {
+      "session.getSession": SESSION_STUB,
       "tools.webFetch": {
         content: MOCK_CONTENT,
         title: "",

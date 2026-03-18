@@ -8,8 +8,8 @@
  * Internal action (no REST endpoint) — called by event handlers and other actions.
  */
 
-import { createAIAdapter } from "core.lib/adapters/ai";
 import type { TypedContext } from "core.lib/__generated__";
+import { createAIAdapter } from "core.lib/adapters/ai";
 import { defineAction } from "core.lib/broker";
 import { AILog, AILogPurpose, AILogStatus, AILogType } from "core.lib/database";
 import { dataSource } from "../../db";

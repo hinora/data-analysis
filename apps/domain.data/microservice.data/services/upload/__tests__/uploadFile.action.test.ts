@@ -72,6 +72,7 @@ beforeEach(async () => {
 });
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
+const SESSION_STUB = { id: SESSION_ID, name: "Test Session" };
 
 describe("upload.uploadFile action", () => {
   it("should reject invalid sessionId", async () => {
@@ -103,6 +104,9 @@ describe("upload.uploadFile action", () => {
           data: Buffer.from("some data"),
         },
       },
+      callStubs: {
+        "session.getSession": SESSION_STUB,
+      },
     });
 
     await expect(uploadFileAction.handler(ctx as any)).rejects.toThrow(
@@ -119,6 +123,9 @@ describe("upload.uploadFile action", () => {
           filename: "test.csv",
           mimetype: "text/csv",
         },
+      },
+      callStubs: {
+        "session.getSession": SESSION_STUB,
       },
     });
 
@@ -154,6 +161,10 @@ describe("upload.uploadFile action", () => {
           mimetype: "text/csv",
           data: Buffer.from("Name,Age\nAlice,30\nBob,25"),
         },
+      },
+      callStubs: {
+        "session.getSession": SESSION_STUB,
+        "session.updateSessionStatus": { success: true },
       },
     });
 
@@ -199,6 +210,10 @@ describe("upload.uploadFile action", () => {
           data: fileBuffer,
         },
       },
+      callStubs: {
+        "session.getSession": SESSION_STUB,
+        "session.updateSessionStatus": { success: true },
+      },
     });
 
     // First upload should succeed
@@ -214,6 +229,9 @@ describe("upload.uploadFile action", () => {
           mimetype: "text/csv",
           data: fileBuffer,
         },
+      },
+      callStubs: {
+        "session.getSession": SESSION_STUB,
       },
     });
 

@@ -57,12 +57,17 @@ beforeEach(async () => {
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const FILE_ID = "33333333-3333-4333-8333-333333333333";
 
+const SESSION_STUB = { id: SESSION_ID, name: "Test Session" };
+
 describe("dataset.listDatasets action", () => {
   defineTest({
     name: "should return empty array when no datasets exist",
     action: listDatasetsAction,
     params: { sessionId: SESSION_ID },
     db: () => testDs,
+    callStubs: {
+      "session.getSession": SESSION_STUB,
+    },
     assertResult: (result) => {
       expect(result).toHaveLength(0);
     },
@@ -73,6 +78,9 @@ describe("dataset.listDatasets action", () => {
     action: listDatasetsAction,
     params: { sessionId: SESSION_ID },
     db: () => testDs,
+    callStubs: {
+      "session.getSession": SESSION_STUB,
+    },
     before: [
       {
         entity: OriginalFile,

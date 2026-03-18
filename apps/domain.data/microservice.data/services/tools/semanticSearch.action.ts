@@ -8,8 +8,8 @@
  * Requires at least one of sessionId or datasetId (or both).
  */
 
-import { createAIAdapter } from "core.lib/adapters/ai";
 import type { TypedContext } from "core.lib/__generated__";
+import { createAIAdapter } from "core.lib/adapters/ai";
 import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";

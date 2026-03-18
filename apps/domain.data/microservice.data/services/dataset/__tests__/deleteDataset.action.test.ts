@@ -58,6 +58,8 @@ const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const FILE_ID = "33333333-3333-4333-8333-333333333333";
 const DATASET_ID = "44444444-4444-4444-8444-444444444444";
 
+const SESSION_STUB = { id: SESSION_ID, name: "Test Session" };
+
 describe("dataset.deleteDataset action", () => {
   defineTest({
     name: "should delete a dataset and cascade records",
@@ -65,6 +67,7 @@ describe("dataset.deleteDataset action", () => {
     params: { id: DATASET_ID },
     db: () => testDs,
     callStubs: {
+      "session.getSession": SESSION_STUB,
       "session.updateSessionStatus": { success: true },
     },
     before: [
@@ -144,6 +147,7 @@ describe("dataset.deleteDataset action", () => {
     params: { id: DATASET_ID },
     db: () => testDs,
     callStubs: {
+      "session.getSession": SESSION_STUB,
       "session.updateSessionStatus": { success: true },
     },
     before: async (ds) => {
@@ -218,6 +222,7 @@ describe("dataset.deleteDataset action", () => {
     params: { id: "00000000-0000-4000-8000-000000000000" },
     db: () => testDs,
     callStubs: {
+      "session.getSession": SESSION_STUB,
       "session.updateSessionStatus": { success: true },
     },
     expectError: "Dataset not found",
@@ -229,6 +234,7 @@ describe("dataset.deleteDataset action", () => {
     params: { id: DATASET_ID },
     db: () => testDs,
     callStubs: {
+      "session.getSession": SESSION_STUB,
       "session.updateSessionStatus": () => {
         throw new Error("Service unavailable");
       },
