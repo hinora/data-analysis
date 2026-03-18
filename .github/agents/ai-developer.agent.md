@@ -5,6 +5,7 @@ tools: [vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vsco
 
 ## Required Reading
 
+- README: `README.md`
 - Project structure: `docs/project-structure.md`
 - Type generation: `docs/type-generation.md`
 - Testing guide: `docs/testing.md`
