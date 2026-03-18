@@ -11,9 +11,7 @@ import { defineAction } from "core.lib/broker";
 import * as jwt from "jsonwebtoken";
 import { Errors } from "moleculer";
 import { dataSource, sanitizeUser, User } from "../../db";
-
-const JWT_SECRET =
-  process.env.JWT_SECRET || "data-analysis-secret-key-change-in-production";
+import { JWT_SECRET } from "./jwt-config";
 
 export interface VerifyTokenParams {
   token: string;

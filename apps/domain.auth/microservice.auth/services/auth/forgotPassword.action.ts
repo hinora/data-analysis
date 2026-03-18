@@ -47,9 +47,7 @@ export default defineAction<ForgotPasswordParams, ForgotPasswordResult>({
       await repo.save(user);
 
       // In production, send email with reset link
-      ctx.broker.logger.info(
-        `Password reset token generated for ${email}: ${resetToken}`,
-      );
+      ctx.broker.logger.info(`Password reset token generated for ${email}`);
     }
 
     // Always return success to avoid revealing if email exists
