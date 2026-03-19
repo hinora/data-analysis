@@ -33,11 +33,24 @@ beforeEach(async () => {
   await clearTestDatabase(testDs, [Session]);
 });
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+const TEST_META = {
+  user: {
+    email: "test@example.com",
+    id: TEST_USER_ID,
+    isActive: true,
+    isVerified: false,
+    nickName: "Test User",
+  },
+};
+
 describe("session.create action", () => {
   defineTest({
     name: "should create a session with a custom name",
     action: createAction,
     params: { name: "My Test Session" },
+    meta: TEST_META,
     db: () => testDs,
     assertResult: (result) => {
       expect(result.name).toBe("My Test Session");
@@ -63,6 +76,7 @@ describe("session.create action", () => {
     name: "should auto-generate a name when none is provided",
     action: createAction,
     params: {},
+    meta: TEST_META,
     db: () => testDs,
     assertResult: (result) => {
       expect(result.name).toMatch(/^Session — /);
@@ -74,6 +88,7 @@ describe("session.create action", () => {
     name: "should have proper action schema",
     action: createAction,
     params: {},
+    meta: TEST_META,
     assertResult: () => {
       expect(createAction.params).toEqual({
         name: { type: "string", optional: true, min: 1, max: 200 },

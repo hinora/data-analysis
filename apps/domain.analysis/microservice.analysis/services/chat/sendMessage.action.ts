@@ -499,9 +499,9 @@ async function prepareConversation(req: {
   // ── Build system prompt ─────────────────────────────────────────────
   writeSSE(stream, { type: "status", message: "Building context…" });
 
-  const { systemPrompt } = await ctx.call("chat.buildDynamicSystemPrompt", {
+  const { systemPrompt } = (await ctx.call("chat.buildDynamicSystemPrompt", {
     sessionId,
-  });
+  })) as { systemPrompt: string };
   await convRepo.update({ id: conversationId }, { systemPrompt });
 
   // ── Save user message ───────────────────────────────────────────────
@@ -570,11 +570,11 @@ async function autoRenameConversation(req: {
 
     const nameContext = `User question: ${content}${datasetSummary}`;
 
-    const { name } = await ctx.call(
+    const { name } = (await ctx.call(
       "chat.generateName",
       { context: nameContext, target: "conversation" as const },
       { timeout: 600000 },
-    );
+    )) as { name: string };
     await ctx.call("conversation.renameConversation", {
       id: conversationId,
       name,

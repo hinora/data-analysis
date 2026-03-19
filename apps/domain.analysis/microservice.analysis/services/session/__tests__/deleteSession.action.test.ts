@@ -34,12 +34,24 @@ beforeEach(async () => {
 });
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+const TEST_META = {
+  user: {
+    email: "test@example.com",
+    id: TEST_USER_ID,
+    isActive: true,
+    isVerified: false,
+    nickName: "Test User",
+  },
+};
 
 describe("session.deleteSession action", () => {
   defineTest({
     name: "should delete a session and emit event",
     action: deleteSessionAction,
     params: { id: SESSION_ID },
+    meta: TEST_META,
     db: () => testDs,
     before: [
       {
@@ -51,6 +63,7 @@ describe("session.deleteSession action", () => {
             status: SessionStatus.EMPTY,
             datasetCount: 0,
             conversationCount: 0,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -73,6 +86,7 @@ describe("session.deleteSession action", () => {
     name: "should throw 404 when session not found",
     action: deleteSessionAction,
     params: { id: "00000000-0000-4000-8000-000000000000" },
+    meta: TEST_META,
     db: () => testDs,
     expectError: "Session not found",
   });

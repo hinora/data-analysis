@@ -57,12 +57,27 @@ beforeEach(async () => {
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const FILE_ID = "33333333-3333-4333-8333-333333333333";
 const DATASET_ID = "44444444-4444-4444-8444-444444444444";
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+const TEST_META = {
+  user: {
+    id: TEST_USER_ID,
+    email: "test@example.com",
+    nickName: "Test User",
+    isActive: true,
+    isVerified: false,
+  },
+};
 
 describe("dataset.previewDataset action", () => {
   defineTest({
     name: "should return preview data with column info",
     action: previewDatasetAction,
     params: { id: DATASET_ID },
+    meta: TEST_META,
+    callStubs: {
+      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+    },
     db: () => testDs,
     before: [
       {
@@ -142,6 +157,10 @@ describe("dataset.previewDataset action", () => {
     name: "should respect limit parameter",
     action: previewDatasetAction,
     params: { id: DATASET_ID, limit: 1 },
+    meta: TEST_META,
+    callStubs: {
+      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+    },
     db: () => testDs,
     before: [
       {
@@ -202,6 +221,10 @@ describe("dataset.previewDataset action", () => {
     name: "should throw 404 when dataset not found",
     action: previewDatasetAction,
     params: { id: "00000000-0000-4000-8000-000000000000" },
+    meta: TEST_META,
+    callStubs: {
+      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+    },
     db: () => testDs,
     expectError: "Dataset not found",
   });
@@ -210,6 +233,10 @@ describe("dataset.previewDataset action", () => {
     name: "should handle dataset with no column mappings",
     action: previewDatasetAction,
     params: { id: DATASET_ID },
+    meta: TEST_META,
+    callStubs: {
+      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+    },
     db: () => testDs,
     before: [
       {

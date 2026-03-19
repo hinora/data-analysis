@@ -72,18 +72,33 @@ beforeEach(async () => {
 });
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+const TEST_META = {
+  user: {
+    id: TEST_USER_ID,
+    email: "test@example.com",
+    nickName: "Test User",
+    isActive: true,
+    isVerified: false,
+  },
+};
 
 describe("upload.uploadFile action", () => {
   it("should reject invalid sessionId", async () => {
     const ctx = createTestContext({
       params: {},
       meta: {
+        ...TEST_META,
         $multipart: {
           sessionId: "not-a-uuid",
           filename: "test.csv",
           mimetype: "text/csv",
           data: Buffer.from("name,age\nAlice,30"),
         },
+      },
+      callStubs: {
+        "session.getSession": { id: SESSION_ID, name: "Test Session" },
       },
     });
 
@@ -96,12 +111,16 @@ describe("upload.uploadFile action", () => {
     const ctx = createTestContext({
       params: {},
       meta: {
+        ...TEST_META,
         $multipart: {
           sessionId: SESSION_ID,
           filename: "test.xyz",
           mimetype: "application/xyz",
           data: Buffer.from("some data"),
         },
+      },
+      callStubs: {
+        "session.getSession": { id: SESSION_ID, name: "Test Session" },
       },
     });
 
@@ -114,11 +133,15 @@ describe("upload.uploadFile action", () => {
     const ctx = createTestContext({
       params: {},
       meta: {
+        ...TEST_META,
         $multipart: {
           sessionId: SESSION_ID,
           filename: "test.csv",
           mimetype: "text/csv",
         },
+      },
+      callStubs: {
+        "session.getSession": { id: SESSION_ID, name: "Test Session" },
       },
     });
 
@@ -148,12 +171,16 @@ describe("upload.uploadFile action", () => {
     const ctx = createTestContext({
       params: {},
       meta: {
+        ...TEST_META,
         $multipart: {
           sessionId: SESSION_ID,
           filename: "people.csv",
           mimetype: "text/csv",
           data: Buffer.from("Name,Age\nAlice,30\nBob,25"),
         },
+      },
+      callStubs: {
+        "session.getSession": { id: SESSION_ID, name: "Test Session" },
       },
     });
 
@@ -192,12 +219,16 @@ describe("upload.uploadFile action", () => {
     const ctx1 = createTestContext({
       params: {},
       meta: {
+        ...TEST_META,
         $multipart: {
           sessionId: SESSION_ID,
           filename: "data.csv",
           mimetype: "text/csv",
           data: fileBuffer,
         },
+      },
+      callStubs: {
+        "session.getSession": { id: SESSION_ID, name: "Test Session" },
       },
     });
 
@@ -208,12 +239,16 @@ describe("upload.uploadFile action", () => {
     const ctx2 = createTestContext({
       params: {},
       meta: {
+        ...TEST_META,
         $multipart: {
           sessionId: SESSION_ID,
           filename: "data.csv",
           mimetype: "text/csv",
           data: fileBuffer,
         },
+      },
+      callStubs: {
+        "session.getSession": { id: SESSION_ID, name: "Test Session" },
       },
     });
 
