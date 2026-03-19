@@ -92,9 +92,7 @@ const ProfilePage: React.FC = () => {
         }}
       >
         <div style={{ marginBottom: 16 }}>
-          <span
-            style={{ fontSize: 13, color: "#6b7280", display: "block" }}
-          >
+          <span style={{ fontSize: 13, color: "#6b7280", display: "block" }}>
             Email
           </span>
           <span style={{ fontSize: 14, fontWeight: 500 }}>{user?.email}</span>

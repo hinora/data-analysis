@@ -5,7 +5,7 @@
  * used in the authentication flow.
  */
 
-import jwt from "jsonwebtoken";
+import jwt, { type SignOptions } from "jsonwebtoken";
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 const JWT_SECRET =
@@ -17,7 +17,10 @@ const JWT_SECRET =
  * @returns Signed JWT token string
  */
 export function signToken(payload: { email: string; id: string }): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const options: SignOptions = {
+    expiresIn: JWT_EXPIRES_IN as SignOptions["expiresIn"],
+  };
+  return jwt.sign(payload, JWT_SECRET, options);
 }
 
 /**

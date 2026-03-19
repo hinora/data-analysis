@@ -8,9 +8,7 @@
 import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
 
-export interface GetProfileParams {
-  /* No params needed - user comes from JWT */
-}
+export type GetProfileParams = {};
 
 export interface GetProfileResult {
   email: string;

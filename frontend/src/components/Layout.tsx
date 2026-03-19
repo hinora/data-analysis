@@ -81,10 +81,7 @@ export default function Layout({ children }: LayoutProps) {
           </nav>
           {user && (
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Link
-                href="/profile"
-                style={{ fontSize: 14, color: "#4b5563" }}
-              >
+              <Link href="/profile" style={{ fontSize: 14, color: "#4b5563" }}>
                 {user.nickName}
               </Link>
               <button

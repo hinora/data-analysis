@@ -107,6 +107,37 @@ The `auth.verifyToken` action is the backbone of the authentication system. It i
 - **Expiration:** `JWT_EXPIRES_IN` env var (default: `7d`)
 - **Payload:** `{ id, email }`
 
+### Entity Ownership Verification
+
+All REST endpoints enforce entity ownership through the session hierarchy:
+
+```mermaid
+graph TD
+    User[User<br/>auth_db.users]
+    Session[Session<br/>analysis_db.sessions<br/>userId column]
+    Conversation[Conversation<br/>analysis_db.conversations<br/>sessionId FK]
+    Dataset[Dataset<br/>data_db.datasets<br/>sessionId column]
+
+    User -->|owns| Session
+    Session -->|contains| Conversation
+    Session -->|contains| Dataset
+```
+
+**Analysis microservice (sessions, conversations, chat):**
+- Session actions filter by `userId: ctx.meta.user.id` directly
+- Conversation/chat actions verify the conversation's session belongs to the user via `sessionRepo.findOneBy({ id: sessionId, userId: ctx.meta.user.id })`
+- Returns 404 "not found" for unauthorized access (prevents information disclosure)
+
+**Data microservice (datasets, uploads, metadata):**
+- Calls `ctx.call("session.getSession", { id: sessionId })` cross-service
+- Since `session.getSession` already checks `userId`, ownership is enforced transitively
+- `ctx.meta.user` is forwarded from the original authenticated call
+
+**Internal actions (no REST):**
+- Tool actions (sampleData, aggregate, etc.) are only called by other services
+- The auth hook skips when `ctx.caller !== "proxy"` (internal calls)
+- Ownership is verified by the parent REST action that initiated the chain
+
 ### Security Considerations
 
 - Passwords are hashed with **bcryptjs** (10 rounds)

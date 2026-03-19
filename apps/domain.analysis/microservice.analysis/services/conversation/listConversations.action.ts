@@ -26,9 +26,9 @@ export default defineAction<ListConversationsParams, Conversation[]>({
   async handler(ctx: AuthenticatedContext<ListConversationsParams>) {
     // Verify session ownership
     const sessionRepo = dataSource.getRepository(Session);
-    const session = await sessionRepo.findOneBy({ 
-      id: ctx.params.sessionId, 
-      userId: ctx.meta.user.id 
+    const session = await sessionRepo.findOneBy({
+      id: ctx.params.sessionId,
+      userId: ctx.meta.user.id,
     });
     if (!session) {
       throw new Errors.MoleculerClientError(

@@ -55,6 +55,8 @@ paths:
       tags: [Sessions]
       summary: Create a new session
       operationId: createSession
+      security:
+        - bearerAuth: []
       requestBody:
         required: false
         content:
@@ -79,6 +81,8 @@ paths:
       tags: [Sessions]
       summary: List sessions (paginated)
       operationId: listSessions
+      security:
+        - bearerAuth: []
       parameters:
         - name: page
           in: query
@@ -119,6 +123,8 @@ paths:
       tags: [Sessions]
       summary: Get a session by ID
       operationId: getSession
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/SessionId"
       responses:
@@ -138,6 +144,8 @@ paths:
         Deletes the session and cascades to conversations and chat messages.
         Emits `sessionData.sessionDeleted` event for cross-service cleanup.
       operationId: deleteSession
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/SessionId"
       responses:
@@ -162,6 +170,8 @@ paths:
       tags: [Sessions]
       summary: Rename a session
       operationId: renameSession
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/SessionId"
       requestBody:
@@ -201,6 +211,8 @@ paths:
         5. Emits metadata.generateMetadata event for metadata generation
         6. Updates session datasetCount
       operationId: uploadFile
+      security:
+        - bearerAuth: []
       parameters:
         - name: sessionId
           in: path
@@ -269,6 +281,8 @@ paths:
         6. Emits metadata.generateMetadata event
         7. Updates session datasetCount
       operationId: importFromUrl
+      security:
+        - bearerAuth: []
       parameters:
         - name: sessionId
           in: path
@@ -333,6 +347,8 @@ paths:
         and returns a deduplicated list of website results. The user can then
         select which websites to import via the import-url endpoint.
       operationId: searchWebsites
+      security:
+        - bearerAuth: []
       parameters:
         - name: sessionId
           in: path
@@ -404,6 +420,8 @@ paths:
         Creates a new conversation within a session. Automatically constructs
         a system prompt from the session's datasets and stores it as the first message.
       operationId: createConversation
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -434,6 +452,8 @@ paths:
       tags: [Conversations]
       summary: List conversations for a session
       operationId: listConversations
+      security:
+        - bearerAuth: []
       parameters:
         - name: sessionId
           in: query
@@ -456,6 +476,8 @@ paths:
       tags: [Conversations]
       summary: Get a conversation by ID
       operationId: getConversation
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/ConversationId"
       responses:
@@ -473,6 +495,8 @@ paths:
       summary: Delete a conversation
       description: Cascade-deletes all messages and AI logs for this conversation.
       operationId: deleteConversation
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/ConversationId"
       responses:
@@ -497,6 +521,8 @@ paths:
       tags: [Conversations]
       summary: Rename a conversation
       operationId: renameConversation
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/ConversationId"
       requestBody:
@@ -528,6 +554,8 @@ paths:
       tags: [Chat]
       summary: Get conversation message history
       operationId: getChatHistory
+      security:
+        - bearerAuth: []
       parameters:
         - name: conversationId
           in: query
@@ -597,6 +625,8 @@ paths:
         - `done` — final saved ChatMessage (stream closes after this)
         - `error` — unrecoverable error (stream closes after this)
       operationId: sendChatMessage
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:

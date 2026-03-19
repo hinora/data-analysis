@@ -5,8 +5,8 @@
  */
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { queryClient } from "@/utils/query";
 import { getToken, removeToken, setToken } from "@/utils/auth";
+import { queryClient } from "@/utils/query";
 import { service } from "@/utils/request";
 
 // --- Types ---
@@ -49,7 +49,10 @@ export const useGetProfile = () => {
 
 export const useLogin = () => {
   return useMutation({
-    mutationFn: async (params: { email: string; password: string }): Promise<AuthResponse> => {
+    mutationFn: async (params: {
+      email: string;
+      password: string;
+    }): Promise<AuthResponse> => {
       const response = await service.post<AuthResponse>("/auth/login", params);
       return response.data;
     },
@@ -67,7 +70,10 @@ export const useRegister = () => {
       password: string;
       nickName: string;
     }): Promise<AuthResponse> => {
-      const response = await service.post<AuthResponse>("/auth/register", params);
+      const response = await service.post<AuthResponse>(
+        "/auth/register",
+        params,
+      );
       return response.data;
     },
     onSuccess: (data) => {
@@ -79,11 +85,13 @@ export const useRegister = () => {
 
 export const useForgotPassword = () => {
   return useMutation({
-    mutationFn: async (params: { email: string }): Promise<{ success: boolean; message: string }> => {
-      const response = await service.post<{ success: boolean; message: string }>(
-        "/auth/forgot-password",
-        params,
-      );
+    mutationFn: async (params: {
+      email: string;
+    }): Promise<{ success: boolean; message: string }> => {
+      const response = await service.post<{
+        success: boolean;
+        message: string;
+      }>("/auth/forgot-password", params);
       return response.data;
     },
   });

@@ -39,9 +39,9 @@ export default defineAction<GetConversationParams, unknown>({
 
     // Verify session ownership
     const sessionRepo = dataSource.getRepository(Session);
-    const session = await sessionRepo.findOneBy({ 
-      id: conversation.sessionId, 
-      userId: ctx.meta.user.id 
+    const session = await sessionRepo.findOneBy({
+      id: conversation.sessionId,
+      userId: ctx.meta.user.id,
     });
     if (!session) {
       throw new Errors.MoleculerClientError(

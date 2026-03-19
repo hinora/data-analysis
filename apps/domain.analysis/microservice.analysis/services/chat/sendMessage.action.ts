@@ -12,9 +12,9 @@
 
 import { PassThrough } from "node:stream";
 import { encode as toonEncode } from "@toon-format/toon";
-import type { AuthenticatedContext } from "core.lib/broker";
 import type { AIMessageWithTools } from "core.lib/adapters/ai";
 import { createAIAdapter } from "core.lib/adapters/ai";
+import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
 import { AILog, AILogStatus, AILogType } from "core.lib/database";
 import { Errors } from "moleculer";

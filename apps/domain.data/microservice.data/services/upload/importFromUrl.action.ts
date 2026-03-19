@@ -8,8 +8,8 @@
  */
 
 import * as crypto from "node:crypto";
-import type { AuthenticatedContext } from "core.lib/broker";
 import { semanticChunkText } from "core.lib/adapters/file-parser";
+import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
