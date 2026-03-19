@@ -488,7 +488,12 @@ async function prepareConversation(req: {
       sessionId: conversation.sessionId,
       userId: ctx.meta.user.id,
     });
-  } catch {
+  } catch (err) {
+    const isMoleculerClientError =
+      err instanceof Error && "code" in err && (err as { code: number }).code === 404;
+    if (!isMoleculerClientError) {
+      ctx.broker.logger.error("Unexpected error verifying session ownership:", err);
+    }
     writeSSE(stream, { type: "error", message: "Conversation not found" });
     stream.end();
     return null;

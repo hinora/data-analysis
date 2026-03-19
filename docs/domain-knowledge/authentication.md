@@ -123,15 +123,25 @@ graph TD
     Session -->|contains| Dataset
 ```
 
+#### Dedicated Verification Actions
+
+Ownership verification is centralized in three internal actions:
+
+| Action | Microservice | Params | Description |
+|--------|-------------|--------|-------------|
+| `session.verifySessionOwnership` | analysis | `sessionId`, `userId` | Checks session exists and belongs to user |
+| `conversation.verifyConversationOwnership` | analysis | `conversationId`, `userId` | Checks conversation exists and its session belongs to user |
+| `dataset.verifyDatasetOwnership` | data | `datasetId`, `userId` | Checks dataset exists, then calls `session.verifySessionOwnership` |
+
+All verification actions throw 404 "not found" for unauthorized access (prevents information disclosure).
+
 **Analysis microservice (sessions, conversations, chat):**
-- Session actions filter by `userId: ctx.meta.user.id` directly
-- Conversation/chat actions verify the conversation's session belongs to the user via `sessionRepo.findOneBy({ id: sessionId, userId: ctx.meta.user.id })`
-- Returns 404 "not found" for unauthorized access (prevents information disclosure)
+- Session CRUD actions filter by `userId: ctx.meta.user.id` directly
+- Conversation/chat actions call `session.verifySessionOwnership({ sessionId, userId: ctx.meta.user.id })`
 
 **Data microservice (datasets, uploads, metadata):**
-- Calls `ctx.call("session.getSession", { id: sessionId })` cross-service
-- Since `session.getSession` already checks `userId`, ownership is enforced transitively
-- `ctx.meta.user` is forwarded from the original authenticated call
+- All REST actions call `session.verifySessionOwnership({ sessionId, userId: ctx.meta.user.id })` cross-service
+- The `userId` is passed explicitly (not relying on meta forwarding)
 
 **Internal actions (no REST):**
 - Tool actions (sampleData, aggregate, etc.) are only called by other services
