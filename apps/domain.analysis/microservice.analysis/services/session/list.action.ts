@@ -4,7 +4,7 @@
  * Returns paginated sessions sorted by createdAt DESC.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
+import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
 import { dataSource } from "../../db";
 import { Session } from "../../db/session.entity";
@@ -23,6 +23,7 @@ export interface ListSessionsResult {
 }
 
 export default defineAction<ListSessionsParams, ListSessionsResult>({
+  authentication: true,
   rest: "GET /",
 
   params: {
@@ -45,7 +46,7 @@ export default defineAction<ListSessionsParams, ListSessionsResult>({
     },
   },
 
-  async handler(ctx: TypedContext<ListSessionsParams>) {
+  async handler(ctx: AuthenticatedContext<ListSessionsParams>) {
     const page = ctx.params.page ?? 1;
     const limit = ctx.params.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -53,6 +54,7 @@ export default defineAction<ListSessionsParams, ListSessionsResult>({
     const repo = dataSource.getRepository(Session);
 
     const [data, total] = await repo.findAndCount({
+      where: { userId: ctx.meta.user.id },
       order: { createdAt: "DESC" },
       skip,
       take: limit,

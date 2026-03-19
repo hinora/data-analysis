@@ -12,11 +12,12 @@
 
 import { PassThrough } from "node:stream";
 import { encode as toonEncode } from "@toon-format/toon";
-import type { TypedContext } from "core.lib/__generated__";
+import type { AuthenticatedContext } from "core.lib/broker";
 import type { AIMessageWithTools } from "core.lib/adapters/ai";
 import { createAIAdapter } from "core.lib/adapters/ai";
 import { defineAction } from "core.lib/broker";
 import { AILog, AILogStatus, AILogType } from "core.lib/database";
+import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import type {
   CitedSource,
@@ -25,6 +26,7 @@ import type {
 } from "../../db/chat-message.entity";
 import { ChatMessage, MessageRole } from "../../db/chat-message.entity";
 import { Conversation } from "../../db/conversation.entity";
+import { Session } from "../../db/session.entity";
 import {
   getDefaultToolEnabledConfig,
   getEnabledToolActions,
@@ -421,6 +423,7 @@ async function runSubAgent(req: {
 // ── Action ──────────────────────────────────────────────────────────────
 
 export default defineAction<SendMessageParams, SendMessageResult>({
+  authentication: true,
   rest: "POST /messages",
 
   params: {
@@ -428,7 +431,7 @@ export default defineAction<SendMessageParams, SendMessageResult>({
     conversationId: { type: "uuid" },
   },
 
-  async handler(ctx: TypedContext<SendMessageParams>) {
+  async handler(ctx: AuthenticatedContext<SendMessageParams>) {
     // Tell moleculer-web to treat the response as an SSE stream.
     (ctx.meta as Record<string, unknown>).$responseType = "text/event-stream";
     (ctx.meta as Record<string, unknown>).$responseHeaders = {
@@ -462,7 +465,7 @@ interface ConversationContext {
 
 /** Verify conversation, build system prompt, save user message, auto-rename, load history. */
 async function prepareConversation(req: {
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   stream: PassThrough;
 }): Promise<ConversationContext | null> {
   const { ctx, stream } = req;
@@ -475,6 +478,17 @@ async function prepareConversation(req: {
 
   const conversation = await convRepo.findOneBy({ id: conversationId });
   if (!conversation) {
+    writeSSE(stream, { type: "error", message: "Conversation not found" });
+    stream.end();
+    return null;
+  }
+
+  // Verify session ownership
+  const session = await dataSource.getRepository(Session).findOneBy({
+    id: conversation.sessionId,
+    userId: ctx.meta.user.id,
+  });
+  if (!session) {
     writeSSE(stream, { type: "error", message: "Conversation not found" });
     stream.end();
     return null;
@@ -535,7 +549,7 @@ async function autoRenameConversation(req: {
   content: string;
   conversation: Conversation;
   conversationId: string;
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   sessionId: string;
   stream: PassThrough;
 }): Promise<void> {
@@ -605,7 +619,7 @@ function extractConfidenceScore(content: string): number | null {
 // ── Sub-agent tool call handler ─────────────────────────────────────────
 
 async function handleSubAgentCall(req: {
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   fnArgs: Record<string, unknown>;
   fnName: string;
   messages: AIMessageWithTools[];
@@ -699,7 +713,7 @@ async function handleSubAgentCall(req: {
 
 async function handleNormalToolInLoop(req: {
   citedSources: CitedSource[];
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   fnArgs: Record<string, unknown>;
   fnName: string;
   messages: AIMessageWithTools[];
@@ -830,7 +844,7 @@ async function handleNormalToolInLoop(req: {
 // ── AI orchestration loop ───────────────────────────────────────────────
 
 async function runOrchestrationLoop(req: {
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   messages: AIMessageWithTools[];
   stream: PassThrough;
 }): Promise<OrchestrationResult> {
@@ -1095,7 +1109,7 @@ async function saveAndFinalize(req: {
 // ── Orchestration entry point (runs asynchronously) ─────────────────────
 
 async function processStream(
-  ctx: TypedContext<SendMessageParams>,
+  ctx: AuthenticatedContext<SendMessageParams>,
   stream: PassThrough,
 ): Promise<void> {
   const prepared = await prepareConversation({ ctx, stream });

@@ -4,12 +4,13 @@
  * Retrieve paginated conversation message history in chronological order.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
+import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import { ChatMessage, MessageRole } from "../../db/chat-message.entity";
 import { Conversation } from "../../db/conversation.entity";
+import { Session } from "../../db/session.entity";
 
 export interface GetHistoryParams {
   conversationId: string;
@@ -38,6 +39,7 @@ export interface GetHistoryResult {
 }
 
 export default defineAction<GetHistoryParams, GetHistoryResult>({
+  authentication: true,
   rest: "GET /messages",
 
   params: {
@@ -67,7 +69,7 @@ export default defineAction<GetHistoryParams, GetHistoryResult>({
     },
   },
 
-  async handler(ctx: TypedContext<GetHistoryParams>) {
+  async handler(ctx: AuthenticatedContext<GetHistoryParams>) {
     const {
       conversationId,
       page = 1,
@@ -80,6 +82,21 @@ export default defineAction<GetHistoryParams, GetHistoryResult>({
     // Verify conversation exists
     const conversation = await convRepo.findOneBy({ id: conversationId });
     if (!conversation) {
+      throw new Errors.MoleculerClientError(
+        "Conversation not found",
+        404,
+        "CONVERSATION_NOT_FOUND",
+        { id: conversationId },
+      );
+    }
+
+    // Verify session ownership
+    const sessionRepo = dataSource.getRepository(Session);
+    const session = await sessionRepo.findOneBy({
+      id: conversation.sessionId,
+      userId: ctx.meta.user.id,
+    });
+    if (!session) {
       throw new Errors.MoleculerClientError(
         "Conversation not found",
         404,

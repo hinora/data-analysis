@@ -4,7 +4,7 @@
  * Returns full dataset details including metadata.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
+import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
@@ -15,13 +15,14 @@ export interface GetDatasetParams {
 }
 
 export default defineAction<GetDatasetParams, Dataset>({
+  authentication: true,
   rest: "GET /:id",
 
   params: {
     id: { type: "uuid" },
   },
 
-  async handler(ctx: TypedContext<GetDatasetParams>) {
+  async handler(ctx: AuthenticatedContext<GetDatasetParams>) {
     const repo = dataSource.getRepository(Dataset);
 
     const dataset = await repo.findOneBy({ id: ctx.params.id });
@@ -34,6 +35,9 @@ export default defineAction<GetDatasetParams, Dataset>({
         { id: ctx.params.id },
       );
     }
+
+    // Verify session ownership
+    await ctx.call("session.getSession", { id: dataset.sessionId });
 
     return dataset;
   },

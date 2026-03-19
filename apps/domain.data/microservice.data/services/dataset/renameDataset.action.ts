@@ -4,7 +4,7 @@
  * Rename a dataset with validation.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
+import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
@@ -16,6 +16,7 @@ export interface RenameDatasetParams {
 }
 
 export default defineAction<RenameDatasetParams, unknown>({
+  authentication: true,
   rest: "PATCH /:id/rename",
 
   params: {
@@ -23,7 +24,7 @@ export default defineAction<RenameDatasetParams, unknown>({
     name: { type: "string", min: 1, max: 200 },
   },
 
-  async handler(ctx: TypedContext<RenameDatasetParams>) {
+  async handler(ctx: AuthenticatedContext<RenameDatasetParams>) {
     const { id, name } = ctx.params;
     const repo = dataSource.getRepository(Dataset);
 
@@ -36,6 +37,9 @@ export default defineAction<RenameDatasetParams, unknown>({
         { id },
       );
     }
+
+    // Verify session ownership
+    await ctx.call("session.getSession", { id: dataset.sessionId });
 
     dataset.name = name.trim();
     const saved = await repo.save(dataset);

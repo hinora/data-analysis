@@ -4,7 +4,7 @@
  * Delete a conversation with cascade deletion of ChatMessages and AILogs.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
+import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
 import { AILog } from "core.lib/database";
 import { Errors } from "moleculer";
@@ -18,18 +18,33 @@ export interface DeleteConversationParams {
 }
 
 export default defineAction<DeleteConversationParams, unknown>({
+  authentication: true,
   rest: "DELETE /:id",
 
   params: {
     id: { type: "uuid" },
   },
 
-  async handler(ctx: TypedContext<DeleteConversationParams>) {
+  async handler(ctx: AuthenticatedContext<DeleteConversationParams>) {
     const { id } = ctx.params;
     const convRepo = dataSource.getRepository(Conversation);
 
     const conversation = await convRepo.findOneBy({ id });
     if (!conversation) {
+      throw new Errors.MoleculerClientError(
+        "Conversation not found",
+        404,
+        "CONVERSATION_NOT_FOUND",
+        { id },
+      );
+    }
+
+    // Verify session ownership
+    const session = await dataSource.getRepository(Session).findOneBy({
+      id: conversation.sessionId,
+      userId: ctx.meta.user.id,
+    });
+    if (!session) {
       throw new Errors.MoleculerClientError(
         "Conversation not found",
         404,
