@@ -114,7 +114,10 @@ export default defineAction<UploadFileParams, UploadFileResult>({
     }
 
     // Verify session ownership
-    await ctx.call("session.getSession", { id: sessionId });
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId,
+      userId: ctx.meta.user.id,
+    });
 
     const filename = (multipart.filename ||
       meta.filename ||

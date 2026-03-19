@@ -6,10 +6,8 @@
 
 import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
-import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import { Conversation } from "../../db/conversation.entity";
-import { Session } from "../../db/session.entity";
 
 export interface ListConversationsParams {
   sessionId: string;
@@ -25,19 +23,10 @@ export default defineAction<ListConversationsParams, Conversation[]>({
 
   async handler(ctx: AuthenticatedContext<ListConversationsParams>) {
     // Verify session ownership
-    const sessionRepo = dataSource.getRepository(Session);
-    const session = await sessionRepo.findOneBy({
-      id: ctx.params.sessionId,
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId: ctx.params.sessionId,
       userId: ctx.meta.user.id,
     });
-    if (!session) {
-      throw new Errors.MoleculerClientError(
-        "Session not found",
-        404,
-        "SESSION_NOT_FOUND",
-        { id: ctx.params.sessionId },
-      );
-    }
 
     const repo = dataSource.getRepository(Conversation);
 

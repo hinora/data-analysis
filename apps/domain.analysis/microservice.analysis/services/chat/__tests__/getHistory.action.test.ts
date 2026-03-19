@@ -56,6 +56,12 @@ describe("chat.getHistory action", () => {
     action: getHistoryAction,
     params: { conversationId: CONVERSATION_ID },
     meta: TEST_META,
+    callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
+    },
     db: () => testDs,
     before: [
       {
@@ -124,6 +130,12 @@ describe("chat.getHistory action", () => {
     action: getHistoryAction,
     params: { conversationId: CONVERSATION_ID, page: 1, limit: 1 },
     meta: TEST_META,
+    callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
+    },
     db: () => testDs,
     before: [
       {
@@ -181,6 +193,12 @@ describe("chat.getHistory action", () => {
     action: getHistoryAction,
     params: { conversationId: CONVERSATION_ID, excludeSystem: true },
     meta: TEST_META,
+    callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
+    },
     db: () => testDs,
     before: [
       {
@@ -246,6 +264,12 @@ describe("chat.getHistory action", () => {
     action: getHistoryAction,
     params: { conversationId: CONVERSATION_ID },
     meta: TEST_META,
+    callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
+    },
     db: () => testDs,
     before: [
       {

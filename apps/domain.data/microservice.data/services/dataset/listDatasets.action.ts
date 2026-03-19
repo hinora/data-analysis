@@ -23,7 +23,10 @@ export default defineAction<ListDatasetsParams, Dataset[]>({
 
   async handler(ctx: AuthenticatedContext<ListDatasetsParams>) {
     // Verify session ownership
-    await ctx.call("session.getSession", { id: ctx.params.sessionId });
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId: ctx.params.sessionId,
+      userId: ctx.meta.user.id,
+    });
 
     const repo = dataSource.getRepository(Dataset);
 

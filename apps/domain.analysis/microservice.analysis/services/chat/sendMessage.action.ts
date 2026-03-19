@@ -26,7 +26,6 @@ import type {
 } from "../../db/chat-message.entity";
 import { ChatMessage, MessageRole } from "../../db/chat-message.entity";
 import { Conversation } from "../../db/conversation.entity";
-import { Session } from "../../db/session.entity";
 import {
   getDefaultToolEnabledConfig,
   getEnabledToolActions,
@@ -484,11 +483,12 @@ async function prepareConversation(req: {
   }
 
   // Verify session ownership
-  const session = await dataSource.getRepository(Session).findOneBy({
-    id: conversation.sessionId,
-    userId: ctx.meta.user.id,
-  });
-  if (!session) {
+  try {
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId: conversation.sessionId,
+      userId: ctx.meta.user.id,
+    });
+  } catch {
     writeSSE(stream, { type: "error", message: "Conversation not found" });
     stream.end();
     return null;

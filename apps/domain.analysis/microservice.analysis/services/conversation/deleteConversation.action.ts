@@ -40,18 +40,10 @@ export default defineAction<DeleteConversationParams, unknown>({
     }
 
     // Verify session ownership
-    const session = await dataSource.getRepository(Session).findOneBy({
-      id: conversation.sessionId,
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId: conversation.sessionId,
       userId: ctx.meta.user.id,
     });
-    if (!session) {
-      throw new Errors.MoleculerClientError(
-        "Conversation not found",
-        404,
-        "CONVERSATION_NOT_FOUND",
-        { id },
-      );
-    }
 
     // Cascade delete
     await dataSource.getRepository(ChatMessage).delete({ conversationId: id });

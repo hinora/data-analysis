@@ -98,7 +98,10 @@ describe("upload.uploadFile action", () => {
         },
       },
       callStubs: {
-        "session.getSession": { id: SESSION_ID, name: "Test Session" },
+        "session.verifySessionOwnership": {
+          sessionId: SESSION_ID,
+          userId: TEST_USER_ID,
+        },
       },
     });
 
@@ -120,7 +123,10 @@ describe("upload.uploadFile action", () => {
         },
       },
       callStubs: {
-        "session.getSession": { id: SESSION_ID, name: "Test Session" },
+        "session.verifySessionOwnership": {
+          sessionId: SESSION_ID,
+          userId: TEST_USER_ID,
+        },
       },
     });
 
@@ -141,7 +147,10 @@ describe("upload.uploadFile action", () => {
         },
       },
       callStubs: {
-        "session.getSession": { id: SESSION_ID, name: "Test Session" },
+        "session.verifySessionOwnership": {
+          sessionId: SESSION_ID,
+          userId: TEST_USER_ID,
+        },
       },
     });
 
@@ -180,7 +189,10 @@ describe("upload.uploadFile action", () => {
         },
       },
       callStubs: {
-        "session.getSession": { id: SESSION_ID, name: "Test Session" },
+        "session.verifySessionOwnership": {
+          sessionId: SESSION_ID,
+          userId: TEST_USER_ID,
+        },
       },
     });
 
@@ -228,7 +240,10 @@ describe("upload.uploadFile action", () => {
         },
       },
       callStubs: {
-        "session.getSession": { id: SESSION_ID, name: "Test Session" },
+        "session.verifySessionOwnership": {
+          sessionId: SESSION_ID,
+          userId: TEST_USER_ID,
+        },
       },
     });
 
@@ -248,7 +263,10 @@ describe("upload.uploadFile action", () => {
         },
       },
       callStubs: {
-        "session.getSession": { id: SESSION_ID, name: "Test Session" },
+        "session.verifySessionOwnership": {
+          sessionId: SESSION_ID,
+          userId: TEST_USER_ID,
+        },
       },
     });
 

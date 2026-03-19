@@ -84,7 +84,10 @@ describe("upload.importFromUrl action", () => {
     meta: TEST_META,
     db: () => testDs,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webFetch": {
         content: MOCK_CONTENT,
         title: MOCK_TITLE,
@@ -145,7 +148,10 @@ describe("upload.importFromUrl action", () => {
     },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
     },
     expectError: "Invalid or missing sessionId",
   });
@@ -159,7 +165,10 @@ describe("upload.importFromUrl action", () => {
     },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
     },
     expectError: "Invalid URL",
   });
@@ -173,7 +182,10 @@ describe("upload.importFromUrl action", () => {
     },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
     },
     expectError: "Only http and https URLs are supported",
   });
@@ -187,7 +199,10 @@ describe("upload.importFromUrl action", () => {
     },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webFetch": {
         content: "",
         title: "",
@@ -209,7 +224,10 @@ describe("upload.importFromUrl action", () => {
     meta: TEST_META,
     db: () => testDs,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webFetch": {
         content: MOCK_CONTENT,
         title: MOCK_TITLE,
@@ -250,7 +268,10 @@ describe("upload.importFromUrl action", () => {
     },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webFetch": () => {
         throw new Error("Connection timeout");
       },
@@ -268,7 +289,10 @@ describe("upload.importFromUrl action", () => {
     meta: TEST_META,
     db: () => testDs,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webFetch": {
         content: MOCK_CONTENT,
         title: "",

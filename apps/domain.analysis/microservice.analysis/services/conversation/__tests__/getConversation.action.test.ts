@@ -61,6 +61,10 @@ describe("conversation.getConversation action", () => {
       "chat.buildDynamicSystemPrompt": {
         systemPrompt: "Dynamic system prompt",
       },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
     },
     before: [
       {
@@ -112,6 +116,10 @@ describe("conversation.getConversation action", () => {
     db: () => testDs,
     callStubs: {
       "chat.buildDynamicSystemPrompt": { systemPrompt: "" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
     },
     expectError: "Conversation not found",
   });

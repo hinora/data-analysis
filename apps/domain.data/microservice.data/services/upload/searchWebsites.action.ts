@@ -71,7 +71,10 @@ export default defineAction<SearchWebsitesParams, SearchWebsitesResult>({
     }
 
     // Verify session ownership
-    await ctx.call("session.getSession", { id: sessionId });
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId,
+      userId: ctx.meta.user.id,
+    });
 
     logger.info(
       `[searchWebsites] keywords=${JSON.stringify(keywords)}, count=${count} for session ${sessionId}`,

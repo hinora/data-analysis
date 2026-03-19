@@ -62,7 +62,10 @@ describe("upload.searchWebsites action", () => {
     },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webSearch": SEARCH_RESULTS_A,
     },
     assertResult: (result) => {
@@ -84,7 +87,10 @@ describe("upload.searchWebsites action", () => {
     },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webSearch": (params: { query: string }) => {
         if (params.query === "keyword1") return SEARCH_RESULTS_A;
         if (params.query === "keyword2") return SEARCH_RESULTS_B;
@@ -117,7 +123,10 @@ describe("upload.searchWebsites action", () => {
     },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
     },
     expectError: "Invalid or missing sessionId",
   });
@@ -131,7 +140,10 @@ describe("upload.searchWebsites action", () => {
     },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webSearch": (params: { query: string }) => {
         if (params.query === "failing-keyword") {
           throw new Error("API key invalid");
@@ -155,7 +167,10 @@ describe("upload.searchWebsites action", () => {
     },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webSearch": () => {
         throw new Error("API unavailable");
       },
@@ -176,7 +191,10 @@ describe("upload.searchWebsites action", () => {
     },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webSearch": (params: { query: string; count: number }) => {
         expect(params.count).toBe(10);
         return { count: 0, query: params.query, results: [] };

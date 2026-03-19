@@ -76,7 +76,10 @@ describe("dataset.previewDataset action", () => {
     params: { id: DATASET_ID },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
     },
     db: () => testDs,
     before: [
@@ -159,7 +162,10 @@ describe("dataset.previewDataset action", () => {
     params: { id: DATASET_ID, limit: 1 },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
     },
     db: () => testDs,
     before: [
@@ -223,7 +229,10 @@ describe("dataset.previewDataset action", () => {
     params: { id: "00000000-0000-4000-8000-000000000000" },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
     },
     db: () => testDs,
     expectError: "Dataset not found",
@@ -235,7 +244,10 @@ describe("dataset.previewDataset action", () => {
     params: { id: DATASET_ID },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
     },
     db: () => testDs,
     before: [

@@ -234,6 +234,10 @@ function registerBasicStubs(callStubs: Record<string, unknown>) {
   callStubs["dataset.listDatasets"] = [];
   callStubs["chat.generateName"] = { name: "Generated Title" };
   callStubs["conversation.renameConversation"] = { success: true };
+  callStubs["session.verifySessionOwnership"] = {
+    sessionId: SESSION_ID,
+    userId: TEST_USER_ID,
+  };
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────
@@ -425,6 +429,10 @@ describe("chat.sendMessage action", () => {
       callStubs["chat.buildDynamicSystemPrompt"] = {
         systemPrompt: "You are a test assistant.",
       };
+      callStubs["session.verifySessionOwnership"] = {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      };
 
       mockAI.chatWithTools.mockResolvedValueOnce({
         ...aiDefaults.chatWithToolsResult,
@@ -450,6 +458,10 @@ describe("chat.sendMessage action", () => {
       });
       callStubs["chat.buildDynamicSystemPrompt"] = {
         systemPrompt: "You are a test assistant.",
+      };
+      callStubs["session.verifySessionOwnership"] = {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
       };
       callStubs["dataset.listDatasets"] = [];
       callStubs["chat.generateName"] = () => {
@@ -487,6 +499,10 @@ describe("chat.sendMessage action", () => {
       });
       callStubs["chat.buildDynamicSystemPrompt"] = {
         systemPrompt: "You are a test assistant.",
+      };
+      callStubs["session.verifySessionOwnership"] = {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
       };
       callStubs["dataset.listDatasets"] = [
         {
@@ -1468,6 +1484,10 @@ describe("chat.sendMessage action", () => {
       callStubs["chat.buildDynamicSystemPrompt"] = {
         systemPrompt: "Updated dynamic system prompt.",
       };
+      callStubs["session.verifySessionOwnership"] = {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      };
 
       mockAI.chatWithTools.mockResolvedValueOnce({
         ...aiDefaults.chatWithToolsResult,
@@ -1967,6 +1987,10 @@ describe("chat.sendMessage action", () => {
         content: "String throw",
         conversationId: CONVERSATION_ID,
       });
+      callStubs["session.verifySessionOwnership"] = {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      };
       callStubs["chat.buildDynamicSystemPrompt"] = () => {
         throw "string error value";
       };

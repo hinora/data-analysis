@@ -77,7 +77,10 @@ describe("dataset.deleteDataset action", () => {
     meta: TEST_META,
     db: () => testDs,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "session.updateSessionStatus": { success: true },
     },
     before: [
@@ -158,7 +161,10 @@ describe("dataset.deleteDataset action", () => {
     meta: TEST_META,
     db: () => testDs,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "session.updateSessionStatus": { success: true },
     },
     before: async (ds) => {
@@ -234,7 +240,10 @@ describe("dataset.deleteDataset action", () => {
     meta: TEST_META,
     db: () => testDs,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "session.updateSessionStatus": { success: true },
     },
     expectError: "Dataset not found",
@@ -247,7 +256,10 @@ describe("dataset.deleteDataset action", () => {
     meta: TEST_META,
     db: () => testDs,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "session.updateSessionStatus": () => {
         throw new Error("Service unavailable");
       },

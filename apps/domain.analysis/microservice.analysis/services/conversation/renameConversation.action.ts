@@ -9,7 +9,6 @@ import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import { Conversation } from "../../db/conversation.entity";
-import { Session } from "../../db/session.entity";
 
 export interface RenameConversationParams {
   id: string;
@@ -40,18 +39,10 @@ export default defineAction<RenameConversationParams, unknown>({
     }
 
     // Verify session ownership
-    const session = await dataSource.getRepository(Session).findOneBy({
-      id: conversation.sessionId,
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId: conversation.sessionId,
       userId: ctx.meta.user.id,
     });
-    if (!session) {
-      throw new Errors.MoleculerClientError(
-        "Conversation not found",
-        404,
-        "CONVERSATION_NOT_FOUND",
-        { id },
-      );
-    }
 
     conversation.name = name.trim();
     const saved = await repo.save(conversation);

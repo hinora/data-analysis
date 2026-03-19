@@ -42,7 +42,10 @@ export default defineAction<RetryGenerationParams, RetryGenerationResult>({
     }
 
     // Verify session ownership
-    await ctx.call("session.getSession", { id: dataset.sessionId });
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId: dataset.sessionId,
+      userId: ctx.meta.user.id,
+    });
 
     if (dataset.metadataStatus !== MetadataStatus.FAILED) {
       throw new Errors.MoleculerClientError(

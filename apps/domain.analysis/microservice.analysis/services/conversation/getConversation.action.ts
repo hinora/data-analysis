@@ -9,7 +9,6 @@ import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import { Conversation } from "../../db/conversation.entity";
-import { Session } from "../../db/session.entity";
 
 export interface GetConversationParams {
   id: string;
@@ -38,19 +37,10 @@ export default defineAction<GetConversationParams, unknown>({
     }
 
     // Verify session ownership
-    const sessionRepo = dataSource.getRepository(Session);
-    const session = await sessionRepo.findOneBy({
-      id: conversation.sessionId,
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId: conversation.sessionId,
       userId: ctx.meta.user.id,
     });
-    if (!session) {
-      throw new Errors.MoleculerClientError(
-        "Conversation not found",
-        404,
-        "CONVERSATION_NOT_FOUND",
-        { id },
-      );
-    }
 
     const promptResult = (await ctx.call("chat.buildDynamicSystemPrompt", {
       sessionId: conversation.sessionId,

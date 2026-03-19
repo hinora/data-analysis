@@ -1,5 +1,5 @@
 /**
- * Tests for dataset/listDatasets.action.ts
+ * Tests for dataset/verifyDatasetOwnership.action.ts
  */
 
 import { AILog } from "core.lib/database";
@@ -28,7 +28,7 @@ jest.mock("../../../db", () => ({
   },
 }));
 
-import listDatasetsAction from "../listDatasets.action";
+import verifyDatasetOwnershipAction from "../verifyDatasetOwnership.action";
 
 beforeAll(async () => {
   testDs = await createTestDataSource([
@@ -56,41 +56,14 @@ beforeEach(async () => {
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const FILE_ID = "33333333-3333-4333-8333-333333333333";
+const DATASET_ID = "44444444-4444-4444-8444-444444444444";
 const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
-const TEST_META = {
-  user: {
-    id: TEST_USER_ID,
-    email: "test@example.com",
-    nickName: "Test User",
-    isActive: true,
-    isVerified: false,
-  },
-};
-
-describe("dataset.listDatasets action", () => {
+describe("dataset.verifyDatasetOwnership action", () => {
   defineTest({
-    name: "should return empty array when no datasets exist",
-    action: listDatasetsAction,
-    params: { sessionId: SESSION_ID },
-    meta: TEST_META,
-    callStubs: {
-      "session.verifySessionOwnership": {
-        sessionId: SESSION_ID,
-        userId: TEST_USER_ID,
-      },
-    },
-    db: () => testDs,
-    assertResult: (result) => {
-      expect(result).toHaveLength(0);
-    },
-  });
-
-  defineTest({
-    name: "should return datasets for a session",
-    action: listDatasetsAction,
-    params: { sessionId: SESSION_ID },
-    meta: TEST_META,
+    name: "should succeed when dataset belongs to user's session",
+    action: verifyDatasetOwnershipAction,
+    params: { datasetId: DATASET_ID, userId: TEST_USER_ID },
     callStubs: {
       "session.verifySessionOwnership": {
         sessionId: SESSION_ID,
@@ -117,9 +90,10 @@ describe("dataset.listDatasets action", () => {
         entity: Dataset,
         data: [
           {
+            id: DATASET_ID,
             sessionId: SESSION_ID,
             originalFileId: FILE_ID,
-            name: "Test Dataset",
+            name: "Test Data",
             fileType: FileType.CSV,
             datasetType: DatasetType.STRUCTURED_TABLE,
             metadataStatus: MetadataStatus.READY,
@@ -132,9 +106,26 @@ describe("dataset.listDatasets action", () => {
       },
     ],
     assertResult: (result) => {
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("Test Dataset");
-      expect(result[0].sessionId).toBe(SESSION_ID);
+      expect(result.datasetId).toBe(DATASET_ID);
+      expect(result.sessionId).toBe(SESSION_ID);
+      expect(result.userId).toBe(TEST_USER_ID);
     },
+  });
+
+  defineTest({
+    name: "should throw 404 when dataset does not exist",
+    action: verifyDatasetOwnershipAction,
+    params: {
+      datasetId: "00000000-0000-4000-8000-000000000000",
+      userId: TEST_USER_ID,
+    },
+    callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
+    },
+    db: () => testDs,
+    expectError: "Dataset not found",
   });
 });

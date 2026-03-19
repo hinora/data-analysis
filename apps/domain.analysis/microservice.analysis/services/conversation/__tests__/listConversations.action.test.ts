@@ -55,6 +55,12 @@ describe("conversation.listConversations action", () => {
     action: listConversationsAction,
     params: { sessionId: SESSION_ID },
     meta: TEST_META,
+    callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
+    },
     db: () => testDs,
     before: [
       {
@@ -81,6 +87,12 @@ describe("conversation.listConversations action", () => {
     action: listConversationsAction,
     params: { sessionId: SESSION_ID },
     meta: TEST_META,
+    callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
+    },
     db: () => testDs,
     before: [
       {

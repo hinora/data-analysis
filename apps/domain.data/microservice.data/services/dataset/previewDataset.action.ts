@@ -49,7 +49,10 @@ export default defineAction<PreviewDatasetParams, unknown>({
     }
 
     // Verify session ownership
-    await ctx.call("session.getSession", { id: dataset.sessionId });
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId: dataset.sessionId,
+      userId: ctx.meta.user.id,
+    });
 
     const records = await recordRepo.find({
       where: { datasetId: id },

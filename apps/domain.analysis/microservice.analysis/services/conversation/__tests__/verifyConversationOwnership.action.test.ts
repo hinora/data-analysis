@@ -1,5 +1,5 @@
 /**
- * Tests for conversation/renameConversation.action.ts
+ * Tests for conversation/verifyConversationOwnership.action.ts
  */
 
 import {
@@ -21,7 +21,7 @@ jest.mock("../../../db", () => ({
   },
 }));
 
-import renameConversationAction from "../renameConversation.action";
+import verifyConversationOwnershipAction from "../verifyConversationOwnership.action";
 
 beforeAll(async () => {
   testDs = await createTestDataSource([Session, Conversation, ChatMessage]);
@@ -37,31 +37,14 @@ beforeEach(async () => {
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const CONVERSATION_ID = "22222222-2222-4222-8222-222222222222";
-
 const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const OTHER_USER_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
-const TEST_META = {
-  user: {
-    id: TEST_USER_ID,
-    email: "test@example.com",
-    nickName: "Test User",
-    isActive: true,
-    isVerified: false,
-  },
-};
-
-describe("conversation.renameConversation action", () => {
+describe("conversation.verifyConversationOwnership action", () => {
   defineTest({
-    name: "should rename an existing conversation",
-    action: renameConversationAction,
-    params: { id: CONVERSATION_ID, name: "New Name" },
-    meta: TEST_META,
-    callStubs: {
-      "session.verifySessionOwnership": {
-        sessionId: SESSION_ID,
-        userId: TEST_USER_ID,
-      },
-    },
+    name: "should succeed when conversation belongs to user",
+    action: verifyConversationOwnershipAction,
+    params: { conversationId: CONVERSATION_ID, userId: TEST_USER_ID },
     db: () => testDs,
     before: [
       {
@@ -69,7 +52,7 @@ describe("conversation.renameConversation action", () => {
         data: [
           {
             id: SESSION_ID,
-            name: "Session",
+            name: "My Session",
             status: SessionStatus.ACTIVE,
             datasetCount: 1,
             conversationCount: 1,
@@ -83,37 +66,35 @@ describe("conversation.renameConversation action", () => {
           {
             id: CONVERSATION_ID,
             sessionId: SESSION_ID,
-            name: "Old Name",
+            name: "My Conversation",
             systemPrompt: "",
             messageCount: 0,
           },
         ],
       },
     ],
-    assertResult: (result: any) => {
-      expect(result.name).toBe("New Name");
+    assertResult: (result) => {
+      expect(result.conversationId).toBe(CONVERSATION_ID);
+      expect(result.sessionId).toBe(SESSION_ID);
+      expect(result.userId).toBe(TEST_USER_ID);
     },
-    after: [
-      {
-        entity: Conversation,
-        assert: (conversations) => {
-          expect(conversations[0].name).toBe("New Name");
-        },
-      },
-    ],
   });
 
   defineTest({
-    name: "should trim whitespace from name",
-    action: renameConversationAction,
-    params: { id: CONVERSATION_ID, name: "  Trimmed Name  " },
-    meta: TEST_META,
-    callStubs: {
-      "session.verifySessionOwnership": {
-        sessionId: SESSION_ID,
-        userId: TEST_USER_ID,
-      },
+    name: "should throw 404 when conversation does not exist",
+    action: verifyConversationOwnershipAction,
+    params: {
+      conversationId: "00000000-0000-4000-8000-000000000000",
+      userId: TEST_USER_ID,
     },
+    db: () => testDs,
+    expectError: "Conversation not found",
+  });
+
+  defineTest({
+    name: "should throw 404 when session belongs to a different user",
+    action: verifyConversationOwnershipAction,
+    params: { conversationId: CONVERSATION_ID, userId: OTHER_USER_ID },
     db: () => testDs,
     before: [
       {
@@ -121,7 +102,7 @@ describe("conversation.renameConversation action", () => {
         data: [
           {
             id: SESSION_ID,
-            name: "Session",
+            name: "My Session",
             status: SessionStatus.ACTIVE,
             datasetCount: 1,
             conversationCount: 1,
@@ -135,24 +116,13 @@ describe("conversation.renameConversation action", () => {
           {
             id: CONVERSATION_ID,
             sessionId: SESSION_ID,
-            name: "Old Name",
+            name: "My Conversation",
             systemPrompt: "",
             messageCount: 0,
           },
         ],
       },
     ],
-    assertResult: (result: any) => {
-      expect(result.name).toBe("Trimmed Name");
-    },
-  });
-
-  defineTest({
-    name: "should throw 404 when conversation not found",
-    action: renameConversationAction,
-    params: { id: "00000000-0000-4000-8000-000000000000", name: "New" },
-    meta: TEST_META,
-    db: () => testDs,
     expectError: "Conversation not found",
   });
 });

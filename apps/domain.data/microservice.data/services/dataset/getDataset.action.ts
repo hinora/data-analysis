@@ -37,7 +37,10 @@ export default defineAction<GetDatasetParams, Dataset>({
     }
 
     // Verify session ownership
-    await ctx.call("session.getSession", { id: dataset.sessionId });
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId: dataset.sessionId,
+      userId: ctx.meta.user.id,
+    });
 
     return dataset;
   },

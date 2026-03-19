@@ -42,7 +42,10 @@ export default defineAction<DeleteDatasetParams, unknown>({
     }
 
     // Verify session ownership
-    await ctx.call("session.getSession", { id: dataset.sessionId });
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId: dataset.sessionId,
+      userId: ctx.meta.user.id,
+    });
 
     // Cascade delete related records
     await dataSource.getRepository(DataRecord).delete({ datasetId: id });

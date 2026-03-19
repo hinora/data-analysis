@@ -76,7 +76,10 @@ describe("dataset.renameDataset action", () => {
     params: { id: DATASET_ID, name: "New Name" },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
     },
     db: () => testDs,
     before: [
@@ -132,7 +135,10 @@ describe("dataset.renameDataset action", () => {
     params: { id: DATASET_ID, name: "  Trimmed  " },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
     },
     db: () => testDs,
     before: [
@@ -180,7 +186,10 @@ describe("dataset.renameDataset action", () => {
     params: { id: "00000000-0000-4000-8000-000000000000", name: "New" },
     meta: TEST_META,
     callStubs: {
-      "session.getSession": { id: SESSION_ID, name: "Test Session" },
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
     },
     db: () => testDs,
     expectError: "Dataset not found",

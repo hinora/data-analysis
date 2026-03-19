@@ -39,7 +39,10 @@ export default defineAction<RenameDatasetParams, unknown>({
     }
 
     // Verify session ownership
-    await ctx.call("session.getSession", { id: dataset.sessionId });
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId: dataset.sessionId,
+      userId: ctx.meta.user.id,
+    });
 
     dataset.name = name.trim();
     const saved = await repo.save(dataset);

@@ -55,7 +55,7 @@ export default defineAction<CreateConversationParams, CreateConversationResult>(
       const sessionRepo = dataSource.getRepository(Session);
       const convRepo = dataSource.getRepository(Conversation);
 
-      // Verify session exists
+      // Verify session exists and ownership
       const session = await sessionRepo.findOneBy({
         id: sessionId,
         userId: ctx.meta.user.id,
