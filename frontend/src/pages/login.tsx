@@ -140,7 +140,6 @@ const LoginPage: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
               style={{
                 width: "100%",
                 padding: "8px 12px",
