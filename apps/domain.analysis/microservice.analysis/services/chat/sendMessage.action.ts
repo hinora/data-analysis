@@ -814,7 +814,11 @@ async function handleNormalToolInLoop(req: {
     }
 
     // Capture chart spec from generateChartSpec tool
-    if (fnName === "generateChartSpec" && result && typeof result === "object") {
+    if (
+      fnName === "generateChartSpec" &&
+      result &&
+      typeof result === "object"
+    ) {
       return result as ChartSpec;
     }
   } catch (toolErr: unknown) {

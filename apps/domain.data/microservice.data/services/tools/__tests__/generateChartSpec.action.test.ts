@@ -80,7 +80,9 @@ describe("tools.generateChartSpec action", () => {
     action: generateChartSpecAction,
     params: {
       chartType: "bar",
-      data: [{ label: 123 as unknown as string, value: "42" as unknown as number }],
+      data: [
+        { label: 123 as unknown as string, value: "42" as unknown as number },
+      ],
       title: "Coercion Test",
     },
     assertResult: (result: ChartSpec) => {

@@ -8,6 +8,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatMessage } from "../../hooks/useChat";
+import DynamicChart from "./DynamicChart";
 import ReasoningPanel from "./ReasoningPanel";
 
 interface ChatMessageBubbleProps {
@@ -46,6 +47,11 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
             {message.content}
           </ReactMarkdown>
         </div>
+
+        {/* Dynamic chart visualization */}
+        {isAssistant && message.metadata?.chartSpec && (
+          <DynamicChart spec={message.metadata.chartSpec} />
+        )}
 
         {/* Confidence score */}
         {isAssistant && message.confidenceScore != null && (
