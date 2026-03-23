@@ -215,6 +215,7 @@ export default function ChatPage() {
                         toolsUsed: null,
                         reasoningSteps: null,
                         promptStats: null,
+                        metadata: null,
                         createdAt: new Date().toISOString(),
                       } satisfies ChatMessage
                     }

@@ -756,9 +756,43 @@ components:
           nullable: true
           items:
             type: string
+        metadata:
+          type: object
+          nullable: true
+          description: Additional structured data attached to the message
+          properties:
+            chartSpec:
+              $ref: "#/components/schemas/ChartSpec"
         createdAt:
           type: string
           format: date-time
+
+    ChartSpec:
+      type: object
+      description: Specification for rendering a dynamic chart on the frontend
+      properties:
+        chartType:
+          type: string
+          enum: [bar, line, pie]
+        title:
+          type: string
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              value:
+                type: number
+            required: [label, value]
+        xAxisLabel:
+          type: string
+          nullable: true
+        yAxisLabel:
+          type: string
+          nullable: true
+      required: [chartType, title, data]
 
     CitedSource:
       type: object

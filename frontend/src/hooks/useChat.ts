@@ -29,6 +29,25 @@ export interface PromptStats {
   totalTokens: number;
 }
 
+export type ChartType = "bar" | "line" | "pie";
+
+export interface ChartDataPoint {
+  label: string;
+  value: number;
+}
+
+export interface ChartSpec {
+  chartType: ChartType;
+  data: ChartDataPoint[];
+  title: string;
+  xAxisLabel?: string;
+  yAxisLabel?: string;
+}
+
+export interface MessageMetadata {
+  chartSpec?: ChartSpec;
+}
+
 export interface ChatMessage {
   id: string;
   conversationId: string;
@@ -39,6 +58,7 @@ export interface ChatMessage {
   toolsUsed: ToolUsage[] | null;
   reasoningSteps: string[] | null;
   promptStats: PromptStats | null;
+  metadata: MessageMetadata | null;
   createdAt: string;
 }
 
