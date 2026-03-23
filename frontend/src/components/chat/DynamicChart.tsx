@@ -117,6 +117,11 @@ function LineChartRenderer({ spec }: DynamicChartProps) {
   );
 }
 
+function formatPieLabel(props: { name?: string; percent?: number }): string {
+  const { name, percent } = props;
+  return `${name ?? ""} (${((percent ?? 0) * 100).toFixed(0)}%)`;
+}
+
 function PieChartRenderer({ spec }: DynamicChartProps) {
   return (
     <ResponsiveContainer width="100%" height={300}>
@@ -128,13 +133,11 @@ function PieChartRenderer({ spec }: DynamicChartProps) {
           cx="50%"
           cy="50%"
           outerRadius={100}
-          label={({ name, percent }: { name?: string; percent?: number }) =>
-            `${name ?? ""} (${((percent ?? 0) * 100).toFixed(0)}%)`
-          }
+          label={formatPieLabel}
         >
-          {spec.data.map((_entry, index) => (
+          {spec.data.map((entry, index) => (
             <Cell
-              key={`cell-${_entry.label}`}
+              key={`cell-${entry.label}`}
               fill={CHART_COLORS[index % CHART_COLORS.length]}
             />
           ))}

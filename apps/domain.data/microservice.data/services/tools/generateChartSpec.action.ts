@@ -11,7 +11,7 @@ import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
 
 // ---------------------------------------------------------------------------
-// ChartSpec types (shared with the frontend via copy)
+// ChartSpec types — keep in sync with frontend/src/hooks/useChat.ts
 // ---------------------------------------------------------------------------
 
 export type ChartType = "bar" | "line" | "pie";
