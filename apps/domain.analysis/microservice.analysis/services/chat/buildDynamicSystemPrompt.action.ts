@@ -69,7 +69,7 @@ export default defineAction<
 function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
   const parts: string[] = [];
   const toolConfig = getDefaultToolEnabledConfig();
-  const { meta, structured, unstructured, web } =
+  const { meta, structured, unstructured, visualization, web } =
     getEnabledToolNamesByCategory(toolConfig);
 
   parts.push(
@@ -111,6 +111,22 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
       "### Web Search Tools",
       "These tools search the internet for up-to-date information, news, or facts not available in the uploaded datasets. Use when the user asks questions requiring real-time or external knowledge.",
       `- ${web.join(", ")}`,
+      "",
+    );
+  }
+
+  if (visualization.length > 0) {
+    parts.push(
+      "### Visualization Tools",
+      "These tools generate chart specifications for rendering interactive charts on the frontend.",
+      `- ${visualization.join(", ")}`,
+      "",
+      "#### When to use visualization tools:",
+      "- If the user asks for a chart, graph, plot, or visualization, first use aggregation/retrieval tools to get the data, then pass the aggregated results to `generateChartSpec`.",
+      "- Choose the appropriate chart type: `bar` for comparisons, `line` for trends over time, `pie` for proportions.",
+      "- Always provide a descriptive title and axis labels.",
+      "- The chart data must be pre-aggregated: each data point needs a `label` (string) and `value` (number).",
+      "- Do NOT print the raw chart JSON in your text response. The chart will be rendered automatically by the frontend.",
       "",
     );
   }

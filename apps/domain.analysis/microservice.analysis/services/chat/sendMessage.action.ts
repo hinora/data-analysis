@@ -19,7 +19,9 @@ import { defineAction } from "core.lib/broker";
 import { AILog, AILogStatus, AILogType } from "core.lib/database";
 import { dataSource } from "../../db";
 import type {
+  ChartSpec,
   CitedSource,
+  MessageMetadata,
   PromptStats,
   ToolUsage,
 } from "../../db/chat-message.entity";
@@ -83,6 +85,7 @@ export interface StreamEventDone {
     conversationId: string;
     createdAt: Date;
     id: string;
+    metadata: MessageMetadata | null;
     promptStats: PromptStats | null;
     reasoningSteps: string[] | null;
     role: string;
@@ -143,8 +146,9 @@ async function validateToolDatasetType(
 ): Promise<string | null> {
   const category = getToolCategory(fnName as ToolName);
 
-  // Web and meta tools don't target datasets — skip validation
-  if (category === "web" || category === "meta") return null;
+  // Web, meta, and visualization tools don't target datasets — skip validation
+  if (category === "web" || category === "meta" || category === "visualization")
+    return null;
 
   // Collect all dataset IDs referenced by this tool call
   const datasetIds: string[] = [];
@@ -580,6 +584,7 @@ async function autoRenameConversation(req: {
 // ── Orchestration types ─────────────────────────────────────────────────
 
 interface OrchestrationResult {
+  chartSpec: ChartSpec | null;
   citedSources: CitedSource[];
   completionTokens: number;
   confidenceScore: number | null;
@@ -706,7 +711,7 @@ async function handleNormalToolInLoop(req: {
   reasoningSteps: string[];
   stream: PassThrough;
   toolsUsed: ToolUsage[];
-}): Promise<void> {
+}): Promise<ChartSpec | null> {
   const {
     citedSources,
     ctx,
@@ -733,7 +738,7 @@ async function handleNormalToolInLoop(req: {
       role: "tool",
       toolName: fnName,
     });
-    return;
+    return null;
   }
 
   // ── Dataset type validation ──────────────────────────────────────
@@ -758,7 +763,7 @@ async function handleNormalToolInLoop(req: {
       role: "tool",
       toolName: fnName,
     });
-    return;
+    return null;
   }
 
   try {
@@ -807,6 +812,11 @@ async function handleNormalToolInLoop(req: {
         });
       }
     }
+
+    // Capture chart spec from generateChartSpec tool
+    if (fnName === "generateChartSpec" && result && typeof result === "object") {
+      return result as ChartSpec;
+    }
   } catch (toolErr: unknown) {
     const errMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);
     const stepFail = `Tool ${fnName} failed: ${errMsg}`;
@@ -825,6 +835,8 @@ async function handleNormalToolInLoop(req: {
       toolName: fnName,
     });
   }
+
+  return null;
 }
 
 // ── AI orchestration loop ───────────────────────────────────────────────
@@ -841,6 +853,7 @@ async function runOrchestrationLoop(req: {
   const reasoningSteps: string[] = [];
   const toolsUsed: ToolUsage[] = [];
   const citedSources: CitedSource[] = [];
+  let chartSpec: ChartSpec | null = null;
   let finalContent = "";
   let contentStreamedViaCallback = false;
   let confidenceScore: number | null = null;
@@ -917,7 +930,7 @@ async function runOrchestrationLoop(req: {
             continue;
           }
 
-          await handleNormalToolInLoop({
+          const toolChartSpec = await handleNormalToolInLoop({
             citedSources,
             ctx,
             fnArgs,
@@ -927,6 +940,9 @@ async function runOrchestrationLoop(req: {
             stream,
             toolsUsed,
           });
+          if (toolChartSpec) {
+            chartSpec = toolChartSpec;
+          }
         }
 
         // ── Self-reflection: prompt the AI to verify data relevance ──
@@ -990,6 +1006,7 @@ async function runOrchestrationLoop(req: {
   }
 
   return {
+    chartSpec,
     citedSources,
     completionTokens: totalCompletionTokens,
     confidenceScore,
@@ -1026,11 +1043,16 @@ async function saveAndFinalize(req: {
         }
       : null;
 
+  const metadata: MessageMetadata | null = result.chartSpec
+    ? { chartSpec: result.chartSpec }
+    : null;
+
   const assistantMessage = msgRepo.create({
     citedSources: result.citedSources.length > 0 ? result.citedSources : null,
     confidenceScore: result.confidenceScore,
     content: result.finalContent,
     conversationId,
+    metadata,
     promptStats,
     reasoningSteps:
       result.reasoningSteps.length > 0 ? result.reasoningSteps : null,
@@ -1082,6 +1104,7 @@ async function saveAndFinalize(req: {
       conversationId: savedMessage.conversationId,
       createdAt: savedMessage.createdAt,
       id: savedMessage.id,
+      metadata: savedMessage.metadata,
       promptStats: savedMessage.promptStats,
       reasoningSteps: savedMessage.reasoningSteps,
       role: savedMessage.role,

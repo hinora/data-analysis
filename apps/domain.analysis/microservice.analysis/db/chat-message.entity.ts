@@ -42,6 +42,25 @@ export interface PromptStats {
   totalTokens: number;
 }
 
+export type ChartType = "bar" | "line" | "pie";
+
+export interface ChartDataPoint {
+  label: string;
+  value: number;
+}
+
+export interface ChartSpec {
+  chartType: ChartType;
+  data: ChartDataPoint[];
+  title: string;
+  xAxisLabel?: string;
+  yAxisLabel?: string;
+}
+
+export interface MessageMetadata {
+  chartSpec?: ChartSpec;
+}
+
 @Entity("chatMessages")
 @Index("idx_chatMessages_conversationId_createdAt", [
   "conversationId",
@@ -88,6 +107,9 @@ export class ChatMessage {
 
   @Column({ nullable: true, type: "jsonb" })
   promptStats: PromptStats | null;
+
+  @Column({ nullable: true, type: "jsonb" })
+  metadata: MessageMetadata | null;
 
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;

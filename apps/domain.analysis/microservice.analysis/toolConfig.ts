@@ -20,6 +20,7 @@ export type ToolName =
   | "createSubAgent"
   | "detectOutliers"
   | "filterByCondition"
+  | "generateChartSpec"
   | "getChunks"
   | "getDistinctValues"
   | "getPercentile"
@@ -31,7 +32,12 @@ export type ToolName =
   | "webFetch"
   | "webSearch";
 
-export type ToolCategory = "meta" | "structured" | "unstructured" | "web";
+export type ToolCategory =
+  | "meta"
+  | "structured"
+  | "unstructured"
+  | "visualization"
+  | "web";
 
 export type ToolEnabledConfig = Record<ToolName, boolean>;
 
@@ -312,6 +318,61 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
             },
           },
           required: ["datasetId", "conditions"],
+        },
+      },
+    },
+  },
+
+  generateChartSpec: {
+    action: "tools.generateChartSpec",
+    category: "visualization",
+    definition: {
+      type: "function",
+      function: {
+        name: "generateChartSpec",
+        description:
+          "[VISUALIZATION] Generate a chart specification from pre-aggregated data. Use this AFTER you have gathered data via aggregation/retrieval tools and the user has asked for a chart or visualization. Provide the aggregated data points, chart type, title, and axis labels. The chart will be rendered on the frontend.",
+        parameters: {
+          type: "object",
+          properties: {
+            chartType: {
+              type: "string",
+              enum: ["bar", "line", "pie"],
+              description: "The type of chart to generate",
+            },
+            title: {
+              type: "string",
+              description: "Chart title",
+            },
+            data: {
+              type: "array",
+              description:
+                "Pre-aggregated data points. Each item has a label (string) and value (number).",
+              items: {
+                type: "object",
+                properties: {
+                  label: {
+                    type: "string",
+                    description: "Category or x-axis label",
+                  },
+                  value: {
+                    type: "number",
+                    description: "Numeric value for the data point",
+                  },
+                },
+                required: ["label", "value"],
+              },
+            },
+            xAxisLabel: {
+              type: "string",
+              description: "Optional label for the X axis",
+            },
+            yAxisLabel: {
+              type: "string",
+              description: "Optional label for the Y axis",
+            },
+          },
+          required: ["chartType", "title", "data"],
         },
       },
     },
@@ -728,11 +789,13 @@ export function getEnabledToolNamesByCategory(config: ToolEnabledConfig): {
   meta: ToolName[];
   structured: ToolName[];
   unstructured: ToolName[];
+  visualization: ToolName[];
   web: ToolName[];
 } {
   const meta: ToolName[] = [];
   const structured: ToolName[] = [];
   const unstructured: ToolName[] = [];
+  const visualization: ToolName[] = [];
   const web: ToolName[] = [];
 
   for (const name of ALL_TOOL_NAMES) {
@@ -744,12 +807,14 @@ export function getEnabledToolNamesByCategory(config: ToolEnabledConfig): {
       web.push(name);
     } else if (category === "meta") {
       meta.push(name);
+    } else if (category === "visualization") {
+      visualization.push(name);
     } else {
       unstructured.push(name);
     }
   }
 
-  return { meta, structured, unstructured, web };
+  return { meta, structured, unstructured, visualization, web };
 }
 
 /** Looks up the category for a tool name. */

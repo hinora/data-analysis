@@ -11,7 +11,9 @@ import { Conversation } from "./conversation.entity";
 import { Session } from "./session.entity";
 
 export type {
+  ChartSpec,
   CitedSource,
+  MessageMetadata,
   PromptStats,
   ToolUsage,
 } from "./chat-message.entity";
