@@ -73,6 +73,7 @@ interface ChartSpec {
 
 - **Location**: `apps/domain.analysis/microservice.analysis/services/chat/buildDynamicSystemPrompt.action.ts`
 - Added "Visualization Tools" section with instructions:
+  - The AI is **proactive**: it generates charts whenever its analysis produces numerical results that would be clearer as a visualization, even without an explicit user request
   - First gather data using aggregation tools, then call `generateChartSpec`
   - Choose appropriate chart type (bar, line, pie)
   - Do NOT print raw chart JSON in text
