@@ -8,7 +8,7 @@
  */
 
 import type { Content, Part } from "@google/genai";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
 import type {
   AIAdapter,
   AIProviderConfig,
@@ -24,7 +24,8 @@ import type {
 } from "./types";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
-const DEFAULT_EMBEDDING_MODEL = "text-embedding-004";
+const DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001";
+const EMBEDDING_DIMENSIONS = 768;
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
@@ -328,10 +329,14 @@ export class GeminiAdapter implements AIAdapter {
     params: GenerateEmbeddingsParams,
   ): Promise<GenerateEmbeddingsResult> {
     const startTime = Date.now();
-    const model = params.model || DEFAULT_EMBEDDING_MODEL;
+    const model =
+      params.model || process.env.EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
 
     const response = await this.executeWithRetry(async () => {
       return this.client.models.embedContent({
+        config: {
+          outputDimensionality: EMBEDDING_DIMENSIONS,
+        },
         contents: params.input.map((text) => ({
           parts: [{ text }],
           role: "user",
@@ -500,7 +505,10 @@ export class GeminiAdapter implements AIAdapter {
       return this.client.models.generateContentStream({
         config: {
           temperature,
-          thinkingConfig: { includeThoughts: true },
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingLevel: ThinkingLevel.HIGH,
+          },
           ...(systemInstruction ? { systemInstruction } : {}),
           ...(tools ? { tools } : {}),
         },
