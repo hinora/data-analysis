@@ -17,6 +17,9 @@ import type {
   CreateAIAdapterOptions,
 } from "./types";
 
+/** Default embedding dimensions used across the platform (nomic-embed-text / Gemini). */
+export { EMBEDDING_DIMENSIONS } from "./constants";
+
 export { GeminiAdapter } from "./gemini.adapter";
 export { OllamaAdapter } from "./ollama.adapter";
 export type {

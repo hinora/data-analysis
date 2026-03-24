@@ -4,7 +4,7 @@
  * A segment of unstructured text from a PDF or non-tabular content,
  * with vector embedding for semantic search via pgvector.
  *
- * Note: The embedding column uses pgvector's vector(768) type.
+ * Note: The embedding column uses pgvector's native vector type (dimensions defined by EMBEDDING_DIMENSIONS).
  * The HNSW index (idx_textChunks_embedding_hnsw) is created at startup
  * in app.ts via raw SQL since TypeORM doesn't natively support pgvector index syntax.
  */
@@ -56,9 +56,10 @@ export class TextChunk {
   orderIndex: number;
 
   /**
-   * 768-dimensional vector embedding (nomic-embed-text) via pgvector.
-   * Stored as pgvector's native vector(768) type for efficient HNSW indexing.
-   * Defined as `text` for TypeORM compatibility; app.ts alters to vector(768) at startup.
+   * Vector embedding (nomic-embed-text) via pgvector.
+   * Stored as pgvector's native vector type for efficient HNSW indexing.
+   * Dimensions defined by EMBEDDING_DIMENSIONS constant in core.lib/adapters/ai.
+   * Defined as `text` for TypeORM compatibility; app.ts alters to the correct vector type at startup.
    */
   @Column({ nullable: true, type: "text" })
   embedding: string | null;
