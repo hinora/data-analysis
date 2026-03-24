@@ -609,9 +609,6 @@ function extractConfidenceScore(content: string): number | null {
 
 // ── Orphan chart-placeholder stripping ──────────────────────────────────
 
-/** Regex matching `[chart:N]` placeholders in message content. */
-const CHART_PLACEHOLDER_RE = /\[chart:\d+\]/g;
-
 /**
  * Strip `[chart:N]` placeholders that reference non-existent charts.
  * When the AI includes placeholders but never called `generateChartSpec`,
@@ -622,7 +619,7 @@ function stripOrphanChartPlaceholders(
   chartCount: number,
 ): string {
   if (chartCount === 0) {
-    return content.replace(CHART_PLACEHOLDER_RE, "").trim();
+    return content.replace(/\[chart:\d+\]/g, "").trim();
   }
 
   // When charts exist, only strip references to out-of-range indices
