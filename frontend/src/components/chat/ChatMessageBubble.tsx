@@ -37,17 +37,22 @@ const CHART_PLACEHOLDER_RE = /\[chart:(\d+)\]/g;
 function buildContentSegments(
   content: string,
   charts: ChartSpec[],
-): Array<{ chart: ChartSpec; type: "chart" } | { text: string; type: "text" }> {
+): Array<
+  | { chart: ChartSpec; key: string; type: "chart" }
+  | { key: string; text: string; type: "text" }
+> {
   if (charts.length === 0) {
-    return [{ text: content, type: "text" }];
+    return [{ key: "text-0", text: content, type: "text" }];
   }
 
   const segments: Array<
-    { chart: ChartSpec; type: "chart" } | { text: string; type: "text" }
+    | { chart: ChartSpec; key: string; type: "chart" }
+    | { key: string; text: string; type: "text" }
   > = [];
   const referencedIndices = new Set<number>();
 
   let currentIndex = 0;
+  let textCount = 0;
 
   // Reset regex state
   CHART_PLACEHOLDER_RE.lastIndex = 0;
@@ -59,6 +64,7 @@ function buildContentSegments(
     // Add preceding text if any
     if (match.index > currentIndex) {
       segments.push({
+        key: `text-${textCount++}`,
         text: content.slice(currentIndex, match.index),
         type: "text",
       });
@@ -66,7 +72,11 @@ function buildContentSegments(
 
     // Add chart if index is valid
     if (chartIndex >= 0 && chartIndex < charts.length) {
-      segments.push({ chart: charts[chartIndex], type: "chart" });
+      segments.push({
+        chart: charts[chartIndex],
+        key: `chart-${chartIndex}`,
+        type: "chart",
+      });
       referencedIndices.add(chartIndex);
     }
 
@@ -76,21 +86,33 @@ function buildContentSegments(
 
   // Add remaining text after the last placeholder
   if (currentIndex < content.length) {
-    segments.push({ text: content.slice(currentIndex), type: "text" });
+    segments.push({
+      key: `text-${textCount++}`,
+      text: content.slice(currentIndex),
+      type: "text",
+    });
   }
 
   // If no placeholders were found, return content + all charts at the end
   if (referencedIndices.size === 0) {
     return [
-      { text: content, type: "text" },
-      ...charts.map((chart) => ({ chart, type: "chart" as const })),
+      { key: "text-0", text: content, type: "text" },
+      ...charts.map((chart, i) => ({
+        chart,
+        key: `chart-${i}`,
+        type: "chart" as const,
+      })),
     ];
   }
 
   // Append any charts that were not referenced by a placeholder
   for (let i = 0; i < charts.length; i++) {
     if (!referencedIndices.has(i)) {
-      segments.push({ chart: charts[i], type: "chart" });
+      segments.push({
+        chart: charts[i],
+        key: `chart-${i}`,
+        type: "chart",
+      });
     }
   }
 
@@ -104,7 +126,7 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
   const charts = isAssistant ? resolveCharts(message) : [];
   const segments = isAssistant
     ? buildContentSegments(message.content, charts)
-    : [{ text: message.content, type: "text" as const }];
+    : [{ key: "text-0", text: message.content, type: "text" as const }];
 
   return (
     <div
@@ -132,7 +154,7 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
         {segments.map((segment) =>
           segment.type === "text" ? (
             <div
-              key={`text-${segment.text.slice(0, 32)}`}
+              key={segment.key}
               className={isUser ? "markdown-user" : "markdown-assistant"}
             >
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -140,10 +162,7 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
               </ReactMarkdown>
             </div>
           ) : (
-            <DynamicChart
-              key={`chart-${segment.chart.title}`}
-              spec={segment.chart}
-            />
+            <DynamicChart key={segment.key} spec={segment.chart} />
           ),
         )}
 
