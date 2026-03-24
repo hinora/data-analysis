@@ -48,12 +48,12 @@ function buildContentSegments(
   const referencedIndices = new Set<number>();
 
   let currentIndex = 0;
-  let match: RegExpExecArray | null = null;
 
   // Reset regex state
   CHART_PLACEHOLDER_RE.lastIndex = 0;
 
-  while ((match = CHART_PLACEHOLDER_RE.exec(content)) !== null) {
+  let match = CHART_PLACEHOLDER_RE.exec(content);
+  while (match !== null) {
     const chartIndex = Number.parseInt(match[1], 10);
 
     // Add preceding text if any
@@ -71,6 +71,7 @@ function buildContentSegments(
     }
 
     currentIndex = match.index + match[0].length;
+    match = CHART_PLACEHOLDER_RE.exec(content);
   }
 
   // Add remaining text after the last placeholder
@@ -128,10 +129,10 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
         }}
       >
         {/* Message content with inline charts */}
-        {segments.map((segment, idx) =>
+        {segments.map((segment) =>
           segment.type === "text" ? (
             <div
-              key={`text-${idx}`}
+              key={`text-${segment.text.slice(0, 32)}`}
               className={isUser ? "markdown-user" : "markdown-assistant"}
             >
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -139,7 +140,10 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
               </ReactMarkdown>
             </div>
           ) : (
-            <DynamicChart key={`chart-${idx}`} spec={segment.chart} />
+            <DynamicChart
+              key={`chart-${segment.chart.title}`}
+              spec={segment.chart}
+            />
           ),
         )}
 
