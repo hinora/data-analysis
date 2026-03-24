@@ -9,6 +9,7 @@ const mockStdout = { on: jest.fn() };
 const mockStderr = { on: jest.fn() };
 const mockStdin = { end: jest.fn(), write: jest.fn() };
 const mockProc = {
+  kill: jest.fn(),
   on: jest.fn(),
   stderr: mockStderr,
   stdin: mockStdin,

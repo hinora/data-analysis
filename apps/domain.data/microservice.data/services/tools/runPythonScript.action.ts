@@ -76,14 +76,26 @@ function runInSandbox(
   script: string,
 ): Promise<{ stderr: string; stdout: string }> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(
-      "docker",
-      ["exec", "-i", CONTAINER_NAME, "python3", "-"],
-      { timeout: EXECUTION_TIMEOUT_MS },
-    );
+    let settled = false;
+
+    const proc = spawn("docker", [
+      "exec",
+      "-i",
+      CONTAINER_NAME,
+      "python3",
+      "-",
+    ]);
 
     let stdout = "";
     let stderr = "";
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        proc.kill("SIGKILL");
+        resolve({ stderr: "Execution timed out", stdout });
+      }
+    }, EXECUTION_TIMEOUT_MS);
 
     proc.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString();
@@ -94,23 +106,31 @@ function runInSandbox(
     });
 
     proc.on("error", (err) => {
-      reject(
-        new Errors.MoleculerClientError(
-          `Python sandbox execution failed: ${err.message}`,
-          500,
-          "SANDBOX_ERROR",
-        ),
-      );
+      clearTimeout(timer);
+      if (!settled) {
+        settled = true;
+        reject(
+          new Errors.MoleculerClientError(
+            `Python sandbox execution failed: ${err.message}`,
+            500,
+            "SANDBOX_ERROR",
+          ),
+        );
+      }
     });
 
     proc.on("close", (code) => {
-      if (code !== 0 && code !== null) {
-        resolve({
-          stderr: stderr || `Process exited with code ${code}`,
-          stdout,
-        });
-      } else {
-        resolve({ stderr, stdout });
+      clearTimeout(timer);
+      if (!settled) {
+        settled = true;
+        if (code === 0) {
+          resolve({ stderr, stdout });
+        } else {
+          resolve({
+            stderr: stderr || `Process exited with code ${code}`,
+            stdout,
+          });
+        }
       }
     });
 
