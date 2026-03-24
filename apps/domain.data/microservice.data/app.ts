@@ -37,7 +37,9 @@ async function main() {
       ALTER COLUMN embedding TYPE vector(${EMBEDDING_DIMENSIONS})
       USING embedding::vector(${EMBEDDING_DIMENSIONS})
     `);
-    console.log(`✅ Embedding column migrated to vector(${EMBEDDING_DIMENSIONS})`);
+    console.log(
+      `✅ Embedding column migrated to vector(${EMBEDDING_DIMENSIONS})`,
+    );
   }
 
   // Create HNSW index for fast cosine similarity search if not exists

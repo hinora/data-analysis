@@ -9,6 +9,7 @@
 
 import type { Content, Part } from "@google/genai";
 import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
+import { EMBEDDING_DIMENSIONS } from "./constants";
 import type {
   AIAdapter,
   AIProviderConfig,
@@ -22,7 +23,6 @@ import type {
   GenerateTextResult,
   ToolCall,
 } from "./types";
-import { EMBEDDING_DIMENSIONS } from "./constants";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
 const DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001";
