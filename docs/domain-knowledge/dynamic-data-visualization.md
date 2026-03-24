@@ -92,6 +92,7 @@ interface ChartSpec {
 - `handleNormalToolInLoop` returns `ChartSpec` when `generateChartSpec` is called
 - `runOrchestrationLoop` collects all chart specs into a `charts: ChartSpec[]` array
 - `saveAndFinalize` stores `charts` in `metadata.charts` JSONB field
+- `saveAndFinalize` strips orphan `[chart:N]` placeholders from content when the AI includes them without calling `generateChartSpec`, or when the index is out of range
 - SSE "done" event includes `metadata` with `charts` array
 - Visualization tools skip dataset type validation
 

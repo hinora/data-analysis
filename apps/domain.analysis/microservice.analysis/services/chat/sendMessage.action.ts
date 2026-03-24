@@ -607,6 +607,33 @@ function extractConfidenceScore(content: string): number | null {
   return null;
 }
 
+// ── Orphan chart-placeholder stripping ──────────────────────────────────
+
+/** Regex matching `[chart:N]` placeholders in message content. */
+const CHART_PLACEHOLDER_RE = /\[chart:\d+\]/g;
+
+/**
+ * Strip `[chart:N]` placeholders that reference non-existent charts.
+ * When the AI includes placeholders but never called `generateChartSpec`,
+ * the orphan tags would otherwise appear as raw text in the saved message.
+ */
+function stripOrphanChartPlaceholders(
+  content: string,
+  chartCount: number,
+): string {
+  if (chartCount === 0) {
+    return content.replace(CHART_PLACEHOLDER_RE, "").trim();
+  }
+
+  // When charts exist, only strip references to out-of-range indices
+  return content
+    .replace(/\[chart:(\d+)\]/g, (match, idx) => {
+      const index = Number.parseInt(idx, 10);
+      return index >= 0 && index < chartCount ? match : "";
+    })
+    .trim();
+}
+
 // ── Sub-agent tool call handler ─────────────────────────────────────────
 
 async function handleSubAgentCall(req: {
@@ -1050,10 +1077,16 @@ async function saveAndFinalize(req: {
   const metadata: MessageMetadata | null =
     result.charts.length > 0 ? { charts: result.charts } : null;
 
+  // Strip orphan [chart:N] placeholders that reference non-existent charts
+  const cleanedContent = stripOrphanChartPlaceholders(
+    result.finalContent,
+    result.charts.length,
+  );
+
   const assistantMessage = msgRepo.create({
     citedSources: result.citedSources.length > 0 ? result.citedSources : null,
     confidenceScore: result.confidenceScore,
-    content: result.finalContent,
+    content: cleanedContent,
     conversationId,
     metadata,
     promptStats,

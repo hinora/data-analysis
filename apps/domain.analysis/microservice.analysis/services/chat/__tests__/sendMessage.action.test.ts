@@ -1980,4 +1980,96 @@ describe("chat.sendMessage action", () => {
       });
     });
   });
+
+  describe("orphan chart placeholder stripping", () => {
+    it("should strip [chart:N] placeholders when AI never called generateChartSpec", async () => {
+      await seedConversation();
+      const { callStubs, ctx } = createCtx({
+        content: "Show me a chart",
+        conversationId: CONVERSATION_ID,
+      });
+      registerBasicStubs(callStubs);
+
+      // AI returns text with chart placeholder but never calls generateChartSpec
+      mockAI.chatWithTools.mockResolvedValueOnce({
+        ...aiDefaults.chatWithToolsResult,
+        content: "Here is the chart:\n\n[chart:0]\n\nAs shown above.",
+        toolCalls: [],
+      });
+
+      const result = await sendMessageAction.handler(ctx as never);
+      const events = await collectSSEEvents(result);
+      const parsed = parseSSEEvents(events);
+
+      const doneEvent = parsed.find((e) => e.type === "done");
+      expect(doneEvent).toBeDefined();
+
+      // Placeholder should be stripped and content trimmed
+      expect(doneEvent!.payload.message.content).not.toContain("[chart:");
+      expect(doneEvent!.payload.message.metadata).toBeNull();
+
+      // Verify persisted content is also stripped
+      const messages = await testDs.getRepository(ChatMessage).find({
+        order: { createdAt: "ASC" },
+        where: { conversationId: CONVERSATION_ID },
+      });
+      const assistantMsg = messages.find(
+        (m) => m.role === MessageRole.ASSISTANT,
+      );
+      expect(assistantMsg!.content).not.toContain("[chart:");
+    });
+
+    it("should preserve valid [chart:N] placeholders when charts exist", async () => {
+      await seedConversation();
+      const { callStubs, ctx } = createCtx({
+        content: "Show me a chart of sales",
+        conversationId: CONVERSATION_ID,
+      });
+      registerBasicStubs(callStubs);
+
+      const chartSpec = {
+        chartType: "bar",
+        data: [
+          { label: "Q1", value: 100 },
+          { label: "Q2", value: 200 },
+        ],
+        title: "Sales by Quarter",
+      };
+
+      // First AI call: tool call to generateChartSpec
+      mockAI.chatWithTools.mockResolvedValueOnce({
+        ...aiDefaults.chatWithToolsResult,
+        content: "",
+        toolCalls: [
+          {
+            function: {
+              name: "generateChartSpec",
+              arguments: chartSpec,
+            },
+          },
+        ],
+      });
+
+      callStubs["tools.generateChartSpec"] = chartSpec;
+
+      // Second AI call: final response with chart placeholder
+      mockAI.chatWithTools.mockResolvedValueOnce({
+        ...aiDefaults.chatWithToolsResult,
+        content: "Here is the chart:\n\n[chart:0]\n\nAs shown above.",
+        toolCalls: [],
+      });
+
+      const result = await sendMessageAction.handler(ctx as never);
+      const events = await collectSSEEvents(result);
+      const parsed = parseSSEEvents(events);
+
+      const doneEvent = parsed.find((e) => e.type === "done");
+      expect(doneEvent).toBeDefined();
+
+      // Valid placeholder should be preserved
+      expect(doneEvent!.payload.message.content).toContain("[chart:0]");
+      expect(doneEvent!.payload.message.metadata).toBeDefined();
+      expect(doneEvent!.payload.message.metadata.charts).toHaveLength(1);
+    });
+  });
 });
