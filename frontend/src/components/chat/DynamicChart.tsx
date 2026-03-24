@@ -193,6 +193,19 @@ export default function DynamicChart({ spec }: DynamicChartProps) {
       {spec.chartType === "bar" && <BarChartRenderer spec={spec} />}
       {spec.chartType === "line" && <LineChartRenderer spec={spec} />}
       {spec.chartType === "pie" && <PieChartRenderer spec={spec} />}
+
+      {spec.datasetName && (
+        <div
+          style={{
+            marginTop: "8px",
+            fontSize: "11px",
+            color: "#888",
+            textAlign: "right",
+          }}
+        >
+          Source: {spec.datasetName}
+        </div>
+      )}
     </div>
   );
 }

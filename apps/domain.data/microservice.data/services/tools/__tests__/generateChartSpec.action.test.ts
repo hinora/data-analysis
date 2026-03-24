@@ -90,4 +90,36 @@ describe("tools.generateChartSpec action", () => {
       expect(result.data[0].value).toBe(42);
     },
   });
+
+  defineTest({
+    name: "should include datasetName when provided",
+    action: generateChartSpecAction,
+    params: {
+      chartType: "bar",
+      data: [
+        { label: "A", value: 10 },
+        { label: "B", value: 20 },
+      ],
+      datasetName: "Sales Data",
+      title: "Sales by Category",
+    },
+    assertResult: (result: ChartSpec) => {
+      expect(result.chartType).toBe("bar");
+      expect(result.title).toBe("Sales by Category");
+      expect(result.datasetName).toBe("Sales Data");
+    },
+  });
+
+  defineTest({
+    name: "should omit datasetName when not provided",
+    action: generateChartSpecAction,
+    params: {
+      chartType: "pie",
+      data: [{ label: "X", value: 1 }],
+      title: "No Source",
+    },
+    assertResult: (result: ChartSpec) => {
+      expect(result.datasetName).toBeUndefined();
+    },
+  });
 });

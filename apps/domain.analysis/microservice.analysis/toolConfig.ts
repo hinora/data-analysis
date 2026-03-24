@@ -331,7 +331,7 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
       function: {
         name: "generateChartSpec",
         description:
-          "[VISUALIZATION] Generate a chart specification from pre-aggregated data. Use this AFTER you have gathered data via aggregation/retrieval tools and the user has asked for a chart or visualization. Provide the aggregated data points, chart type, title, and axis labels. The chart will be rendered on the frontend.",
+          "[VISUALIZATION] Generate a chart specification from pre-aggregated data. Use this AFTER you have gathered data via aggregation/retrieval tools. Provide the aggregated data points, chart type, title, axis labels, and the dataset name. You can call this multiple times to create multiple charts. Place [chart:N] placeholders in your text response (N = 0-based call order) where you want each chart to appear.",
         parameters: {
           type: "object",
           properties: {
@@ -362,6 +362,11 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
                 },
                 required: ["label", "value"],
               },
+            },
+            datasetName: {
+              type: "string",
+              description:
+                "Name of the dataset this chart data originates from, for data source attribution",
             },
             xAxisLabel: {
               type: "string",

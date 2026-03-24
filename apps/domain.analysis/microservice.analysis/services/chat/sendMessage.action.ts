@@ -584,7 +584,7 @@ async function autoRenameConversation(req: {
 // ── Orchestration types ─────────────────────────────────────────────────
 
 interface OrchestrationResult {
-  chartSpec: ChartSpec | null;
+  charts: ChartSpec[];
   citedSources: CitedSource[];
   completionTokens: number;
   confidenceScore: number | null;
@@ -857,7 +857,7 @@ async function runOrchestrationLoop(req: {
   const reasoningSteps: string[] = [];
   const toolsUsed: ToolUsage[] = [];
   const citedSources: CitedSource[] = [];
-  let chartSpec: ChartSpec | null = null;
+  const charts: ChartSpec[] = [];
   let finalContent = "";
   let contentStreamedViaCallback = false;
   let confidenceScore: number | null = null;
@@ -945,7 +945,7 @@ async function runOrchestrationLoop(req: {
             toolsUsed,
           });
           if (toolChartSpec) {
-            chartSpec = toolChartSpec;
+            charts.push(toolChartSpec);
           }
         }
 
@@ -1010,7 +1010,7 @@ async function runOrchestrationLoop(req: {
   }
 
   return {
-    chartSpec,
+    charts,
     citedSources,
     completionTokens: totalCompletionTokens,
     confidenceScore,
@@ -1047,9 +1047,8 @@ async function saveAndFinalize(req: {
         }
       : null;
 
-  const metadata: MessageMetadata | null = result.chartSpec
-    ? { chartSpec: result.chartSpec }
-    : null;
+  const metadata: MessageMetadata | null =
+    result.charts.length > 0 ? { charts: result.charts } : null;
 
   const assistantMessage = msgRepo.create({
     citedSources: result.citedSources.length > 0 ? result.citedSources : null,
