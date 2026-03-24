@@ -51,7 +51,7 @@ function buildContentSegments(
   > = [];
   const referencedIndices = new Set<number>();
 
-  let lastIndex = 0;
+  let currentIndex = 0;
   let match: RegExpExecArray | null = null;
 
   // Reset regex state
@@ -61,9 +61,9 @@ function buildContentSegments(
     const chartIndex = Number.parseInt(match[1], 10);
 
     // Add preceding text if any
-    if (match.index > lastIndex) {
+    if (match.index > currentIndex) {
       segments.push({
-        text: content.slice(lastIndex, match.index),
+        text: content.slice(currentIndex, match.index),
         type: "text",
       });
     }
@@ -74,12 +74,12 @@ function buildContentSegments(
       referencedIndices.add(chartIndex);
     }
 
-    lastIndex = match.index + match[0].length;
+    currentIndex = match.index + match[0].length;
   }
 
   // Add remaining text after the last placeholder
-  if (lastIndex < content.length) {
-    segments.push({ text: content.slice(lastIndex), type: "text" });
+  if (currentIndex < content.length) {
+    segments.push({ text: content.slice(currentIndex), type: "text" });
   }
 
   // If no placeholders were found, return content + all charts at the end
