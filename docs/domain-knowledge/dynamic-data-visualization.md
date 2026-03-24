@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Dynamic Data Visualization feature allows the AI chat assistant to generate interactive charts that can be placed **anywhere within a message**. The AI can call `generateChartSpec` multiple times to produce multiple charts, and use `[chart:N]` placeholders in its text response to position each chart inline. Each chart can reference its data source via the optional `datasetName` field.
+The Dynamic Data Visualization feature allows the AI chat assistant to generate interactive charts that can be placed **anywhere within a message**. The AI can call `generateChartSpec` multiple times to produce multiple charts, and use `[chart:N]` placeholders in its text response to position each chart inline. Each chart can reference its data sources via the optional `datasetNames` field.
 
 ## Architecture
 
