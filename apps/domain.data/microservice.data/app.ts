@@ -7,6 +7,7 @@
 process.env.TZ = "UTC";
 
 import "dotenv/config";
+import { EMBEDDING_DIMENSIONS } from "core.lib/adapters/ai";
 import { createApp, run } from "core.lib/broker";
 import { validateAIProvider } from "core.lib/config";
 import { dataSource } from "./db";
@@ -29,14 +30,14 @@ async function main() {
   `);
   if (columnType.length > 0 && columnType[0].data_type !== "USER-DEFINED") {
     console.log(
-      `⏳ Migrating embedding column from ${columnType[0].data_type} to vector(768)...`,
+      `⏳ Migrating embedding column from ${columnType[0].data_type} to vector(${EMBEDDING_DIMENSIONS})...`,
     );
     await dataSource.query(`
       ALTER TABLE "textChunks"
-      ALTER COLUMN embedding TYPE vector(768)
-      USING embedding::vector(768)
+      ALTER COLUMN embedding TYPE vector(${EMBEDDING_DIMENSIONS})
+      USING embedding::vector(${EMBEDDING_DIMENSIONS})
     `);
-    console.log("✅ Embedding column migrated to vector(768)");
+    console.log(`✅ Embedding column migrated to vector(${EMBEDDING_DIMENSIONS})`);
   }
 
   // Create HNSW index for fast cosine similarity search if not exists

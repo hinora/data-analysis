@@ -2,6 +2,7 @@
  * Tests for tools/semanticSearch.action.ts
  */
 
+import { EMBEDDING_DIMENSIONS } from "core.lib/adapters/ai";
 import {
   aiDefaults,
   createMockAIAdapter,
@@ -62,7 +63,7 @@ describe("tools.semanticSearch action", () => {
   });
 
   it("should merge vector and keyword search results", async () => {
-    const mockEmbedding = Array.from({ length: 768 }, () => 0.1);
+    const mockEmbedding = Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.1);
     mockAI.generateEmbeddings.mockResolvedValueOnce({
       ...aiDefaults.embeddingsResult,
       embeddings: [mockEmbedding],
@@ -127,7 +128,7 @@ describe("tools.semanticSearch action", () => {
   });
 
   it("should boost results that appear in both vector and keyword search", async () => {
-    const mockEmbedding = Array.from({ length: 768 }, () => 0.1);
+    const mockEmbedding = Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.1);
     mockAI.generateEmbeddings.mockResolvedValueOnce({
       ...aiDefaults.embeddingsResult,
       embeddings: [mockEmbedding],

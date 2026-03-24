@@ -22,10 +22,10 @@ import type {
   GenerateTextResult,
   ToolCall,
 } from "./types";
+import { EMBEDDING_DIMENSIONS } from "./constants";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
 const DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001";
-const EMBEDDING_DIMENSIONS = 768;
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
