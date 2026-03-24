@@ -761,8 +761,10 @@ components:
           nullable: true
           description: Additional structured data attached to the message
           properties:
-            chartSpec:
-              $ref: "#/components/schemas/ChartSpec"
+            charts:
+              type: array
+              items:
+                $ref: "#/components/schemas/ChartSpec"
         createdAt:
           type: string
           format: date-time
@@ -786,6 +788,12 @@ components:
               value:
                 type: number
             required: [label, value]
+        datasetNames:
+          type: array
+          nullable: true
+          items:
+            type: string
+          description: Names of the datasets the chart data originates from
         xAxisLabel:
           type: string
           nullable: true

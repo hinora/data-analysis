@@ -24,7 +24,7 @@ export interface ChartDataPoint {
 export interface ChartSpec {
   chartType: ChartType;
   data: ChartDataPoint[];
-  datasetName?: string;
+  datasetNames?: string[];
   title: string;
   xAxisLabel?: string;
   yAxisLabel?: string;
@@ -39,8 +39,8 @@ export interface GenerateChartSpecParams {
   chartType: "bar" | "line" | "pie";
   /** Pre-aggregated data points for the chart */
   data: ChartDataPoint[];
-  /** Name of the dataset this chart data originates from */
-  datasetName?: string;
+  /** Names of the datasets this chart data originates from */
+  datasetNames?: string[];
   /** Chart title */
   title: string;
   /** Optional X-axis label */
@@ -74,13 +74,17 @@ export default defineAction<GenerateChartSpecParams, ChartSpec>({
       min: 1,
     },
     title: { type: "string", min: 1 },
-    datasetName: { type: "string", optional: true },
+    datasetNames: {
+      type: "array",
+      items: { type: "string" },
+      optional: true,
+    },
     xAxisLabel: { type: "string", optional: true },
     yAxisLabel: { type: "string", optional: true },
   },
 
   handler(ctx: TypedContext<GenerateChartSpecParams>): ChartSpec {
-    const { chartType, data, datasetName, title, xAxisLabel, yAxisLabel } =
+    const { chartType, data, datasetNames, title, xAxisLabel, yAxisLabel } =
       ctx.params;
 
     const spec: ChartSpec = {
@@ -92,7 +96,8 @@ export default defineAction<GenerateChartSpecParams, ChartSpec>({
       title,
     };
 
-    if (datasetName) spec.datasetName = datasetName;
+    if (datasetNames && datasetNames.length > 0)
+      spec.datasetNames = datasetNames;
     if (xAxisLabel) spec.xAxisLabel = xAxisLabel;
     if (yAxisLabel) spec.yAxisLabel = yAxisLabel;
 

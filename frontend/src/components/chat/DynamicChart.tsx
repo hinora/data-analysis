@@ -194,7 +194,7 @@ export default function DynamicChart({ spec }: DynamicChartProps) {
       {spec.chartType === "line" && <LineChartRenderer spec={spec} />}
       {spec.chartType === "pie" && <PieChartRenderer spec={spec} />}
 
-      {spec.datasetName && (
+      {spec.datasetNames && spec.datasetNames.length > 0 && (
         <div
           style={{
             marginTop: "8px",
@@ -203,7 +203,7 @@ export default function DynamicChart({ spec }: DynamicChartProps) {
             textAlign: "right",
           }}
         >
-          Source: {spec.datasetName}
+          Source: {spec.datasetNames.join(", ")}
         </div>
       )}
     </div>

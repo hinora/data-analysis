@@ -92,7 +92,7 @@ describe("tools.generateChartSpec action", () => {
   });
 
   defineTest({
-    name: "should include datasetName when provided",
+    name: "should include datasetNames when provided",
     action: generateChartSpecAction,
     params: {
       chartType: "bar",
@@ -100,18 +100,32 @@ describe("tools.generateChartSpec action", () => {
         { label: "A", value: 10 },
         { label: "B", value: 20 },
       ],
-      datasetName: "Sales Data",
+      datasetNames: ["Sales Data"],
       title: "Sales by Category",
     },
     assertResult: (result: ChartSpec) => {
       expect(result.chartType).toBe("bar");
       expect(result.title).toBe("Sales by Category");
-      expect(result.datasetName).toBe("Sales Data");
+      expect(result.datasetNames).toEqual(["Sales Data"]);
     },
   });
 
   defineTest({
-    name: "should omit datasetName when not provided",
+    name: "should support multiple datasetNames",
+    action: generateChartSpecAction,
+    params: {
+      chartType: "line",
+      data: [{ label: "X", value: 1 }],
+      datasetNames: ["Sales Data", "Marketing Data"],
+      title: "Combined View",
+    },
+    assertResult: (result: ChartSpec) => {
+      expect(result.datasetNames).toEqual(["Sales Data", "Marketing Data"]);
+    },
+  });
+
+  defineTest({
+    name: "should omit datasetNames when not provided",
     action: generateChartSpecAction,
     params: {
       chartType: "pie",
@@ -119,7 +133,7 @@ describe("tools.generateChartSpec action", () => {
       title: "No Source",
     },
     assertResult: (result: ChartSpec) => {
-      expect(result.datasetName).toBeUndefined();
+      expect(result.datasetNames).toBeUndefined();
     },
   });
 });

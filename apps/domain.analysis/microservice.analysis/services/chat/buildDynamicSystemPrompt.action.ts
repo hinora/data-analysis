@@ -127,7 +127,7 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
       "- Choose the appropriate chart type: `bar` for comparisons, `line` for trends over time, `pie` for proportions.",
       "- Always provide a descriptive title and axis labels.",
       "- The chart data must be pre-aggregated: each data point needs a `label` (string) and `value` (number).",
-      "- Always provide the `datasetName` parameter to reference the data source.",
+      "- Always provide the `datasetNames` parameter to reference the data source(s).",
       "- Do NOT print the raw chart JSON in your text response. The chart will be rendered automatically by the frontend.",
       "",
       "#### Multiple charts and inline placement:",
@@ -140,7 +140,8 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
       "#### Data source referencing:",
       "- When reporting data or analysis results, ALWAYS mention the dataset name it came from.",
       '- Example: "Based on the **Sales Dataset**, the total revenue is $1.2M."',
-      "- When generating charts, always pass the `datasetName` parameter so the chart displays its data source.",
+      "- When generating charts, always pass the `datasetNames` parameter (an array of dataset names) so the chart displays its data source(s).",
+      "- If the chart uses data from multiple datasets, include all relevant dataset names in the array.",
       "",
     );
   }

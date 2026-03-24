@@ -17,15 +17,11 @@ interface ChatMessageBubbleProps {
 }
 
 /**
- * Resolve the list of charts from message metadata,
- * supporting both the new `charts` array and the legacy `chartSpec` field.
+ * Resolve the list of charts from message metadata.
  */
 function resolveCharts(message: ChatMessage): ChartSpec[] {
   if (message.metadata?.charts && message.metadata.charts.length > 0) {
     return message.metadata.charts;
-  }
-  if (message.metadata?.chartSpec) {
-    return [message.metadata.chartSpec];
   }
   return [];
 }

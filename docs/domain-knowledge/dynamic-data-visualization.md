@@ -45,7 +45,7 @@ interface ChartDataPoint {
 interface ChartSpec {
   chartType: ChartType;
   data: ChartDataPoint[];
-  datasetName?: string; // Data source attribution
+  datasetNames?: string[]; // Data source attribution (supports multiple sources)
   title: string;
   xAxisLabel?: string;
   yAxisLabel?: string;
@@ -59,7 +59,7 @@ interface ChartSpec {
 - **Location**: `apps/domain.data/microservice.data/services/tools/generateChartSpec.action.ts`
 - **Category**: `visualization`
 - **Purpose**: Validates and returns a strictly typed `ChartSpec` JSON
-- **Parameters**: `chartType`, `title`, `data[]`, optional `datasetName`, `xAxisLabel`, `yAxisLabel`
+- **Parameters**: `chartType`, `title`, `data[]`, optional `datasetNames`, `xAxisLabel`, `yAxisLabel`
 - **No database access**: Pure transformation/validation tool
 
 ### 2. Tool Configuration
@@ -67,7 +67,7 @@ interface ChartSpec {
 - **Location**: `apps/domain.analysis/microservice.analysis/toolConfig.ts`
 - `"generateChartSpec"` in `ToolName` union type
 - `"visualization"` in `ToolCategory` union type
-- Tool is registered with OpenAI-compatible function definition including `datasetName` parameter
+- Tool is registered with OpenAI-compatible function definition including `datasetNames` parameter
 - `getEnabledToolNamesByCategory` returns visualization tools separately
 
 ### 3. System Prompt
@@ -77,14 +77,14 @@ interface ChartSpec {
   - Be **proactive**: generate charts whenever numerical results would be clearer as a visualization
   - First gather data using aggregation tools, then call `generateChartSpec`
   - Choose appropriate chart type (bar, line, pie)
-  - Always provide the `datasetName` parameter to reference the data source
+  - Always provide the `datasetNames` parameter to reference the data source(s)
   - Do NOT print raw chart JSON in text
   - **Multiple charts**: call `generateChartSpec` multiple times; each call gets an index (0-based)
   - **Inline placement**: use `[chart:N]` placeholders in text to position charts
   - If no placeholders are used, charts appear at the end of the message
 - "Data source referencing" section instructs the AI:
   - Always mention the dataset name when reporting data
-  - Always pass `datasetName` to `generateChartSpec`
+  - Always pass `datasetNames` to `generateChartSpec`
 
 ### 4. Orchestration Loop
 
@@ -100,8 +100,7 @@ interface ChartSpec {
 - **Location**: `apps/domain.analysis/microservice.analysis/db/chat-message.entity.ts`
 - `metadata` JSONB column (`MessageMetadata | null`)
 - `MessageMetadata` contains:
-  - `charts?: ChartSpec[]` — array of chart specs (current)
-  - `chartSpec?: ChartSpec` — single chart spec (legacy, backward compat)
+  - `charts?: ChartSpec[]` — array of chart specs
 
 ## Frontend Components
 
@@ -114,13 +113,13 @@ interface ChartSpec {
   - **Line chart**: `LineChartRenderer` — for trends over time
   - **Pie chart**: `PieChartRenderer` — for proportional distributions
 - Validates ChartSpec before rendering (fallback warning shown for invalid specs)
-- Shows data source label when `spec.datasetName` is provided
+- Shows data source label(s) when `spec.datasetNames` is provided
 - Responsive container adapts to parent width
 
 ### 2. ChatMessageBubble Integration
 
 - **Location**: `frontend/src/components/chat/ChatMessageBubble.tsx`
-- **`resolveCharts()`**: reads charts from `metadata.charts` (preferred) or `metadata.chartSpec` (legacy fallback)
+- **`resolveCharts()`**: reads charts from `metadata.charts`
 - **`buildContentSegments()`**: parses `[chart:N]` placeholders in message content and interleaves text segments with chart segments
   - If placeholders are found, charts are rendered at the placeholder positions
   - If no placeholders exist, charts are appended after the message text
@@ -131,5 +130,5 @@ interface ChartSpec {
 
 - **Location**: `frontend/src/hooks/useChat.ts`
 - `metadata: MessageMetadata | null` on `ChatMessage` interface
-- `MessageMetadata` contains `charts?: ChartSpec[]` and legacy `chartSpec?: ChartSpec`
+- `MessageMetadata` contains `charts?: ChartSpec[]`
 - Exported `ChartSpec`, `ChartDataPoint`, `ChartType`, `MessageMetadata` types

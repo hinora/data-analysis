@@ -52,15 +52,13 @@ export interface ChartDataPoint {
 export interface ChartSpec {
   chartType: ChartType;
   data: ChartDataPoint[];
-  datasetName?: string;
+  datasetNames?: string[];
   title: string;
   xAxisLabel?: string;
   yAxisLabel?: string;
 }
 
 export interface MessageMetadata {
-  /** @deprecated Use `charts` instead. Kept for backward compatibility. */
-  chartSpec?: ChartSpec;
   charts?: ChartSpec[];
 }
 

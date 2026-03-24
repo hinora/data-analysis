@@ -363,10 +363,11 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
                 required: ["label", "value"],
               },
             },
-            datasetName: {
-              type: "string",
+            datasetNames: {
+              type: "array",
+              items: { type: "string" },
               description:
-                "Name of the dataset this chart data originates from, for data source attribution",
+                "Names of the datasets this chart data originates from, for data source attribution",
             },
             xAxisLabel: {
               type: "string",
