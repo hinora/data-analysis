@@ -28,7 +28,7 @@ Single source of truth containing:
 | Export | Description |
 |--------|-------------|
 | `ToolName` | Union type of all tool names (alphabetical) |
-| `ToolCategory` | `"structured"`, `"unstructured"`, or `"web"` |
+| `ToolCategory` | `"meta"`, `"structured"`, `"unstructured"`, `"visualization"`, or `"web"` |
 | `ToolEnabledConfig` | `Record<ToolName, boolean>` |
 | `ALL_TOOL_NAMES` | Sorted array of every tool name |
 | `getDefaultToolEnabledConfig()` | Returns config with all tools **enabled** |
@@ -106,6 +106,20 @@ webFetch, webSearch
 > JS-heavy sites. Supports `waitForSelector` to wait for specific elements
 > and `maxLength` to truncate large pages. Blocks images, fonts, and stylesheets
 > for faster loading.
+
+### Meta / Advanced Tools (`meta`)
+
+Tools that orchestrate other tools or provide advanced capabilities:
+
+createSubAgent, runPythonScript
+
+- **createSubAgent** — Delegate a self-contained analysis task to a sub-agent.
+  See `docs/domain-knowledge/sub-agent-delegation.md` for details.
+- **runPythonScript** — Execute a target tool to retrieve data, then run a
+  Python script against that data in an isolated Docker sandbox. The tool
+  result is injected as `input_data` into the Python environment. The sandbox
+  (`python-sandbox` service in docker-compose.yml) runs with no network access
+  and limited CPU/RAM for security.
 
 ## Adding a New Tool
 

@@ -60,9 +60,9 @@ const DATASET_ID = "44444444-4444-4444-8444-444444444444";
 
 describe("tools.sampleData action", () => {
   defineTest({
-    name: "should return sample rows from dataset",
+    name: "should return sample rows from dataset using fromRecord/toRecord",
     action: sampleDataAction,
-    params: { datasetId: DATASET_ID },
+    params: { datasetId: DATASET_ID, fromRecord: 0, toRecord: 3 },
     db: () => testDs,
     callStubs: {
       "dataset.getDataset": { id: DATASET_ID },
@@ -122,17 +122,17 @@ describe("tools.sampleData action", () => {
       },
     ],
     assertResult: (result: any) => {
-      expect(result.count).toBe(3);
-      expect(result.results).toHaveLength(3);
-      expect(result.results[0]).toHaveProperty("name");
-      expect(result.results[0]).toHaveProperty("age");
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(3);
+      expect(result[0]).toHaveProperty("name");
+      expect(result[0]).toHaveProperty("age");
     },
   });
 
   defineTest({
-    name: "should respect the limit parameter",
+    name: "should respect the fromRecord/toRecord range",
     action: sampleDataAction,
-    params: { datasetId: DATASET_ID, limit: 2 },
+    params: { datasetId: DATASET_ID, fromRecord: 0, toRecord: 2 },
     db: () => testDs,
     callStubs: {
       "dataset.getDataset": { id: DATASET_ID },
@@ -192,15 +192,15 @@ describe("tools.sampleData action", () => {
       },
     ],
     assertResult: (result: any) => {
-      expect(result.count).toBe(2);
-      expect(result.results).toHaveLength(2);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(2);
     },
   });
 
   defineTest({
     name: "should return empty results for dataset with no records",
     action: sampleDataAction,
-    params: { datasetId: DATASET_ID },
+    params: { datasetId: DATASET_ID, fromRecord: 0, toRecord: 10 },
     db: () => testDs,
     callStubs: {
       "dataset.getDataset": { id: DATASET_ID },
@@ -240,8 +240,8 @@ describe("tools.sampleData action", () => {
       },
     ],
     assertResult: (result: any) => {
-      expect(result.count).toBe(0);
-      expect(result.results).toHaveLength(0);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(0);
     },
   });
 });

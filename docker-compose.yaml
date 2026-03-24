@@ -46,6 +46,18 @@ services:
       - "4318:4318"
     restart: unless-stopped
 
+  python-sandbox:
+    image: python:3.12-slim
+    container_name: python-sandbox
+    command: ["sleep", "infinity"]
+    network_mode: "none"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   postgres_test_data:

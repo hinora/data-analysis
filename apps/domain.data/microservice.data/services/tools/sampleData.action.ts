@@ -1,39 +1,57 @@
 /**
  * Sample Data Tool
  *
- * Preview rows from a structured-table dataset. Returns the first N rows
- * (by insertion order) so the AI can understand column formats, data types,
- * and representative values before performing analysis.
+ * Preview rows from a structured-table dataset using a record range.
+ * Returns a JSON array of records between fromRecord and toRecord
+ * (0-based, exclusive end) so the AI can understand column formats,
+ * data types, and representative values before performing analysis.
  */
 
 import type { TypedContext } from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
+import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import { DataRecord } from "../../db/data-record.entity";
 
-const DEFAULT_LIMIT = 10;
-const MAX_LIMIT = 100;
+const MAX_RANGE = 50;
 
 export interface SampleDataParams {
   datasetId: string;
-  limit?: number;
+  fromRecord: number;
+  toRecord: number;
 }
 
 export default defineAction<SampleDataParams, unknown>({
   params: {
     datasetId: { type: "uuid" },
-    limit: {
+    fromRecord: {
+      type: "number",
+      integer: true,
+      min: 0,
+    },
+    toRecord: {
       type: "number",
       integer: true,
       min: 1,
-      max: MAX_LIMIT,
-      optional: true,
-      default: DEFAULT_LIMIT,
     },
   },
 
   async handler(ctx: TypedContext<SampleDataParams>) {
-    const { datasetId, limit = DEFAULT_LIMIT } = ctx.params;
+    const { datasetId, fromRecord, toRecord } = ctx.params;
+
+    if (toRecord <= fromRecord) {
+      throw new Errors.ValidationError(
+        "toRecord must be greater than fromRecord",
+      );
+    }
+
+    const range = toRecord - fromRecord;
+    if (range > MAX_RANGE) {
+      throw new Errors.ValidationError(
+        `Range exceeds maximum of ${MAX_RANGE} records per request`,
+      );
+    }
+
     await ctx.call("dataset.getDataset", { id: datasetId });
     const repo = dataSource.getRepository(DataRecord);
 
@@ -42,12 +60,10 @@ export default defineAction<SampleDataParams, unknown>({
       .select("r.data")
       .where("r.datasetId = :datasetId", { datasetId })
       .orderBy("r.id", "ASC")
-      .limit(Math.min(limit, MAX_LIMIT))
+      .offset(fromRecord)
+      .limit(range)
       .getRawMany();
 
-    return {
-      results: results.map((r) => r.r_data || r.data),
-      count: results.length,
-    };
+    return results.map((r) => r.r_data || r.data);
   },
 });

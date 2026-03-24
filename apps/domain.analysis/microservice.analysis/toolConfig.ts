@@ -26,6 +26,7 @@ export type ToolName =
   | "getPercentile"
   | "joinDatasets"
   | "pivotTable"
+  | "runPythonScript"
   | "sampleData"
   | "semanticSearch"
   | "sortByField"
@@ -564,6 +565,40 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
     },
   },
 
+  runPythonScript: {
+    action: "tools.runPythonScript",
+    category: "meta",
+    definition: {
+      type: "function",
+      function: {
+        name: "runPythonScript",
+        description:
+          "Execute a target tool to retrieve data, then run a Python script against that data in an isolated sandbox. The tool result is injected as `input_data` (a Python variable) into the script. Use this for custom computations, transformations, or analysis that cannot be done with the built-in tools alone.",
+        parameters: {
+          type: "object",
+          properties: {
+            pythonCode: {
+              type: "string",
+              description:
+                "Python code to execute. The variable `input_data` contains the tool result (parsed JSON). Use `print()` to produce output.",
+            },
+            targetTool: {
+              type: "string",
+              description:
+                'Name of the tool to execute first (e.g. "sampleData").',
+            },
+            toolParams: {
+              type: "object",
+              description:
+                'Arguments to pass to the target tool (e.g. {"datasetId": "...", "fromRecord": 0, "toRecord": 10}).',
+            },
+          },
+          required: ["targetTool", "toolParams", "pythonCode"],
+        },
+      },
+    },
+  },
+
   sampleData: {
     action: "tools.sampleData",
     category: "structured",
@@ -572,17 +607,23 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
       function: {
         name: "sampleData",
         description:
-          "[STRUCTURED DATA ONLY] Preview rows from a structured-table dataset. Returns the first N rows so you can understand column formats, data types, and representative values before performing analysis. Use this as a first step to explore unfamiliar data. Do NOT use on unstructured-text datasets.",
+          "[STRUCTURED DATA ONLY] Preview rows from a structured-table dataset by record range. Returns a JSON array of records between fromRecord (inclusive, 0-based) and toRecord (exclusive). Maximum 50 records per request. Use this as a first step to explore unfamiliar data. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
             datasetId: { type: "string", description: "Dataset UUID" },
-            limit: {
+            fromRecord: {
               type: "number",
-              description: "Number of rows to return (default: 10, max: 100)",
+              description:
+                "Start index (0-based, inclusive). First record is 0.",
+            },
+            toRecord: {
+              type: "number",
+              description:
+                "End index (exclusive). Must be greater than fromRecord. Max range: 50.",
             },
           },
-          required: ["datasetId"],
+          required: ["datasetId", "fromRecord", "toRecord"],
         },
       },
     },
