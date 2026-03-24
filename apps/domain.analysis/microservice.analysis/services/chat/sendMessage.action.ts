@@ -584,7 +584,7 @@ async function autoRenameConversation(req: {
 // ── Orchestration types ─────────────────────────────────────────────────
 
 interface OrchestrationResult {
-  chartSpec: ChartSpec | null;
+  charts: ChartSpec[];
   citedSources: CitedSource[];
   completionTokens: number;
   confidenceScore: number | null;
@@ -605,6 +605,30 @@ function extractConfidenceScore(content: string): number | null {
   if (parsed >= 0 && parsed <= 1) return parsed;
   if (parsed > 1 && parsed <= 100) return parsed / 100;
   return null;
+}
+
+// ── Orphan chart-placeholder stripping ──────────────────────────────────
+
+/**
+ * Strip `[chart:N]` placeholders that reference non-existent charts.
+ * When the AI includes placeholders but never called `generateChartSpec`,
+ * the orphan tags would otherwise appear as raw text in the saved message.
+ */
+function stripOrphanChartPlaceholders(
+  content: string,
+  chartCount: number,
+): string {
+  if (chartCount === 0) {
+    return content.replace(/\[chart:\d+\]/g, "").trim();
+  }
+
+  // When charts exist, only strip references to out-of-range indices
+  return content
+    .replace(/\[chart:(\d+)\]/g, (match, idx) => {
+      const index = Number.parseInt(idx, 10);
+      return index >= 0 && index < chartCount ? match : "";
+    })
+    .trim();
 }
 
 // ── Sub-agent tool call handler ─────────────────────────────────────────
@@ -857,7 +881,7 @@ async function runOrchestrationLoop(req: {
   const reasoningSteps: string[] = [];
   const toolsUsed: ToolUsage[] = [];
   const citedSources: CitedSource[] = [];
-  let chartSpec: ChartSpec | null = null;
+  const charts: ChartSpec[] = [];
   let finalContent = "";
   let contentStreamedViaCallback = false;
   let confidenceScore: number | null = null;
@@ -945,7 +969,7 @@ async function runOrchestrationLoop(req: {
             toolsUsed,
           });
           if (toolChartSpec) {
-            chartSpec = toolChartSpec;
+            charts.push(toolChartSpec);
           }
         }
 
@@ -1010,7 +1034,7 @@ async function runOrchestrationLoop(req: {
   }
 
   return {
-    chartSpec,
+    charts,
     citedSources,
     completionTokens: totalCompletionTokens,
     confidenceScore,
@@ -1047,14 +1071,19 @@ async function saveAndFinalize(req: {
         }
       : null;
 
-  const metadata: MessageMetadata | null = result.chartSpec
-    ? { chartSpec: result.chartSpec }
-    : null;
+  const metadata: MessageMetadata | null =
+    result.charts.length > 0 ? { charts: result.charts } : null;
+
+  // Strip orphan [chart:N] placeholders that reference non-existent charts
+  const cleanedContent = stripOrphanChartPlaceholders(
+    result.finalContent,
+    result.charts.length,
+  );
 
   const assistantMessage = msgRepo.create({
     citedSources: result.citedSources.length > 0 ? result.citedSources : null,
     confidenceScore: result.confidenceScore,
-    content: result.finalContent,
+    content: cleanedContent,
     conversationId,
     metadata,
     promptStats,

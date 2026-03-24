@@ -39,13 +39,14 @@ export interface ChartDataPoint {
 export interface ChartSpec {
   chartType: ChartType;
   data: ChartDataPoint[];
+  datasetNames?: string[];
   title: string;
   xAxisLabel?: string;
   yAxisLabel?: string;
 }
 
 export interface MessageMetadata {
-  chartSpec?: ChartSpec;
+  charts?: ChartSpec[];
 }
 
 export interface ChatMessage {

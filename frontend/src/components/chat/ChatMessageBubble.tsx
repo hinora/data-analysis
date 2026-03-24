@@ -3,11 +3,12 @@
  *
  * Renders a single chat message with role-specific styling,
  * confidence indicator, cited sources, and tool usage details.
+ * Supports inline chart rendering via [chart:N] placeholders.
  */
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatMessage } from "../../hooks/useChat";
+import type { ChartSpec, ChatMessage } from "../../hooks/useChat";
 import DynamicChart from "./DynamicChart";
 import ReasoningPanel from "./ReasoningPanel";
 
@@ -15,9 +16,117 @@ interface ChatMessageBubbleProps {
   message: ChatMessage;
 }
 
+/**
+ * Resolve the list of charts from message metadata.
+ */
+function resolveCharts(message: ChatMessage): ChartSpec[] {
+  if (message.metadata?.charts && message.metadata.charts.length > 0) {
+    return message.metadata.charts;
+  }
+  return [];
+}
+
+/** Regex matching `[chart:N]` placeholders in message content. */
+const CHART_PLACEHOLDER_RE = /\[chart:(\d+)\]/g;
+
+/**
+ * Split message content into interleaved text and chart segments.
+ * If no placeholders are found, returns the full content as a single text
+ * segment and appends all charts at the end.
+ */
+function buildContentSegments(
+  content: string,
+  charts: ChartSpec[],
+): Array<
+  | { chart: ChartSpec; key: string; type: "chart" }
+  | { key: string; text: string; type: "text" }
+> {
+  if (charts.length === 0) {
+    return [{ key: "text-0", text: content, type: "text" }];
+  }
+
+  const segments: Array<
+    | { chart: ChartSpec; key: string; type: "chart" }
+    | { key: string; text: string; type: "text" }
+  > = [];
+  const referencedIndices = new Set<number>();
+
+  let currentIndex = 0;
+  let textCount = 0;
+
+  // Reset regex state
+  CHART_PLACEHOLDER_RE.lastIndex = 0;
+
+  let match = CHART_PLACEHOLDER_RE.exec(content);
+  while (match !== null) {
+    const chartIndex = Number.parseInt(match[1], 10);
+
+    // Add preceding text if any
+    if (match.index > currentIndex) {
+      segments.push({
+        key: `text-${textCount++}`,
+        text: content.slice(currentIndex, match.index),
+        type: "text",
+      });
+    }
+
+    // Add chart if index is valid
+    if (chartIndex >= 0 && chartIndex < charts.length) {
+      segments.push({
+        chart: charts[chartIndex],
+        key: `chart-${chartIndex}`,
+        type: "chart",
+      });
+      referencedIndices.add(chartIndex);
+    }
+
+    currentIndex = match.index + match[0].length;
+    match = CHART_PLACEHOLDER_RE.exec(content);
+  }
+
+  // Add remaining text after the last placeholder
+  if (currentIndex < content.length) {
+    segments.push({
+      key: `text-${textCount++}`,
+      text: content.slice(currentIndex),
+      type: "text",
+    });
+  }
+
+  // If no placeholders were found, return content + all charts at the end
+  if (referencedIndices.size === 0) {
+    return [
+      { key: "text-0", text: content, type: "text" },
+      ...charts.map((chart, i) => ({
+        chart,
+        key: `chart-${i}`,
+        type: "chart" as const,
+      })),
+    ];
+  }
+
+  // Append any charts that were not referenced by a placeholder
+  for (let i = 0; i < charts.length; i++) {
+    if (!referencedIndices.has(i)) {
+      segments.push({
+        chart: charts[i],
+        key: `chart-${i}`,
+        type: "chart",
+      });
+    }
+  }
+
+  return segments;
+}
+
 export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
+
+  const charts = isAssistant ? resolveCharts(message) : [];
+  const segments = isAssistant
+    ? buildContentSegments(message.content, charts)
+    : [{ key: "text-0", text: message.content, type: "text" as const }];
 
   return (
     <div
@@ -41,16 +150,20 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
           wordBreak: "break-word",
         }}
       >
-        {/* Message content */}
-        <div className={isUser ? "markdown-user" : "markdown-assistant"}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {message.content}
-          </ReactMarkdown>
-        </div>
-
-        {/* Dynamic chart visualization */}
-        {isAssistant && message.metadata?.chartSpec && (
-          <DynamicChart spec={message.metadata.chartSpec} />
+        {/* Message content with inline charts */}
+        {segments.map((segment) =>
+          segment.type === "text" ? (
+            <div
+              key={segment.key}
+              className={isUser ? "markdown-user" : "markdown-assistant"}
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {segment.text}
+              </ReactMarkdown>
+            </div>
+          ) : (
+            <DynamicChart key={segment.key} spec={segment.chart} />
+          ),
         )}
 
         {/* Confidence score */}
