@@ -171,8 +171,8 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
       "",
       "#### Python Script Execution (runPythonScript):",
       "- Run a custom Python script against data retrieved by any tool.",
-      '- Provide `targetTool` (e.g. "sampleData"), `toolParams` (arguments for that tool), and `pythonCode` (Python script to execute).',
-      "- The tool result is injected as a Python variable `input_data` — use `print()` to produce output.",
+      "- Provide `tools` (array of {name, params} objects for each tool to run) and `pythonCode` (Python script to execute).",
+      "- Each tool result becomes an element of the `input_data` list — use `print()` to produce output.",
       "- Use this for custom calculations, data transformations, statistical analysis, or any computation not covered by built-in tools.",
       "",
     );
@@ -212,7 +212,7 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
     "- If the response says `truncated: true`, inform the user that results were limited and offer to drill down further (e.g. with filters or a different groupBy).",
     "- NEVER request all grouped results for high-cardinality fields — this wastes context and slows down analysis. Instead, ask targeted questions: 'top 10 by revenue', 'bottom 5 by count', etc.",
     "- The aggregate tool supports rich `conditions` for pre-filtering records before aggregation (operators: eq, neq, gt, gte, lt, lte, contains, in).",
-    "- Use `sampleData` to preview rows from a dataset before analysis to understand column formats and representative values.",
+    "- Use `getRecords` to retrieve rows from a dataset before analysis to understand column formats and representative values.",
   );
 
   parts.push(

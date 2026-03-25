@@ -1,7 +1,7 @@
 /**
- * Sample Data Tool
+ * Get Records Tool
  *
- * Preview rows from a structured-table dataset using a record range.
+ * Retrieve rows from a structured-table dataset using a record range.
  * Returns a JSON array of records between fromRecord and toRecord
  * (0-based, exclusive end) so the AI can understand column formats,
  * data types, and representative values before performing analysis.
@@ -15,13 +15,13 @@ import { DataRecord } from "../../db/data-record.entity";
 
 const MAX_RANGE = 50;
 
-export interface SampleDataParams {
+export interface GetRecordsParams {
   datasetId: string;
   fromRecord: number;
   toRecord: number;
 }
 
-export default defineAction<SampleDataParams, unknown>({
+export default defineAction<GetRecordsParams, unknown>({
   params: {
     datasetId: { type: "uuid" },
     fromRecord: {
@@ -36,7 +36,7 @@ export default defineAction<SampleDataParams, unknown>({
     },
   },
 
-  async handler(ctx: TypedContext<SampleDataParams>) {
+  async handler(ctx: TypedContext<GetRecordsParams>) {
     const { datasetId, fromRecord, toRecord } = ctx.params;
 
     if (toRecord <= fromRecord) {

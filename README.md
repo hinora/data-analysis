@@ -143,7 +143,7 @@ Handles file upload, parsing, AI metadata generation, and 16 data analysis tools
 | `getPercentile` | Percentile values (P25, P50, P75, P99) |
 | `joinDatasets` | Join two datasets on a shared field |
 | `pivotTable` | Cross-tabulation by two categorical fields |
-| `sampleData` | Random sample of records from a dataset |
+| `getRecords` | Retrieve records from a dataset by range |
 | `sortByField` | Sort records by field(s) with limit |
 
 #### Unstructured Text Tools (for `unstructured-text` datasets)

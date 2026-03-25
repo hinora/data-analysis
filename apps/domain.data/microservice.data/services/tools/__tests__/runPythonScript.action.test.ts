@@ -61,17 +61,25 @@ beforeEach(() => {
 });
 
 describe("tools.runPythonScript action", () => {
-  it("should execute target tool and run Python code", async () => {
-    simulateSuccessfulExecution("Processing 3 records...\n");
+  it("should execute multiple tools and run Python code", async () => {
+    simulateSuccessfulExecution("Processing 2 tool results...\n");
 
     const ctx = createTestContext({
       params: {
-        pythonCode: "print(f'Processing {len(input_data)} records...')",
-        targetTool: "sampleData",
-        toolParams: { datasetId: "ds-1", fromRecord: 0, toRecord: 3 },
+        pythonCode: "print(f'Processing {len(input_data)} tool results...')",
+        tools: [
+          {
+            name: "getRecords",
+            params: { datasetId: "ds-1", fromRecord: 0, toRecord: 3 },
+          },
+          {
+            name: "getRecords",
+            params: { datasetId: "ds-2", fromRecord: 0, toRecord: 2 },
+          },
+        ],
       },
       callStubs: {
-        "tools.sampleData": [
+        "tools.getRecords": [
           { age: "30", name: "Alice" },
           { age: "25", name: "Bob" },
           { age: "35", name: "Charlie" },
@@ -82,7 +90,35 @@ describe("tools.runPythonScript action", () => {
     const result = await runPythonScriptAction.handler(ctx);
 
     expect(result.success).toBe(true);
-    expect(result.output).toContain("Processing 3 records...");
+    expect(result.output).toContain("Processing 2 tool results...");
+  });
+
+  it("should execute a single tool and run Python code", async () => {
+    simulateSuccessfulExecution("Processing 1 tool results...\n");
+
+    const ctx = createTestContext({
+      params: {
+        pythonCode: "print(f'Processing {len(input_data)} tool results...')",
+        tools: [
+          {
+            name: "getRecords",
+            params: { datasetId: "ds-1", fromRecord: 0, toRecord: 3 },
+          },
+        ],
+      },
+      callStubs: {
+        "tools.getRecords": [
+          { age: "30", name: "Alice" },
+          { age: "25", name: "Bob" },
+          { age: "35", name: "Charlie" },
+        ],
+      },
+    });
+
+    const result = await runPythonScriptAction.handler(ctx);
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain("Processing 1 tool results...");
   });
 
   it("should return error when Python code fails", async () => {
@@ -91,11 +127,15 @@ describe("tools.runPythonScript action", () => {
     const ctx = createTestContext({
       params: {
         pythonCode: "print(undefined_var)",
-        targetTool: "sampleData",
-        toolParams: { datasetId: "ds-1", fromRecord: 0, toRecord: 3 },
+        tools: [
+          {
+            name: "getRecords",
+            params: { datasetId: "ds-1", fromRecord: 0, toRecord: 3 },
+          },
+        ],
       },
       callStubs: {
-        "tools.sampleData": [{ name: "Alice" }],
+        "tools.getRecords": [{ name: "Alice" }],
       },
     });
 
@@ -105,17 +145,16 @@ describe("tools.runPythonScript action", () => {
     expect(result.output).toContain("NameError");
   });
 
-  it("should throw when target tool fails", async () => {
+  it("should throw when a tool fails", async () => {
     const ctx = createTestContext({
       params: {
         pythonCode: "print('hello')",
-        targetTool: "nonExistentTool",
-        toolParams: {},
+        tools: [{ name: "nonExistentTool", params: {} }],
       },
     });
 
     await expect(runPythonScriptAction.handler(ctx)).rejects.toThrow(
-      'Failed to execute target tool "nonExistentTool"',
+      'Failed to execute tool "nonExistentTool"',
     );
   });
 });

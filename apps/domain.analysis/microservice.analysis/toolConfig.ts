@@ -24,10 +24,10 @@ export type ToolName =
   | "getChunks"
   | "getDistinctValues"
   | "getPercentile"
+  | "getRecords"
   | "joinDatasets"
   | "pivotTable"
   | "runPythonScript"
-  | "sampleData"
   | "semanticSearch"
   | "sortByField"
   | "webFetch"
@@ -573,41 +573,52 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
       function: {
         name: "runPythonScript",
         description:
-          "Execute a target tool to retrieve data, then run a Python script against that data in an isolated sandbox. The tool result is injected as `input_data` (a Python variable) into the script. Use this for custom computations, transformations, or analysis that cannot be done with the built-in tools alone.",
+          "Execute one or more tools to retrieve data, then run a Python script against the collected results in an isolated sandbox. Each tool result becomes an element of the `input_data` list (a Python variable) in strict order. Use this for custom computations, transformations, or analysis that cannot be done with the built-in tools alone.",
         parameters: {
           type: "object",
           properties: {
             pythonCode: {
               type: "string",
               description:
-                "Python code to execute. The variable `input_data` contains the tool result (parsed JSON). Use `print()` to produce output.",
+                "Python code to execute. The variable `input_data` is a list where each element is the result of the corresponding tool call (parsed JSON). Use `print()` to produce output.",
             },
-            targetTool: {
-              type: "string",
+            tools: {
+              type: "array",
               description:
-                'Name of the tool to execute first (e.g. "sampleData").',
-            },
-            toolParams: {
-              type: "object",
-              description:
-                'Arguments to pass to the target tool (e.g. {"datasetId": "...", "fromRecord": 0, "toRecord": 10}).',
+                "Array of tool calls to execute before running the Python code. Results are collected in order.",
+              items: {
+                type: "object",
+                properties: {
+                  name: {
+                    type: "string",
+                    description:
+                      'Name of the tool to execute (e.g. "getRecords").',
+                  },
+                  params: {
+                    type: "object",
+                    description:
+                      'Arguments to pass to the tool (e.g. {"datasetId": "...", "fromRecord": 0, "toRecord": 10}).',
+                  },
+                },
+                required: ["name", "params"],
+              },
             },
           },
-          required: ["targetTool", "toolParams", "pythonCode"],
+          required: ["tools", "pythonCode"],
         },
       },
     },
   },
 
-  sampleData: {
-    action: "tools.sampleData",
+  getRecords: {
+    action: "tools.getRecords",
     category: "structured",
     definition: {
       type: "function",
       function: {
-        name: "sampleData",
+        name: "getRecords",
         description:
-          "[STRUCTURED DATA ONLY] Preview rows from a structured-table dataset by record range. Returns a JSON array of records between fromRecord (inclusive, 0-based) and toRecord (exclusive). Maximum 50 records per request. Use this as a first step to explore unfamiliar data. Do NOT use on unstructured-text datasets.",
+          "[STRUCTURED DATA ONLY] Retrieve rows from a structured-table dataset by record range. Returns a JSON array of records between fromRecord (inclusive, 0-based) and toRecord (exclusive). Maximum 50 records per request. Use this as a first step to explore unfamiliar data. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {

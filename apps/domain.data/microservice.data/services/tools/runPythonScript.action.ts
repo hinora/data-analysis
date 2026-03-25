@@ -1,9 +1,10 @@
 /**
  * Run Python Script Tool
  *
- * Executes a target tool to retrieve data, injects the result into an
- * isolated Python sandbox as `input_data`, then runs the provided Python
- * code and returns its stdout output.
+ * Executes one or more tools to retrieve data, collects their results
+ * into an ordered array, injects it into an isolated Python sandbox as
+ * `input_data`, then runs the provided Python code and returns its
+ * stdout output.
  */
 
 import { spawn } from "node:child_process";
@@ -14,10 +15,14 @@ import { Errors } from "moleculer";
 const EXECUTION_TIMEOUT_MS = 30_000;
 const CONTAINER_NAME = "python-sandbox";
 
+export interface ToolCall {
+  name: string;
+  params: Record<string, unknown>;
+}
+
 export interface RunPythonScriptParams {
   pythonCode: string;
-  targetTool: string;
-  toolParams: Record<string, unknown>;
+  tools: ToolCall[];
 }
 
 export interface RunPythonScriptResult {
@@ -28,40 +33,50 @@ export interface RunPythonScriptResult {
 export default defineAction<RunPythonScriptParams, RunPythonScriptResult>({
   params: {
     pythonCode: { type: "string" },
-    targetTool: { type: "string" },
-    toolParams: { type: "object" },
+    tools: {
+      type: "array",
+      items: {
+        type: "object",
+        props: {
+          name: { type: "string" },
+          params: { type: "object" },
+        },
+      },
+      min: 1,
+    },
   },
 
   async handler(
     ctx: TypedContext<RunPythonScriptParams>,
   ): Promise<RunPythonScriptResult> {
-    const { pythonCode, targetTool, toolParams } = ctx.params;
+    const { pythonCode, tools } = ctx.params;
 
-    // 1. Resolve the target tool action name
-    const actionName = `tools.${targetTool}`;
-
-    // 2. Execute the target tool to retrieve data
-    let toolResult: unknown;
-    try {
-      toolResult = await ctx.call(actionName, toolParams);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new Errors.MoleculerClientError(
-        `Failed to execute target tool "${targetTool}": ${msg}`,
-        422,
-        "TARGET_TOOL_ERROR",
-      );
+    // 1. Execute each tool sequentially and collect results in order
+    const toolResults: unknown[] = [];
+    for (const tool of tools) {
+      const actionName = `tools.${tool.name}`;
+      try {
+        const result = await ctx.call(actionName, tool.params);
+        toolResults.push(result);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Errors.MoleculerClientError(
+          `Failed to execute tool "${tool.name}": ${msg}`,
+          422,
+          "TOOL_EXECUTION_ERROR",
+        );
+      }
     }
 
-    // 3. Build the Python script with data injected via json.loads
-    const dataJson = JSON.stringify(toolResult);
+    // 2. Build the Python script with data injected via json.loads
+    const dataJson = JSON.stringify(toolResults);
     const fullScript = [
       "import json",
       `input_data = json.loads(${JSON.stringify(dataJson)})`,
       pythonCode,
     ].join("\n");
 
-    // 4. Execute in the Python sandbox container
+    // 3. Execute in the Python sandbox container
     const { stderr, stdout } = await runInSandbox(fullScript);
 
     if (stderr) {

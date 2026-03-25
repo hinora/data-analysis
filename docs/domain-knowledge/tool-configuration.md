@@ -62,8 +62,8 @@ automatically when the overrides are shared or centralised.
 Operate on `structured-table` datasets (CSV, Excel rows/columns):
 
 aggregate, correlateFields, countDistinctValues, detectOutliers,
-filterByCondition, getDistinctValues, getPercentile, joinDatasets, pivotTable,
-sampleData, sortByField
+filterByCondition, getDistinctValues, getPercentile, getRecords, joinDatasets,
+pivotTable, sortByField
 
 > **Note:** The `aggregate` tool is the primary tool for all numeric aggregation
 > needs (sum, avg, min, max, count) with optional `groupBy`, `orderBy`, and
@@ -71,7 +71,7 @@ sampleData, sortByField
 > `contains`, `in`). Previously separate tools (`sumField`, `avgField`, `count`,
 > `countAndGroup`, `getMinMax`) have been consolidated into `aggregate`.
 > The `getTopByField` tool has been merged into `sortByField`.
-> A new `sampleData` tool has been added for previewing dataset rows.
+> The `getRecords` tool retrieves rows from a dataset by record range.
 
 ### Unstructured Text Tools (`unstructured`)
 
@@ -115,11 +115,11 @@ createSubAgent, runPythonScript
 
 - **createSubAgent** — Delegate a self-contained analysis task to a sub-agent.
   See `docs/domain-knowledge/sub-agent-delegation.md` for details.
-- **runPythonScript** — Execute a target tool to retrieve data, then run a
-  Python script against that data in an isolated Docker sandbox. The tool
-  result is injected as `input_data` into the Python environment. The sandbox
-  (`python-sandbox` service in docker-compose.yml) runs with no network access
-  and limited CPU/RAM for security.
+- **runPythonScript** — Execute one or more tools to retrieve data, then run a
+  Python script against the collected results in an isolated Docker sandbox.
+  Each tool result becomes an element of the `input_data` list in Python.
+  The sandbox (`python-sandbox` service in docker-compose.yml) runs with no
+  network access and limited CPU/RAM for security.
 
 ## Adding a New Tool
 
