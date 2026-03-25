@@ -91,6 +91,11 @@ describe("tools.runPythonScript action", () => {
 
     expect(result.success).toBe(true);
     expect(result.output).toContain("Processing 2 tool results...");
+
+    // Verify base64-encoded data injection
+    const writtenScript = mockStdin.write.mock.calls[0][0] as string;
+    expect(writtenScript).toContain("import json, base64");
+    expect(writtenScript).toContain("base64.b64decode");
   });
 
   it("should execute a single tool and run Python code", async () => {
@@ -143,6 +148,46 @@ describe("tools.runPythonScript action", () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toContain("NameError");
+    expect(result.output).toContain("input_data structure");
+  });
+
+  it("should succeed when stderr has warnings but exit code is 0", async () => {
+    mockStdout.on.mockImplementation(
+      (event: string, cb: (data: Buffer) => void) => {
+        if (event === "data") cb(Buffer.from("result output\n"));
+      },
+    );
+    mockStderr.on.mockImplementation(
+      (event: string, cb: (data: Buffer) => void) => {
+        if (event === "data")
+          cb(Buffer.from("DeprecationWarning: some warning"));
+      },
+    );
+    mockProc.on.mockImplementation(
+      (event: string, cb: (code: number) => void) => {
+        if (event === "close") cb(0);
+      },
+    );
+
+    const ctx = createTestContext({
+      params: {
+        pythonCode: "print('result output')",
+        tools: [
+          {
+            name: "getRecords",
+            params: { datasetId: "ds-1", fromRecord: 0, toRecord: 1 },
+          },
+        ],
+      },
+      callStubs: {
+        "tools.getRecords": [{ name: "Alice" }],
+      },
+    });
+
+    const result = await runPythonScriptAction.handler(ctx);
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain("result output");
   });
 
   it("should throw when a tool fails", async () => {

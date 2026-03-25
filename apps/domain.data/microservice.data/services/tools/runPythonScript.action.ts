@@ -8,7 +8,10 @@
  */
 
 import { spawn } from "node:child_process";
-import type { TypedContext } from "core.lib/__generated__";
+import type {
+  GlobalServiceRegistry,
+  TypedContext,
+} from "core.lib/__generated__";
 import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 
@@ -56,7 +59,10 @@ export default defineAction<RunPythonScriptParams, RunPythonScriptResult>({
     for (const tool of tools) {
       const actionName = `tools.${tool.name}`;
       try {
-        const result = await ctx.call(actionName, tool.params);
+        const result = await ctx.call(
+          actionName as keyof GlobalServiceRegistry,
+          tool.params,
+        );
         toolResults.push(result);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -68,29 +74,56 @@ export default defineAction<RunPythonScriptParams, RunPythonScriptResult>({
       }
     }
 
-    // 2. Build the Python script with data injected via json.loads
+    // 2. Build the Python script with data injected via base64-encoded JSON
     const dataJson = JSON.stringify(toolResults);
+    const base64Data = Buffer.from(dataJson, "utf-8").toString("base64");
     const fullScript = [
-      "import json",
-      `input_data = json.loads(${JSON.stringify(dataJson)})`,
+      "import json, base64",
+      `input_data = json.loads(base64.b64decode("${base64Data}").decode("utf-8"))`,
       pythonCode,
     ].join("\n");
 
     // 3. Execute in the Python sandbox container
-    const { stderr, stdout } = await runInSandbox(fullScript);
+    const { exitCode, stderr, stdout } = await runInSandbox(fullScript);
 
-    if (stderr) {
-      const combined = stdout ? `${stdout}\n${stderr}` : stderr;
-      return { output: combined, success: false };
+    if (exitCode !== 0) {
+      const typeInfo = toolResults
+        .map((r, i) => `  input_data[${i}]: ${describeValue(r)}`)
+        .join("\n");
+      const errorOutput = [
+        stdout,
+        stderr,
+        `\ninput_data structure:\n${typeInfo}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+      return { output: errorOutput, success: false };
     }
 
     return { output: stdout, success: true };
   },
 });
 
+function describeValue(value: unknown): string {
+  if (value === null || value === undefined) return "null";
+  if (typeof value === "string") return `string (length ${value.length})`;
+  if (typeof value === "number") return "number";
+  if (typeof value === "boolean") return "boolean";
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "empty list";
+    return `list of ${value.length} ${describeValue(value[0])}`;
+  }
+  if (typeof value === "object") {
+    const keys = Object.keys(value as Record<string, unknown>);
+    const preview = JSON.stringify(keys.slice(0, 10));
+    return `dict with keys: ${preview}${keys.length > 10 ? ` (+${keys.length - 10} more)` : ""}`;
+  }
+  return typeof value;
+}
+
 function runInSandbox(
   script: string,
-): Promise<{ stderr: string; stdout: string }> {
+): Promise<{ exitCode: number; stderr: string; stdout: string }> {
   return new Promise((resolve, reject) => {
     let settled = false;
 
@@ -109,7 +142,7 @@ function runInSandbox(
       if (!settled) {
         settled = true;
         proc.kill("SIGKILL");
-        resolve({ stderr: "Execution timed out", stdout });
+        resolve({ exitCode: 1, stderr: "Execution timed out", stdout });
       }
     }, EXECUTION_TIMEOUT_MS);
 
@@ -139,14 +172,7 @@ function runInSandbox(
       clearTimeout(timer);
       if (!settled) {
         settled = true;
-        if (code === 0) {
-          resolve({ stderr, stdout });
-        } else {
-          resolve({
-            stderr: stderr || `Process exited with code ${code}`,
-            stdout,
-          });
-        }
+        resolve({ exitCode: code ?? 1, stderr, stdout });
       }
     });
 
