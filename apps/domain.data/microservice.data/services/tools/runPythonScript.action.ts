@@ -80,7 +80,8 @@ export default defineAction<RunPythonScriptParams, RunPythonScriptResult>({
     const { stderr, stdout } = await runInSandbox(fullScript);
 
     if (stderr) {
-      return { output: stderr, success: false };
+      const combined = stdout ? `${stdout}\n${stderr}` : stderr;
+      return { output: combined, success: false };
     }
 
     return { output: stdout, success: true };
