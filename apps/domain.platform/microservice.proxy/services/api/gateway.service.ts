@@ -176,10 +176,11 @@ const ApiGatewayService: ServiceSchema = {
               filename: string;
               mimetype: string;
             }> = [];
+            const filePromises: Array<Promise<void>> = [];
 
             const bb = new Busboy({
               headers: req.headers as Record<string, string>,
-              limits: { fileSize: 100 * 1024 * 1024 },
+              limits: { files: 10, fileSize: 100 * 1024 * 1024 },
             });
 
             bb.on(
@@ -189,27 +190,36 @@ const ApiGatewayService: ServiceSchema = {
                 stream: Readable,
                 info: { filename: string; mimeType: string },
               ) => {
-                const chunks: Buffer[] = [];
-                stream.on("data", (chunk: Buffer) => chunks.push(chunk));
-                stream.on("end", () => {
-                  files.push({
-                    data: Buffer.concat(chunks),
-                    filename: info.filename,
-                    mimetype: info.mimeType,
-                  });
-                });
+                filePromises.push(
+                  new Promise<void>((resolve, reject) => {
+                    const chunks: Buffer[] = [];
+                    stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+                    stream.on("end", () => {
+                      files.push({
+                        data: Buffer.concat(chunks),
+                        filename: info.filename,
+                        mimetype: info.mimeType,
+                      });
+                      resolve();
+                    });
+                    stream.on("error", reject);
+                  }),
+                );
               },
             );
 
             bb.on("finish", () => {
-              this.broker
-                .call(
-                  "upload.uploadFiles",
-                  { files, sessionId },
-                  {
-                    meta: { clientIP, token, userAgent },
-                    timeout: 600000,
-                  },
+              // Wait for all file streams to finish before calling the action
+              Promise.all(filePromises)
+                .then(() =>
+                  this.broker.call(
+                    "upload.uploadFiles",
+                    { files, sessionId },
+                    {
+                      meta: { clientIP, token, userAgent },
+                      timeout: 600000,
+                    },
+                  ),
                 )
                 .then((result: unknown) => {
                   res.writeHead(200, {
