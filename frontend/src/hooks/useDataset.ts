@@ -65,6 +65,20 @@ export interface UploadResult {
   }>;
 }
 
+export interface UploadFilesResult {
+  files: Array<{
+    datasets: Array<{
+      columnCount: number | null;
+      datasetType: string;
+      id: string;
+      name: string;
+      rowCount: number;
+    }>;
+    filename: string;
+    originalFileId: string;
+  }>;
+}
+
 export interface DatasetPreviewDataset {
   id: string;
   name: string;
@@ -161,6 +175,40 @@ const previewDatasetFn: QueryFunction<
 };
 
 // --- Mutations ---
+
+export const useUploadFiles = () => {
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      files,
+    }: {
+      sessionId: string;
+      files: File[];
+    }) => {
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append("files", file);
+      }
+
+      const response = await service.post<UploadFilesResult>(
+        `/sessions/${sessionId}/upload`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      );
+      return response.data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [DATASET_LIST_KEY, variables.sessionId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [SESSION_DETAIL_KEY, variables.sessionId],
+      });
+    },
+  });
+};
 
 export const useUploadFile = () => {
   return useMutation({

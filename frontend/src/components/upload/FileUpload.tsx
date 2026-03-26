@@ -3,13 +3,13 @@
  *
  * Drag-and-drop file upload with type validation, progress indicator,
  * and error display. Supports CSV, PDF, and XLSM files.
- * Supports multiple file uploads at the same time — files are uploaded
- * sequentially (one request per file) to avoid overwhelming the server.
+ * Supports multiple file uploads — all files are sent in a single request
+ * so that metadata generation runs once, processing datasets one by one.
  */
 
 import type React from "react";
 import { useCallback, useRef, useState } from "react";
-import { type UploadResult, useUploadFile } from "@/hooks/useDataset";
+import { useUploadFiles } from "@/hooks/useDataset";
 
 interface FileUploadProps {
   sessionId: string;
@@ -24,23 +24,11 @@ const _ACCEPTED_TYPES = [
 
 const ACCEPTED_EXTENSIONS = [".csv", ".pdf", ".xlsm", ".xlsx"];
 
-interface UploadProgress {
-  completed: number;
-  currentFile: string;
-  errors: Array<{ filename: string; message: string }>;
-  results: UploadResult[];
-  total: number;
-}
-
 export const FileUpload: React.FC<FileUploadProps> = ({ sessionId }) => {
-  const uploadFile = useUploadFile();
+  const { mutateAsync, isPending, isSuccess, data } = useUploadFiles();
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(
-    null,
-  );
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isUploading =
-    uploadProgress !== null && uploadProgress.completed < uploadProgress.total;
 
   const validateFile = useCallback((file: File): string | null => {
     const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
@@ -55,62 +43,39 @@ export const FileUpload: React.FC<FileUploadProps> = ({ sessionId }) => {
 
   const handleUploadFiles = useCallback(
     async (files: File[]) => {
-      if (isUploading) return;
+      if (isPending) return;
+      setError(null);
 
       // Validate all files first
       const validFiles: File[] = [];
-      const errors: Array<{ filename: string; message: string }> = [];
+      const errors: string[] = [];
 
       for (const file of files) {
         const validationError = validateFile(file);
         if (validationError) {
-          errors.push({ filename: file.name, message: validationError });
+          errors.push(`${file.name}: ${validationError}`);
         } else {
           validFiles.push(file);
         }
       }
 
-      if (validFiles.length === 0) {
-        setUploadProgress({
-          completed: 0,
-          currentFile: "",
-          errors,
-          results: [],
-          total: 0,
-        });
-        return;
+      if (errors.length > 0) {
+        setError(errors.join("\n"));
       }
 
-      const progress: UploadProgress = {
-        completed: 0,
-        currentFile: validFiles[0].name,
-        errors: [...errors],
-        results: [],
-        total: validFiles.length,
-      };
-      setUploadProgress({ ...progress });
+      if (validFiles.length === 0) return;
 
-      // Upload files sequentially (one request per file)
-      for (const file of validFiles) {
-        progress.currentFile = file.name;
-        setUploadProgress({ ...progress });
-
-        try {
-          const result = await uploadFile.mutateAsync({ sessionId, file });
-          progress.results.push(result);
-        } catch (err: unknown) {
-          const message =
-            err instanceof Error
-              ? err.message
-              : "Upload failed. Please try again.";
-          progress.errors.push({ filename: file.name, message });
-        }
-
-        progress.completed++;
-        setUploadProgress({ ...progress });
+      try {
+        await mutateAsync({ files: validFiles, sessionId });
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Upload failed. Please try again.";
+        setError(message);
       }
     },
-    [isUploading, sessionId, uploadFile, validateFile],
+    [isPending, sessionId, mutateAsync, validateFile],
   );
 
   const handleDrop = useCallback(
@@ -138,10 +103,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ sessionId }) => {
   };
 
   const totalDatasetsImported =
-    uploadProgress?.results.reduce((sum, r) => sum + r.datasets.length, 0) ?? 0;
-  const isComplete =
-    uploadProgress !== null &&
-    uploadProgress.completed === uploadProgress.total;
+    data?.files.reduce((sum, f) => sum + f.datasets.length, 0) ?? 0;
 
   return (
     <div>
@@ -151,16 +113,16 @@ export const FileUpload: React.FC<FileUploadProps> = ({ sessionId }) => {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onClick={() => fileInputRef.current?.click()}
-        disabled={isUploading}
+        disabled={isPending}
         style={{
           border: `2px dashed ${isDragging ? "#3b82f6" : "#e2e8f0"}`,
           borderRadius: 8,
           padding: 24,
           textAlign: "center",
-          cursor: isUploading ? "not-allowed" : "pointer",
+          cursor: isPending ? "not-allowed" : "pointer",
           backgroundColor: isDragging ? "#eff6ff" : "transparent",
           transition: "all 0.15s",
-          opacity: isUploading ? 0.6 : 1,
+          opacity: isPending ? 0.6 : 1,
           width: "100%",
           font: "inherit",
           color: "inherit",
@@ -174,14 +136,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({ sessionId }) => {
           onChange={handleFileSelect}
           style={{ display: "none" }}
         />
-        {isUploading ? (
+        {isPending ? (
           <div>
             <div style={{ fontSize: 14, color: "#3b82f6", fontWeight: 500 }}>
-              Uploading {uploadProgress.completed + 1} of {uploadProgress.total}
-              ...
+              Uploading...
             </div>
             <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>
-              {uploadProgress.currentFile}
+              Parsing and importing data
             </div>
           </div>
         ) : (
@@ -196,7 +157,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ sessionId }) => {
         )}
       </button>
 
-      {uploadProgress && uploadProgress.errors.length > 0 && (
+      {error && (
         <div
           style={{
             marginTop: 8,
@@ -205,17 +166,14 @@ export const FileUpload: React.FC<FileUploadProps> = ({ sessionId }) => {
             color: "#dc2626",
             borderRadius: 4,
             fontSize: 13,
+            whiteSpace: "pre-line",
           }}
         >
-          {uploadProgress.errors.map((e) => (
-            <div key={`${e.filename}-${e.message}`}>
-              {e.filename}: {e.message}
-            </div>
-          ))}
+          {error}
         </div>
       )}
 
-      {isComplete && uploadProgress.results.length > 0 && (
+      {isSuccess && data && (
         <div
           style={{
             marginTop: 8,
@@ -226,9 +184,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({ sessionId }) => {
             fontSize: 13,
           }}
         >
-          {uploadProgress.results.length === 1
+          {data.files.length === 1
             ? `File uploaded successfully! ${totalDatasetsImported} dataset${totalDatasetsImported !== 1 ? "s" : ""} imported.`
-            : `${uploadProgress.results.length} files uploaded successfully! ${totalDatasetsImported} dataset${totalDatasetsImported !== 1 ? "s" : ""} imported.`}
+            : `${data.files.length} files uploaded successfully! ${totalDatasetsImported} dataset${totalDatasetsImported !== 1 ? "s" : ""} imported.`}
         </div>
       )}
     </div>
