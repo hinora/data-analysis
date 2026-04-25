@@ -119,7 +119,7 @@ export function createAIAdapter(
 
     default:
       throw new Error(
-        `Unknown AI provider: ${provider}. Supported providers: ollama, gemini, lmstudio`,
+        `Unknown AI provider: ${provider}. Supported providers: ${SUPPORTED_AI_PROVIDERS.join(", ")}`,
       );
   }
 }

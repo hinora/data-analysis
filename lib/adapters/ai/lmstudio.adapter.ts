@@ -132,10 +132,17 @@ export class LMStudioAdapter implements AIAdapter {
       options.apiKey || process.env.LM_STUDIO_API_KEY || "lm-studio";
 
     // Strip trailing slashes from the host without using a regex (avoid ReDoS
-    // on hostile env values with many trailing slashes).
+    // on hostile env values with many trailing slashes). Bounded for safety.
     let host = rawHost;
-    while (host.length > 0 && host.charCodeAt(host.length - 1) === 47) {
+    const MAX_TRAILING_SLASHES = 1024;
+    let removed = 0;
+    while (
+      host.length > 0 &&
+      host.charCodeAt(host.length - 1) === 47 &&
+      removed < MAX_TRAILING_SLASHES
+    ) {
       host = host.slice(0, -1);
+      removed++;
     }
 
     this.apiKey = apiKey;
