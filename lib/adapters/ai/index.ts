@@ -10,6 +10,7 @@ import {
   type SupportedAIProvider,
 } from "../../config/utils";
 import { GeminiAdapter } from "./gemini.adapter";
+import { LMStudioAdapter } from "./lmstudio.adapter";
 import { OllamaAdapter } from "./ollama.adapter";
 import type {
   AIAdapter,
@@ -21,6 +22,7 @@ import type {
 export { EMBEDDING_DIMENSIONS } from "./constants";
 
 export { GeminiAdapter } from "./gemini.adapter";
+export { LMStudioAdapter } from "./lmstudio.adapter";
 export { OllamaAdapter } from "./ollama.adapter";
 export type {
   AIAdapter,
@@ -108,9 +110,16 @@ export function createAIAdapter(
         model: options.model,
       });
 
+    case "lmstudio":
+      return new LMStudioAdapter({
+        apiKey: options.apiKey,
+        host: options.host,
+        model: options.model,
+      });
+
     default:
       throw new Error(
-        `Unknown AI provider: ${provider}. Supported providers: ollama, gemini`,
+        `Unknown AI provider: ${provider}. Supported providers: ollama, gemini, lmstudio`,
       );
   }
 }
