@@ -126,17 +126,24 @@ export class LMStudioAdapter implements AIAdapter {
   private host: string;
 
   constructor(options: LMStudioAdapterOptions = {}) {
-    const host = options.host || process.env.LM_STUDIO_HOST || DEFAULT_HOST;
+    const rawHost = options.host || process.env.LM_STUDIO_HOST || DEFAULT_HOST;
     const model = options.model || process.env.LM_STUDIO_MODEL || DEFAULT_MODEL;
     const apiKey =
       options.apiKey || process.env.LM_STUDIO_API_KEY || "lm-studio";
 
+    // Strip trailing slashes from the host without using a regex (avoid ReDoS
+    // on hostile env values with many trailing slashes).
+    let host = rawHost;
+    while (host.length > 0 && host.charCodeAt(host.length - 1) === 47) {
+      host = host.slice(0, -1);
+    }
+
     this.apiKey = apiKey;
-    this.host = host.replace(/\/+$/, "");
+    this.host = host;
     this.config = {
       apiKey,
       defaultModel: model,
-      host: this.host,
+      host,
       provider: "lmstudio",
     };
   }

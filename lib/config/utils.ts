@@ -9,7 +9,7 @@ import type { AppConfig } from "./types";
 /**
  * Supported AI providers
  */
-export const SUPPORTED_AI_PROVIDERS = ["ollama", "gemini", "lmstudio"] as const;
+export const SUPPORTED_AI_PROVIDERS = ["gemini", "lmstudio", "ollama"] as const;
 export type SupportedAIProvider = (typeof SUPPORTED_AI_PROVIDERS)[number];
 
 /**
