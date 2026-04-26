@@ -8,6 +8,9 @@
   "scripts": {
     "build:lib": "bash scripts/build-lib.sh",
     "db:clear": "ts-node scripts/clear-database.ts",
+    "eval": "ts-node evals/src/runEvals.ts",
+    "eval:command": "ts-node evals/src/runEvals.ts --command",
+    "eval:mock": "ts-node evals/src/runEvals.ts --mock",
     "init:microservice": "ts-node scripts/init-microservice.ts",
     "generate:types": "ts-node lib/codegen/generate-action-types.ts",
     "generate:types:all": "ts-node lib/codegen/generate-all.ts",

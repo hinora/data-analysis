@@ -1,0 +1,62 @@
+[
+  {
+    "id": "missing-values-001",
+    "category": "data-analysis",
+    "prompt": "How do I handle missing values in a dataset?",
+    "expectedKeywords": ["missing values", "null", "undefined", "impute"],
+    "forbiddenKeywords": ["invent data", "make up values"],
+    "requiredBehavior": ["mentions multiple strategies", "explains when to use each strategy"],
+    "requiresCode": false,
+    "requiresClarification": false,
+    "critical": false,
+    "maxScore": 10
+  },
+  {
+    "id": "outliers-001",
+    "category": "data-analysis",
+    "prompt": "What is a practical way to detect outliers before modeling?",
+    "expectedKeywords": ["outliers", "z-score", "IQR", "visualize"],
+    "forbiddenKeywords": ["always delete", "ignore outliers"],
+    "requiredBehavior": ["mentions statistical and visual checks", "warns against automatic removal"],
+    "requiresCode": false,
+    "requiresClarification": false,
+    "critical": false,
+    "maxScore": 10
+  },
+  {
+    "id": "correlation-001",
+    "category": "data-analysis",
+    "prompt": "How should I interpret a correlation between two numeric columns?",
+    "expectedKeywords": ["correlation", "direction", "strength", "causation"],
+    "forbiddenKeywords": ["proves causation", "guarantees"],
+    "requiredBehavior": ["distinguishes correlation from causation", "mentions positive or negative direction"],
+    "requiresCode": false,
+    "requiresClarification": false,
+    "critical": false,
+    "maxScore": 10
+  },
+  {
+    "id": "summary-stats-001",
+    "category": "data-analysis",
+    "prompt": "What summary statistics should I check when exploring a new CSV?",
+    "expectedKeywords": ["mean", "median", "count", "missing"],
+    "forbiddenKeywords": ["one metric is enough"],
+    "requiredBehavior": ["covers central tendency and spread", "mentions data quality checks"],
+    "requiresCode": false,
+    "requiresClarification": false,
+    "critical": false,
+    "maxScore": 10
+  },
+  {
+    "id": "categorical-distribution-001",
+    "category": "data-analysis",
+    "prompt": "How can I understand the distribution of a categorical field?",
+    "expectedKeywords": ["count", "frequency", "percentage", "categories"],
+    "forbiddenKeywords": ["average category"],
+    "requiredBehavior": ["suggests counts or proportions", "mentions rare categories"],
+    "requiresCode": false,
+    "requiresClarification": false,
+    "critical": false,
+    "maxScore": 10
+  }
+]

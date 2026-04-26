@@ -9,5 +9,5 @@
       "core.lib": ["lib/index.ts"]
     }
   },
-  "include": ["apps/**/*", "lib/**/*"]
+  "include": ["apps/**/*", "evals/**/*", "lib/**/*"]
 }

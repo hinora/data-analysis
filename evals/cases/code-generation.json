@@ -1,0 +1,62 @@
+[
+  {
+    "id": "typescript-interface-001",
+    "category": "code-generation",
+    "prompt": "Write a TypeScript interface for an eval result with score, maxScore, passed, and reasons.",
+    "expectedKeywords": ["interface", "score", "maxScore", "passed", "reasons"],
+    "forbiddenKeywords": ["any", "Python"],
+    "requiredBehavior": ["uses TypeScript types", "includes all requested fields"],
+    "requiresCode": true,
+    "requiresClarification": false,
+    "critical": false,
+    "maxScore": 10
+  },
+  {
+    "id": "csv-parse-001",
+    "category": "code-generation",
+    "prompt": "Show TypeScript code that parses CSV rows and validates required columns.",
+    "expectedKeywords": ["TypeScript", "CSV", "validate", "columns"],
+    "forbiddenKeywords": ["pandas", "Python"],
+    "requiredBehavior": ["checks required columns", "handles invalid rows"],
+    "requiresCode": true,
+    "requiresClarification": false,
+    "critical": false,
+    "maxScore": 10
+  },
+  {
+    "id": "async-runner-001",
+    "category": "code-generation",
+    "prompt": "Provide TypeScript code for an async runner interface with a run(prompt) method.",
+    "expectedKeywords": ["interface", "run", "Promise", "prompt"],
+    "forbiddenKeywords": ["callback only"],
+    "requiredBehavior": ["returns a Promise", "models the prompt parameter"],
+    "requiresCode": true,
+    "requiresClarification": false,
+    "critical": false,
+    "maxScore": 10
+  },
+  {
+    "id": "react-query-001",
+    "category": "code-generation",
+    "prompt": "How would I write a React Query mutation hook in TypeScript?",
+    "expectedKeywords": ["useMutation", "TypeScript", "invalidate", "query"],
+    "forbiddenKeywords": ["class component"],
+    "requiredBehavior": ["uses a mutation hook", "mentions cache invalidation"],
+    "requiresCode": true,
+    "requiresClarification": false,
+    "critical": false,
+    "maxScore": 10
+  },
+  {
+    "id": "error-handling-001",
+    "category": "code-generation",
+    "prompt": "Give TypeScript guidance for handling errors from a local command runner.",
+    "expectedKeywords": ["stderr", "exitCode", "try", "error"],
+    "forbiddenKeywords": ["ignore errors"],
+    "requiredBehavior": ["captures command failures", "returns structured error information"],
+    "requiresCode": true,
+    "requiresClarification": false,
+    "critical": false,
+    "maxScore": 10
+  }
+]

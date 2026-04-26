@@ -1,0 +1,50 @@
+[
+  {
+    "id": "debug-null-001",
+    "category": "debugging",
+    "prompt": "My TypeScript function crashes with Cannot read properties of undefined. What should I check?",
+    "expectedKeywords": ["undefined", "null", "stack trace", "guard"],
+    "forbiddenKeywords": ["rewrite everything"],
+    "requiredBehavior": ["suggests reproducing the issue", "suggests input validation or guards"],
+    "requiresCode": false,
+    "requiresClarification": false,
+    "critical": false,
+    "maxScore": 10
+  },
+  {
+    "id": "debug-test-failure-001",
+    "category": "debugging",
+    "prompt": "A Jest test started failing after a refactor. How should I debug it?",
+    "expectedKeywords": ["Jest", "refactor", "failing", "regression"],
+    "forbiddenKeywords": ["delete the test"],
+    "requiredBehavior": ["compares expected and actual behavior", "recommends a focused regression fix"],
+    "requiresCode": false,
+    "requiresClarification": false,
+    "critical": false,
+    "maxScore": 10
+  },
+  {
+    "id": "debug-command-001",
+    "category": "debugging",
+    "prompt": "A local command exits with code 1 and no stdout. What information should I inspect?",
+    "expectedKeywords": ["exit code", "stderr", "logs", "environment"],
+    "forbiddenKeywords": ["assume success"],
+    "requiredBehavior": ["checks stderr and logs", "mentions environment or configuration"],
+    "requiresCode": false,
+    "requiresClarification": false,
+    "critical": false,
+    "maxScore": 10
+  },
+  {
+    "id": "debug-data-quality-001",
+    "category": "debugging",
+    "prompt": "A chart looks wrong after importing a CSV. What data issues should I investigate?",
+    "expectedKeywords": ["CSV", "types", "missing", "duplicates"],
+    "forbiddenKeywords": ["chart library is always wrong"],
+    "requiredBehavior": ["checks parsing and data types", "checks missing or duplicate values"],
+    "requiresCode": false,
+    "requiresClarification": false,
+    "critical": false,
+    "maxScore": 10
+  }
+]

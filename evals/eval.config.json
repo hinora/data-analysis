@@ -1,0 +1,6 @@
+{
+  "passingScorePercent": 75,
+  "criticalCategories": ["hallucination"],
+  "reportPath": "evals/reports/latest.md",
+  "defaultRunner": "mock"
+}
