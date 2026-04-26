@@ -47,7 +47,7 @@ graph TB
 - **Frontend:** Next.js 16 / React 19 / React Query
 - **Database:** PostgreSQL 16+ with pgvector for vector similarity search
 - **ORM:** TypeORM with automatic migrations
-- **AI:** Ollama (local) / Google Gemini adapters with retry & fallback
+- **AI:** Ollama (local) / Google Gemini / LM Studio (local) adapters with retry & fallback
 - **File Parsing:** CSV (PapaParse), PDF (pdf-parse), XLSM/XLSX (SheetJS)
 - **Text Chunking:** LangChain RecursiveCharacterTextSplitter (800 char chunks, 200 overlap)
 - **Embeddings:** nomic-embed-text (768-dim vectors via Ollama) or text-embedding-004 (Gemini)
@@ -57,7 +57,7 @@ graph TB
 
 - **Node.js** >= 18
 - **PostgreSQL 16+** with pgvector extension
-- **Ollama** (for local AI) or a **Gemini API key**
+- **Ollama** (for local AI), **LM Studio** (for local AI) or a **Gemini API key**
 - **NATS** (optional — for multi-process transporter)
 
 ```bash
@@ -78,7 +78,7 @@ npm install
 # 2. Configure environment
 #    Copy .env.example to .env in each microservice and set:
 #    - Database credentials (POSTGRES_HOST, POSTGRES_DB, etc.)
-#    - AI provider (AI_PROVIDER=ollama or AI_PROVIDER=gemini + GEMINI_API_KEY)
+#    - AI provider (AI_PROVIDER=ollama | gemini | lmstudio + matching credentials/host)
 #    - Transporter (TRANSPORTER=nats://localhost:4222 for multi-service)
 
 # 3. Generate type-safe service call types
@@ -176,7 +176,7 @@ Demo/scaffold microservice showing patterns (user CRUD, event-driven notificatio
 ├── lib/                        # Shared core library (core.lib)
 │   ├── broker/                 #   createApp, defineAction, defineEvent, run
 │   ├── config/                 #   Configuration system & env presets
-│   ├── adapters/               #   AI (Ollama/Gemini) & file-parser adapters
+│   ├── adapters/               #   AI (Ollama/Gemini/LM Studio) & file-parser adapters
 │   ├── database/               #   TypeORM DataSource factory & shared entities
 │   ├── codegen/                #   Type generation for typed ctx.call()
 │   └── __generated__/          #   Global action/event registry (all microservices)
@@ -304,9 +304,12 @@ Key environment variables:
 | `NODE_ENV` | — | `development` / `staging` / `production` |
 | `TRANSPORTER` | `null` | Moleculer transporter URL (e.g. `nats://localhost:4222`) |
 | `LOG_LEVEL` | `info` | `trace` / `debug` / `info` / `warn` / `error` / `fatal` |
-| `AI_PROVIDER` | `ollama` | AI backend: `ollama` or `gemini` |
+| `AI_PROVIDER` | `ollama` | AI backend: `ollama`, `gemini`, or `lmstudio` |
 | `GEMINI_API_KEY` | — | Google Generative AI API key (required when `AI_PROVIDER=gemini`) |
 | `GEMINI_MODEL` | `gemini-2.0-flash` | Gemini model name |
+| `LM_STUDIO_HOST` | `http://localhost:1234` | LM Studio OpenAI-compatible server URL (used when `AI_PROVIDER=lmstudio`) |
+| `LM_STUDIO_MODEL` | `lmstudio-community/qwen2.5-7b-instruct` | Model name as registered in LM Studio |
+| `LM_STUDIO_API_KEY` | `lm-studio` | API key sent to LM Studio (any non-empty value is accepted) |
 | `POSTGRES_HOST` | `localhost` | PostgreSQL host |
 | `POSTGRES_PORT` | `5432` | PostgreSQL port |
 | `POSTGRES_USER` | `postgres` | Database user |
@@ -344,6 +347,7 @@ See [docs/configuration.md](docs/configuration.md) for the full reference.
 | [Text Chunking](docs/domain-knowledge/text-chunking.md) | LangChain text splitting with word-boundary awareness |
 | [Hybrid Semantic Search](docs/domain-knowledge/hybrid-semantic-search.md) | Vector similarity search with pgvector |
 | [Gemini Adapter](docs/domain-knowledge/gemini-adapter.md) | Google Gemini AI integration and tool-calling flow |
+| [LM Studio Adapter](docs/domain-knowledge/lmstudio-adapter.md) | LM Studio (OpenAI-compatible) AI integration and tool-calling flow |
 | [AI Logging](docs/domain-knowledge/ai-logging.md) | Audit trail for all AI interactions |
 | [AI Naming](docs/domain-knowledge/ai-naming.md) | AI-generated naming conventions |
 | [Agent Self-Reflection](docs/domain-knowledge/agent-self-reflection.md) | Agent self-reflection patterns |

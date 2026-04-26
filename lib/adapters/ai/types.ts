@@ -119,7 +119,7 @@ export interface AIProviderConfig {
 /**
  * Supported AI provider types
  */
-export type AIProviderType = "gemini" | "ollama";
+export type AIProviderType = "gemini" | "lmstudio" | "ollama";
 
 /**
  * AI Adapter interface

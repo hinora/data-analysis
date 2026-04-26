@@ -60,6 +60,7 @@ const config: Config = {
     "!**/services/metadata/**",
     // Exclude adapters that require external services
     "!**/adapters/ai/gemini.adapter.ts",
+    "!**/adapters/ai/lmstudio.adapter.ts",
     "!**/adapters/ai/ollama.adapter.ts",
     "!**/adapters/file-parser/pdf.parser.ts",
     "!**/adapters/file-parser/csv.parser.ts",
