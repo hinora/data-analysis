@@ -11,7 +11,7 @@ export class CommandAgentRunner implements AgentRunner {
       const child = exec(
         this.command,
         {
-          env: { ...process.env, AGENT_EVAL_PROMPT: prompt },
+          env: buildCommandEnv(prompt),
           timeout: 120_000,
         },
         (error, stdout, stderr) => {
@@ -33,4 +33,15 @@ export class CommandAgentRunner implements AgentRunner {
       child.stdin?.end(prompt);
     });
   }
+}
+
+function buildCommandEnv(prompt: string): NodeJS.ProcessEnv {
+  return {
+    AGENT_EVAL_PROMPT: prompt,
+    HOME: process.env.HOME,
+    NODE_ENV: process.env.NODE_ENV,
+    PATH: process.env.PATH,
+    SHELL: process.env.SHELL,
+    TMPDIR: process.env.TMPDIR,
+  };
 }

@@ -13,6 +13,7 @@ const DEFAULT_SYSTEM_PROMPT = [
   "Ask clarifying questions when the prompt lacks enough information.",
   "Use TypeScript-oriented guidance for coding prompts.",
 ].join(" ");
+const DEFAULT_TEMPERATURE = 0.2;
 
 export interface ApiAgentRunnerOptions {
   adapter?: AIAdapter;
@@ -34,7 +35,8 @@ export class ApiAgentRunner implements AgentRunner {
     this.name = this.getRunnerName(options);
     this.systemPrompt = options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
     this.temperature =
-      options.temperature ?? Number(process.env.AGENT_EVAL_TEMPERATURE ?? 0.2);
+      options.temperature ??
+      parseTemperature(process.env.AGENT_EVAL_TEMPERATURE);
   }
 
   static fromEnvironment(): ApiAgentRunner {
@@ -81,4 +83,17 @@ export class ApiAgentRunner implements AgentRunner {
     const model = options.adapterOptions?.model ?? "default";
     return `ApiAgentRunner(${provider}:${model})`;
   }
+}
+
+function parseTemperature(value: string | undefined): number {
+  if (!value?.trim()) {
+    return DEFAULT_TEMPERATURE;
+  }
+
+  const temperature = Number.parseFloat(value);
+  if (!Number.isFinite(temperature)) {
+    return DEFAULT_TEMPERATURE;
+  }
+
+  return temperature;
 }
