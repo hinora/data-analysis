@@ -1,22 +1,25 @@
 # Agent Evaluation Framework
 
-Local automatic evaluation and scoring framework for the `sendMessage` chat agent in `microservice.analysis`. Runs entirely within Jest — no external services required.
+Local automatic evaluation and scoring framework for the `sendMessage` chat agent in `microservice.analysis`. Runs the real AI adapter against curated fixtures — no AI mocking, no predetermined tool call sequences.
 
 ## Overview
 
-The evaluation framework provides deterministic, regression-safe quality measurement for the AI agent by:
+The evaluation framework measures real AI agent quality by:
 
-1. **Replaying recorded scenarios** (fixtures) with a mocked AI adapter
+1. **Running live scenarios** (fixtures) with the real AI provider configured via environment variables
 2. **Scoring outputs** with five metrics covering faithfulness, relevance, tool accuracy, efficiency, and confidence calibration
-3. **Generating structured reports** that can be viewed in CI logs or saved as artefacts
+3. **Generating structured reports** (console summary + `evaluation-report.json`)
+
+This is an on-demand quality tool, not part of the Jest test suite.
 
 ## Architecture
 
 ```
 evaluation/
 ├── types.ts                          ← Core interfaces (EvalCase, EvalResult, EvalReport…)
+├── cli.ts                            ← Standalone entry point (npx tsx cli.ts)
 ├── runner.ts                         ← runEvaluation() — orchestrates the full pipeline
-├── report.ts                         ← generateReport() — aggregates results into EvalReport
+├── report.ts                         ← generateReport(), printReport(), writeJsonReport()
 ├── metrics/
 │   ├── index.ts                      ← ALL_METRICS array + MetricRunner type
 │   ├── faithfulness.metric.ts        ← Is the answer grounded in tool data?
@@ -34,17 +37,41 @@ evaluation/
 │   ├── case-wrong-tool-type.ts       ← Self-correction after wrong-category tool call
 │   └── case-confidence.ts            ← Explicit confidence score calibration
 └── __tests__/
-    └── runner.test.ts                ← Jest test (integration + unit metric tests)
+    └── runner.test.ts                ← Jest unit tests for metrics and report generator
 ```
 
 ## Running the Evaluation
 
-```bash
-# Run the full evaluation suite
-npm run eval:agent
+### Prerequisites
 
-# Run a single fixture during development
-npx jest --testPathPattern=evaluation/runner --verbose -t "structured-basic"
+1. Start the test database:
+   ```bash
+   docker compose up -d postgres-test
+   ```
+
+2. Configure your AI provider via environment variables (same as the microservice):
+   ```bash
+   # Google Gemini
+   export AI_PROVIDER=gemini
+   export GEMINI_API_KEY=your-key
+
+   # Ollama (local)
+   export AI_PROVIDER=ollama
+   export OLLAMA_URL=http://localhost:11434
+   ```
+
+### Run
+
+```bash
+npm run eval:agent
+```
+
+The script connects to the test database (port 5433 by default — override with `ANALYSIS_DB_URI`), runs all 7 fixtures, and writes `evaluation-report.json` in the project root.
+
+### Custom database
+
+```bash
+ANALYSIS_DB_URI=postgresql://user:pass@host:5432/mydb npm run eval:agent
 ```
 
 ## How It Works
@@ -53,41 +80,30 @@ npx jest --testPathPattern=evaluation/runner --verbose -t "structured-basic"
 
 ```mermaid
 flowchart TD
-    A[EvalCase fixture] --> B[Clear & seed test DB]
-    B --> C[Queue aiResponses on mockAI]
-    C --> D[Build merged callStubs]
-    D --> E[Call sendMessageHandler]
-    E --> F[Collect SSE events]
-    F --> G[Extract done message]
-    G --> H[Run ALL_METRICS]
-    H --> I[EvalResult]
-    I --> J[generateReport]
-    J --> K[EvalReport]
+    A[cli.ts: set env vars] --> B[Initialize dataSource from db/index.ts]
+    B --> C[EvalCase fixture]
+    C --> D[Clear & seed test DB]
+    D --> E[Build merged callStubs]
+    E --> F[Call sendMessageHandler with real AI]
+    F --> G[Collect SSE events]
+    G --> H[Extract done message]
+    H --> I[Run ALL_METRICS]
+    I --> J[EvalResult]
+    J --> K[generateReport]
+    K --> L[printReport + writeJsonReport]
 ```
 
-### Mock AI Adapter
+### Real AI Adapter
 
-The `aiResponses` array in each `EvalCase` drives the mock AI adapter via `jest.fn().mockResolvedValueOnce(...)`. Each entry in the array corresponds to one call to `chatWithTools` — in the exact order they occur across the main orchestration loop and any sub-agent loops.
-
-```typescript
-// Example: two-step flow (tool call → final answer)
-aiResponses: [
-  {
-    content: "",
-    toolCalls: [{ function: { name: "aggregate", arguments: { ... } } }],
-    // ...token fields
-  },
-  {
-    content: "The total revenue is $500K. Confidence: 0.9",
-    toolCalls: [],
-    // ...token fields
-  },
-]
-```
+The action calls `createAIAdapter()` naturally — whichever provider is configured via environment variables is used. No AI responses are pre-seeded. The AI decides:
+- Which tool to call
+- What parameters to pass
+- When to stop iterating
+- What confidence to report
 
 ### Call Stubs
 
-`callStubs` in each fixture override `ctx.call()` for inter-service calls. The runner provides default stubs for common calls:
+`callStubs` in each fixture override `ctx.call()` for inter-service calls (tool execution, dataset metadata). The runner provides default stubs for common calls:
 
 | Action | Default stub |
 |--------|--------------|
@@ -96,7 +112,7 @@ aiResponses: [
 | `conversation.renameConversation` | `{ success: true }` |
 | `dataset.listDatasets` | Array from fixture.datasets |
 
-Fixture-specific stubs (e.g. `tools.aggregate`, `dataset.getDataset`) are merged on top with fixture values taking priority.
+Fixture-specific stubs (e.g. `tools.aggregate`, `dataset.getDataset`) are merged on top with fixture values taking priority. This is intentional — tool results are seeded so the AI can interpret realistic data without a running data microservice.
 
 ## Metrics Reference
 
@@ -162,40 +178,27 @@ The `extractConfidenceScore` function in the action parses `confidence: N` patte
 
 1. Create `evaluation/fixtures/case-<name>.ts` exporting a single `EvalCase` object.
 2. Add it to `evaluation/fixtures/index.ts` and `ALL_FIXTURES`.
-3. If needed, add a corresponding test in `__tests__/runner.test.ts`.
+3. If needed, add a corresponding unit test in `__tests__/runner.test.ts`.
 
 ```typescript
 // case-my-scenario.ts
-import type { ChatWithToolsResponse } from "core.lib/adapters/ai";
 import type { EvalCase } from "../types";
 
 const DATASET_ID = "xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx";
-
-const BASE_RESPONSE: Omit<ChatWithToolsResponse, "content" | "toolCalls"> = {
-  completionTokens: 20,
-  durationMs: 100,
-  model: "mock-model",
-  promptTokens: 100,
-  reasoning: null,
-  totalTokens: 120,
-};
 
 export const caseMyScenario: EvalCase = {
   id: "my-scenario",
   description: "Human-readable description",
   userMessage: "User question here",
   datasets: [{ id: DATASET_ID, name: "My Dataset", datasetType: "structured-table" }],
-  aiResponses: [
-    { ...BASE_RESPONSE, content: "", toolCalls: [/* tool call */] },
-    { ...BASE_RESPONSE, content: "Final answer. Confidence: 0.9", toolCalls: [] },
-  ],
   callStubs: {
-    "dataset.getDataset": { datasetType: "structured-table", name: "My Dataset" },
+    "dataset.getDataset": { datasetType: "structured-table", id: DATASET_ID, name: "My Dataset" },
     "tools.aggregate": { results: [], totalGroups: 0, truncated: false },
   },
   expectedToolCalls: [{ toolName: "aggregate", minCalls: 1 }],
   maxIterations: 5,
   minConfidence: 0.8,
+  referenceAnswer: "Expected answer for human review",
 };
 ```
 
@@ -231,10 +234,37 @@ export function myMetric(evalCase: EvalCase, result: EvalResult): ScoreResult {
 | `wrong-tool-type` | Self-correction after wrong-category tool call | `semanticSearch` | 7 |
 | `confidence` | Explicit confidence calibration check | `aggregate` | 5 |
 
+## Interpreting the Report
+
+```
+=== Agent Evaluation Report ===
+Cases: 7  Passed: 6  Failed: 1
+────────────────────────────────────────────────────────────
+case-structured-basic          ✅  tool_accuracy:1.00  efficiency:1.00  faithfulness:1.00
+case-wrong-tool-type           ✅  tool_accuracy:1.00  faithfulness:1.00
+case-sub-agent                 ❌  tool_accuracy:0.50  [error: timeout]
+────────────────────────────────────────────────────────────
+Aggregate Scores:
+  confidence_calibration        0.88
+  efficiency                    0.92
+  faithfulness                  0.86
+  relevance                     0.78
+  tool_accuracy                 0.93
+```
+
+### Acceptable thresholds (guidance)
+
+| Metric | Target | Warning |
+|--------|--------|---------|
+| `tool_accuracy` | ≥ 0.85 | < 0.70 |
+| `faithfulness` | ≥ 0.80 | < 0.60 |
+| `relevance` | ≥ 0.65 | < 0.50 |
+| `efficiency` | ≥ 0.80 | < 0.60 |
+| `confidence_calibration` | ≥ 0.75 | < 0.50 |
+
 ## Future Enhancements
 
 - **LLM-as-judge:** Use a lightweight judge model to verify faithfulness claim-by-claim.
 - **Reference-answer similarity:** Add a `referenceSimilarity` metric using embedding cosine distance.
 - **Latency percentiles:** Track p50/p99 `durationMs` across fixture runs.
 - **Historical trending:** Persist `EvalReport` as JSON artefacts and plot metric trends over commits.
-- **TSX CLI runner:** Create a standalone `runner.ts` entry point that patches the module cache for AI mocking and runs outside Jest.

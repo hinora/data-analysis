@@ -3,10 +3,10 @@
  *
  * Core types for the local automatic evaluation/scoring framework
  * for the sendMessage agent. Each EvalCase defines the scenario,
- * expected behaviour, and AI response sequence used by the runner.
+ * expected behaviour, and the tool-execution stubs used by the runner.
+ * The AI adapter is always real — no mock AI responses are seeded here.
  */
 
-import type { ChatWithToolsResponse } from "core.lib/adapters/ai";
 import type { StreamEventDone } from "../services/chat/sendMessage.action";
 
 /** Metadata about a dataset referenced in an evaluation case. */
@@ -27,16 +27,13 @@ export interface ToolCallExpectation {
 /**
  * A single evaluation scenario.
  *
- * `aiResponses` drives the mock AI adapter — each entry is returned by
- * `chatWithTools` in sequence, allowing deterministic multi-turn flows.
- *
  * `callStubs` are merged on top of the runner's basic stubs (dataset lists,
  * system-prompt builder, etc.) so each fixture only needs to supply stubs
- * that are specific to its scenario.
+ * that are specific to its scenario (e.g. `tools.aggregate` results,
+ * `dataset.getDataset` metadata). The AI adapter is real — no pre-seeded
+ * AI responses are required.
  */
 export interface EvalCase {
-  /** Per-test AI responses: array of chatWithTools mock return values in sequence. */
-  aiResponses: ChatWithToolsResponse[];
   /** ctx.call stubs keyed by action name, merged with the runner's basic stubs. */
   callStubs: Record<string, unknown>;
   /** Datasets referenced in this scenario (metadata only, no DB records). */

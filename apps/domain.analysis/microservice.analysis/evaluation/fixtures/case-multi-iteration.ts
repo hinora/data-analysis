@@ -1,76 +1,19 @@
 /**
  * Fixture: Multi-Iteration
  *
- * The agent compares Q1 and Q2 revenue trends and identifies outliers,
- * requiring two separate aggregate tool calls — one per quarter — before
- * synthesising the final answer.
+ * The agent compares Q1 and Q2 revenue trends and identifies outliers.
+ * With a real AI the agent should make at least two separate `aggregate`
+ * calls (one per quarter) and synthesise findings before answering.
  *
- * Flow: aggregate(Q1) → self-reflect → aggregate(Q2) → self-reflect → final answer
- * Expected main-loop iterations: 3 (tool call 1, tool call 2, final answer)
+ * The `tools.aggregate` stub always returns Q1 data; the agent is expected
+ * to interpret the results and produce a meaningful comparative answer.
  */
 
-import type { ChatWithToolsResponse } from "core.lib/adapters/ai";
 import type { EvalCase } from "../types";
 
 const DATASET_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 
-const BASE_RESPONSE: Omit<ChatWithToolsResponse, "content" | "toolCalls"> = {
-  completionTokens: 20,
-  durationMs: 100,
-  model: "mock-model",
-  promptTokens: 100,
-  reasoning: null,
-  totalTokens: 120,
-};
-
 export const caseMultiIteration: EvalCase = {
-  aiResponses: [
-    // Iteration 1: fetch Q1 data
-    {
-      ...BASE_RESPONSE,
-      content: "",
-      toolCalls: [
-        {
-          function: {
-            arguments: {
-              aggregations: [{ field: "revenue", operation: "sum" }],
-              conditions: [{ field: "quarter", operator: "eq", value: "Q1" }],
-              datasetId: DATASET_ID,
-              groupBy: ["quarter"],
-            },
-            name: "aggregate",
-          },
-        },
-      ],
-    },
-    // Iteration 2 (after self-reflection): fetch Q2 data
-    {
-      ...BASE_RESPONSE,
-      content: "",
-      toolCalls: [
-        {
-          function: {
-            arguments: {
-              aggregations: [{ field: "revenue", operation: "sum" }],
-              conditions: [{ field: "quarter", operator: "eq", value: "Q2" }],
-              datasetId: DATASET_ID,
-              groupBy: ["quarter"],
-            },
-            name: "aggregate",
-          },
-        },
-      ],
-    },
-    // Iteration 3 (after second self-reflection): final answer
-    {
-      ...BASE_RESPONSE,
-      completionTokens: 70,
-      content:
-        "Q1 revenue totaled $1.2M while Q2 showed $1.5M — 25% growth. Outlier detected: Widget X at $500K. Confidence: 0.88",
-      toolCalls: [],
-      totalTokens: 170,
-    },
-  ],
   callStubs: {
     "dataset.getDataset": {
       datasetType: "structured-table",

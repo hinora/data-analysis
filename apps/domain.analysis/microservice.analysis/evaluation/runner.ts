@@ -1,32 +1,29 @@
 /**
  * Evaluation Runner
  *
- * Executes evaluation fixtures against the live sendMessage action using a
- * Jest-mocked AI adapter. For each fixture the runner:
+ * Executes evaluation fixtures against the live sendMessage action using the
+ * configured real AI adapter. For each fixture the runner:
  *   1. Clears and re-seeds the test database (Session + Conversation)
- *   2. Queues the fixture's `aiResponses` on the mock AI adapter
- *   3. Invokes `sendMessageHandler` and collects all SSE events
- *   4. Extracts the `done` event payload
- *   5. Runs all configured metric functions
- *   6. Returns the aggregated EvalReport
+ *   2. Invokes `sendMessageHandler` with the fixture's ctx and collects SSE events
+ *   3. Extracts the `done` event payload
+ *   4. Runs all configured metric functions
+ *   5. Returns the aggregated EvalReport
  *
- * The runner does NOT import sendMessage.action.ts directly so that Jest
- * module mocks (core.lib/adapters/ai, @toon-format/toon, db) can be set up
- * by the caller BEFORE the action module is loaded.
+ * The runner does NOT import sendMessage.action.ts directly so that the
+ * caller (cli.ts or a test) can ensure the db module is initialised before
+ * the action module is loaded.
  *
- * Usage (inside a Jest test file):
+ * Usage (cli.ts):
  * ```ts
  * const report = await runEvaluation({
  *   dataSource: testDs,
  *   fixtures: ALL_FIXTURES,
- *   mockAI,
  *   sendMessageHandler: sendMessageAction.handler,
  * });
  * ```
  */
 
 import type { PassThrough } from "node:stream";
-import type { AIAdapter } from "core.lib/adapters/ai";
 import { AILog } from "core.lib/database";
 import { clearTestDatabase } from "core.lib/testing";
 import type { DataSource } from "typeorm";
@@ -179,15 +176,18 @@ function createEvalCtx(req: {
 /**
  * Run the full evaluation suite and return an aggregated report.
  *
- * @param req - Configuration including fixtures, mock AI, and DB source
+ * The AI adapter used is whatever `sendMessageHandler` resolves at runtime —
+ * in production use (via cli.ts) this is the real LLM provider configured
+ * by environment variables (AI_PROVIDER, GEMINI_API_KEY, OLLAMA_URL, etc.).
+ *
+ * @param req - Configuration including fixtures, DB source, and handler
  * @returns Aggregated EvalReport with scores and pass/fail summary
  *
  * @example
  * ```ts
  * const report = await runEvaluation({
- *   dataSource: testDs,
+ *   dataSource,
  *   fixtures: [caseStructuredBasic],
- *   mockAI,
  *   sendMessageHandler: sendMessageAction.handler,
  * });
  * expect(report.passed).toBe(1);
@@ -197,7 +197,6 @@ export async function runEvaluation(req: {
   dataSource: DataSource;
   fixtures: EvalCase[];
   metrics?: MetricRunner[];
-  mockAI: jest.Mocked<AIAdapter>;
   // biome-ignore lint/suspicious/noExplicitAny: handler ctx type varies per Moleculer version
   sendMessageHandler: (ctx: any) => PassThrough | Promise<PassThrough>;
 }): Promise<EvalReport> {
@@ -205,7 +204,6 @@ export async function runEvaluation(req: {
     dataSource,
     fixtures,
     metrics = ALL_METRICS,
-    mockAI,
     sendMessageHandler,
   } = req;
 
@@ -220,11 +218,6 @@ export async function runEvaluation(req: {
       dataSource,
       sessionId: EVAL_SESSION_ID,
     });
-
-    // ── Queue mock AI responses ──────────────────────────────────────
-    for (const response of fixture.aiResponses) {
-      mockAI.chatWithTools.mockResolvedValueOnce(response);
-    }
 
     // ── Build merged call stubs ──────────────────────────────────────
     // Basic stubs handle auto-rename helpers; fixture stubs take priority.

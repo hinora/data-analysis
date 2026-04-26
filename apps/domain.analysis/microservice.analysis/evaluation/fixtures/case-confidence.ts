@@ -1,54 +1,17 @@
 /**
  * Fixture: Confidence Calibration
  *
- * The agent answers a question about customer tier distribution and explicitly
- * reports a confidence score of 0.85 in its response. The minConfidence
- * threshold is set to 0.8 to verify the confidence-calibration metric.
+ * The agent answers a question about customer tier distribution. With a
+ * real AI the agent should call `aggregate`, interpret the results, and
+ * include a confidence score in the answer that the confidence-calibration
+ * metric can validate (minConfidence: 0.8).
  */
 
-import type { ChatWithToolsResponse } from "core.lib/adapters/ai";
 import type { EvalCase } from "../types";
 
 const DATASET_ID = "77777777-7777-4777-8777-777777777777";
 
-const BASE_RESPONSE: Omit<ChatWithToolsResponse, "content" | "toolCalls"> = {
-  completionTokens: 20,
-  durationMs: 100,
-  model: "mock-model",
-  promptTokens: 100,
-  reasoning: null,
-  totalTokens: 120,
-};
-
 export const caseConfidence: EvalCase = {
-  aiResponses: [
-    // [0] Count distinct customer tiers via aggregate
-    {
-      ...BASE_RESPONSE,
-      content: "",
-      toolCalls: [
-        {
-          function: {
-            arguments: {
-              aggregations: [{ field: "customerId", operation: "count" }],
-              datasetId: DATASET_ID,
-              groupBy: ["tier"],
-            },
-            name: "aggregate",
-          },
-        },
-      ],
-    },
-    // [1] Final answer with explicit confidence score
-    {
-      ...BASE_RESPONSE,
-      completionTokens: 45,
-      content:
-        "Based on the data, 28% of customers are in the premium tier (2,800 out of 10,000 total customers). Confidence: 0.85",
-      toolCalls: [],
-      totalTokens: 145,
-    },
-  ],
   callStubs: {
     "dataset.getDataset": {
       datasetType: "structured-table",
