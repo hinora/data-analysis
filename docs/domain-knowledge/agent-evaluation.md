@@ -156,7 +156,7 @@ Only tools in `toolsUsed` (i.e. successfully executed) count. Tools rejected by 
 
 **Goal:** Verify the agent resolved the query without excessive back-and-forth.
 
-**Method:** Count SSE events with `type: "reasoning"` and `step: "Cooking..."` (exactly, 3 ASCII periods). This equals the number of main-loop iterations. Sub-agent loops emit `[Sub-agent] Cooking…` (Unicode ellipsis) and are not counted.
+**Method:** Count SSE events with `type: "reasoning"` and `step: "Cooking..."` (exactly 3 ASCII periods). This equals the number of main-loop iterations. Sub-agent loops emit `[Sub-agent] Cooking…` (Unicode ellipsis) and are not counted.
 
 **Formula:** `score = min(1, maxIterations / actualIterations)`
 
