@@ -1,5 +1,5 @@
 import { exec } from "node:child_process";
-import type { AgentRunResult, AgentRunner } from "../types";
+import type { AgentRunner, AgentRunResult } from "../types";
 
 export class CommandAgentRunner implements AgentRunner {
   readonly name = "CommandAgentRunner";
@@ -10,7 +10,10 @@ export class CommandAgentRunner implements AgentRunner {
     return new Promise((resolve) => {
       const child = exec(
         this.command,
-        { env: { ...process.env, AGENT_EVAL_PROMPT: prompt }, timeout: 120_000 },
+        {
+          env: { ...process.env, AGENT_EVAL_PROMPT: prompt },
+          timeout: 120_000,
+        },
         (error, stdout, stderr) => {
           if (error) {
             resolve({
@@ -21,7 +24,10 @@ export class CommandAgentRunner implements AgentRunner {
             });
             return;
           }
-          resolve({ response: stdout.trim(), stderr: stderr.trim() || undefined });
+          resolve({
+            response: stdout.trim(),
+            stderr: stderr.trim() || undefined,
+          });
         },
       );
       child.stdin?.end(prompt);

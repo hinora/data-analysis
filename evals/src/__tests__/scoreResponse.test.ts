@@ -27,7 +27,10 @@ describe("scoreResponse", () => {
   });
 
   it("penalizes forbidden keywords", () => {
-    const clean = scoreResponse({ ...baseCase, forbiddenKeywords: ["invent data"] }, "Use missing data checks.");
+    const clean = scoreResponse(
+      { ...baseCase, forbiddenKeywords: ["invent data"] },
+      "Use missing data checks.",
+    );
     const forbidden = scoreResponse(
       { ...baseCase, forbiddenKeywords: ["invent data"] },
       "You can invent data for missing values.",
@@ -64,7 +67,12 @@ describe("scoreResponse", () => {
 
   it("penalizes hallucinated facts in critical cases", () => {
     const result = scoreResponse(
-      { ...baseCase, category: "hallucination", critical: true, prompt: "What is the average age?" },
+      {
+        ...baseCase,
+        category: "hallucination",
+        critical: true,
+        prompt: "What is the average age?",
+      },
       "The average is 32% based on your data.",
     );
 
@@ -76,9 +84,30 @@ describe("scoreResponse", () => {
 describe("calculateCategoryScores", () => {
   it("calculates category scores", () => {
     const results: ScoreResult[] = [
-      { caseId: "a", category: "one", maxScore: 10, passed: true, reasons: [], score: 8 },
-      { caseId: "b", category: "one", maxScore: 10, passed: true, reasons: [], score: 7 },
-      { caseId: "c", category: "two", maxScore: 5, passed: true, reasons: [], score: 5 },
+      {
+        caseId: "a",
+        category: "one",
+        maxScore: 10,
+        passed: true,
+        reasons: [],
+        score: 8,
+      },
+      {
+        caseId: "b",
+        category: "one",
+        maxScore: 10,
+        passed: true,
+        reasons: [],
+        score: 7,
+      },
+      {
+        caseId: "c",
+        category: "two",
+        maxScore: 5,
+        passed: true,
+        reasons: [],
+        score: 5,
+      },
     ];
 
     expect(calculateCategoryScores(results)).toEqual([
@@ -91,8 +120,19 @@ describe("calculateCategoryScores", () => {
 describe("generateMarkdownReport", () => {
   it("generates a Markdown report", () => {
     const result: EvaluationResult = {
-      caseResults: [{ caseId: "a", category: "one", maxScore: 10, passed: true, reasons: ["ok"], score: 8 }],
-      categoryScores: [{ category: "one", maxScore: 10, percentage: 80, score: 8 }],
+      caseResults: [
+        {
+          caseId: "a",
+          category: "one",
+          maxScore: 10,
+          passed: true,
+          reasons: ["ok"],
+          score: 8,
+        },
+      ],
+      categoryScores: [
+        { category: "one", maxScore: 10, percentage: 80, score: 8 },
+      ],
       commandErrors: [],
       maxScore: 10,
       passed: true,

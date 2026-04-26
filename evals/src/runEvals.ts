@@ -3,7 +3,13 @@ import { writeMarkdownReport } from "./report";
 import { CommandAgentRunner } from "./runners/CommandAgentRunner";
 import { MockAgentRunner } from "./runners/MockAgentRunner";
 import { calculateCategoryScores, scoreResponse } from "./scoreResponse";
-import type { AgentRunner, CommandError, EvalConfig, RunnerKind, ScoreResult } from "./types";
+import type {
+  AgentRunner,
+  CommandError,
+  EvalConfig,
+  RunnerKind,
+  ScoreResult,
+} from "./types";
 
 async function main(): Promise<void> {
   try {
@@ -25,12 +31,23 @@ async function main(): Promise<void> {
       caseResults.push(scoreResponse(evalCase, runResult.response));
     }
 
-    const score = caseResults.reduce((total, result) => total + result.score, 0);
-    const maxScore = caseResults.reduce((total, result) => total + result.maxScore, 0);
+    const score = caseResults.reduce(
+      (total, result) => total + result.score,
+      0,
+    );
+    const maxScore = caseResults.reduce(
+      (total, result) => total + result.maxScore,
+      0,
+    );
     const percentage = maxScore === 0 ? 0 : (score / maxScore) * 100;
     const hasCriticalZero = caseResults.some((result) => {
       const evalCase = cases.find((item) => item.id === result.caseId);
-      return Boolean(evalCase?.critical && result.score === 0);
+      return Boolean(
+        result.score === 0 &&
+          evalCase &&
+          (evalCase.critical ||
+            config.criticalCategories.includes(evalCase.category)),
+      );
     });
     const passed = percentage >= config.passingScorePercent && !hasCriticalZero;
     const evaluationResult = {
@@ -46,10 +63,19 @@ async function main(): Promise<void> {
     };
 
     await writeMarkdownReport(evaluationResult, config.reportPath);
-    printSummary({ maxScore, passed, percentage, reportPath: config.reportPath, runnerName: runner.name, score });
+    printSummary({
+      maxScore,
+      passed,
+      percentage,
+      reportPath: config.reportPath,
+      runnerName: runner.name,
+      score,
+    });
     process.exitCode = passed ? 0 : 1;
   } catch (error) {
-    console.error(`Evaluation failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `Evaluation failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
     process.exitCode = 1;
   }
 }
@@ -60,7 +86,9 @@ function createRunner(config: EvalConfig, args: string[]): AgentRunner {
     return new CommandAgentRunner(process.env.AGENT_EVAL_COMMAND);
   }
   if (requestedRunner === "command") {
-    console.warn("AGENT_EVAL_COMMAND is not set; falling back to MockAgentRunner.");
+    console.warn(
+      "AGENT_EVAL_COMMAND is not set; falling back to MockAgentRunner.",
+    );
   }
   return new MockAgentRunner();
 }
@@ -87,7 +115,9 @@ function printSummary(req: {
   score: number;
 }): void {
   console.log(`Runner: ${req.runnerName}`);
-  console.log(`Score: ${req.score} / ${req.maxScore} (${req.percentage.toFixed(1)}%)`);
+  console.log(
+    `Score: ${req.score} / ${req.maxScore} (${req.percentage.toFixed(1)}%)`,
+  );
   console.log(`Status: ${req.passed ? "PASS" : "FAIL"}`);
   console.log(`Report: ${req.reportPath}`);
 }

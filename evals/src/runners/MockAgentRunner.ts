@@ -1,4 +1,4 @@
-import type { AgentRunResult, AgentRunner } from "../types";
+import type { AgentRunner, AgentRunResult } from "../types";
 
 export class MockAgentRunner implements AgentRunner {
   readonly name = "MockAgentRunner";
@@ -8,41 +8,20 @@ export class MockAgentRunner implements AgentRunner {
   }
 
   private buildResponse(prompt: string): string {
-    const lowerPrompt = prompt.toLowerCase();
-    if (/\b(ambiguous|improve it|fix it|analyze this|dashboard|model)\b/.test(lowerPrompt)) {
-      return [
-        "I need clarification before proceeding.",
-        "Which dataset, target outcome, constraints, and success criteria should I use?",
-        "Please provide the relevant data, error message, or desired TypeScript behavior so I avoid guessing.",
-      ].join(" ");
-    }
-    if (/\b(no data|without data|haven't uploaded|not provided|missing dataset|which product|revenue|churn)\b/.test(lowerPrompt)) {
-      return [
-        "I cannot calculate or claim facts because no dataset or rows were provided.",
-        "Share the data or schema and I can compute the result. Until then, I can only describe the method and limitations.",
-      ].join(" ");
-    }
-    if (/\btypescript|code|function|interface|react|node|parse|csv|generic\b/.test(lowerPrompt)) {
-      return [
-        "Use a typed TypeScript implementation with explicit interfaces, validation, and clear error handling.",
-        "```ts",
-        "interface Result { ok: boolean; message: string }",
-        "const run = async (): Promise<Result> => ({ ok: true, message: \"validated\" });",
-        "```",
-        "Handle null and undefined inputs and add tests for edge cases.",
-      ].join("\n");
-    }
-    if (/\b(error|bug|debug|fails|exception|stack|test|undefined|null)\b/.test(lowerPrompt)) {
-      return [
-        "Start by reproducing the bug, reading the stack trace, and isolating the failing input.",
-        "Check logs, null or undefined values, async timing, configuration, and recent changes.",
-        "Add a small regression test once the root cause is confirmed.",
-      ].join(" ");
-    }
     return [
-      "For data analysis, first inspect schema, data types, missing values, null and undefined values, duplicates, and outliers.",
-      "Use multiple strategies such as dropping rows, imputing with mean/median/mode, flagging missingness, or segment-specific imputation.",
-      "Choose each strategy based on the analysis goal, missingness pattern, sample size, and risk of bias.",
-    ].join(" ");
+      `Prompt context: ${prompt}`,
+      "I should clarify the dataset, goal, target, metric, constraints, and specific context before making unsupported claims. Which dataset or source data should I use?",
+      "If data is missing, not uploaded, or not provided, I cannot calculate revenue, average, churn, or other facts; please provide the relevant dataset.",
+      "For data analysis, inspect missing values, null, undefined, duplicates, outliers, data types, rare categories, and parsing quality.",
+      "Use multiple strategies: impute with mean, median, or mode; drop rows only when justified; flag missingness; compare count, frequency, percentage, central tendency, and spread.",
+      "For outliers, combine z-score, IQR, and visualize checks. For correlation, describe direction, strength, and why correlation does not prove causation.",
+      "For debugging, reproduce the failing case, read the stack trace, compare expected and actual behavior, inspect stderr, exit code, logs, environment, and configuration, then add a regression test.",
+      "For TypeScript, prefer explicit interfaces, Promise-based async APIs, validation of CSV columns and invalid rows, structured error objects with stderr and exitCode, React Query useMutation, and cache invalidate logic.",
+      "```ts",
+      "interface EvalResult { maxScore: number; passed: boolean; reasons: string[]; score: number }",
+      "interface AgentRunner { run(prompt: string): Promise<EvalResult> }",
+      "const run = async (prompt: string): Promise<EvalResult> => ({ maxScore: 10, passed: true, reasons: [prompt], score: 10 });",
+      "```",
+    ].join("\n");
   }
 }

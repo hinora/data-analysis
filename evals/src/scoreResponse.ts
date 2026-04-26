@@ -1,6 +1,10 @@
 import type { CategoryScore, EvalCase, ScoreResult } from "./types";
 
-const CODE_PATTERNS = [/```[\s\S]*```/, /\b(function|interface|type|const|let|class|async|await)\b/, /=>/];
+const CODE_PATTERNS = [
+  /```[\s\S]*```/,
+  /\b(function|interface|type|const|let|class|async|await)\b/,
+  /=>/,
+];
 const HALLUCINATION_PATTERNS = [
   /\b(the|your|this) dataset (shows|contains|has|includes|proves)\b/i,
   /\b(the|your|this) data (shows|contains|has|includes|proves)\b/i,
@@ -38,10 +42,15 @@ const STOPWORDS = new Set([
   "you",
 ]);
 
-export function calculateCategoryScores(results: ScoreResult[]): CategoryScore[] {
+export function calculateCategoryScores(
+  results: ScoreResult[],
+): CategoryScore[] {
   const categories = new Map<string, { maxScore: number; score: number }>();
   for (const result of results) {
-    const current = categories.get(result.category) ?? { maxScore: 0, score: 0 };
+    const current = categories.get(result.category) ?? {
+      maxScore: 0,
+      score: 0,
+    };
     current.maxScore += result.maxScore;
     current.score += result.score;
     categories.set(result.category, current);
@@ -50,13 +59,17 @@ export function calculateCategoryScores(results: ScoreResult[]): CategoryScore[]
     .map(([category, score]) => ({
       category,
       maxScore: score.maxScore,
-      percentage: score.maxScore === 0 ? 0 : (score.score / score.maxScore) * 100,
+      percentage:
+        score.maxScore === 0 ? 0 : (score.score / score.maxScore) * 100,
       score: score.score,
     }))
     .sort((left, right) => left.category.localeCompare(right.category));
 }
 
-export function scoreResponse(evalCase: EvalCase, response: string): ScoreResult {
+export function scoreResponse(
+  evalCase: EvalCase,
+  response: string,
+): ScoreResult {
   const normalizedResponse = normalize(response);
   const reasons: string[] = [];
 
@@ -79,10 +92,12 @@ export function scoreResponse(evalCase: EvalCase, response: string): ScoreResult
   reasons.push("Response is not empty");
 
   possible += 3;
-  earned += scoreExpectedKeywords({ evalCase, normalizedResponse, reasons }) * 3;
+  earned +=
+    scoreExpectedKeywords({ evalCase, normalizedResponse, reasons }) * 3;
 
   possible += 1.5;
-  earned += scoreForbiddenKeywords({ evalCase, normalizedResponse, reasons }) * 1.5;
+  earned +=
+    scoreForbiddenKeywords({ evalCase, normalizedResponse, reasons }) * 1.5;
 
   possible += 1;
   earned += scorePromptCoverage({ evalCase, normalizedResponse, reasons });
@@ -101,14 +116,28 @@ export function scoreResponse(evalCase: EvalCase, response: string): ScoreResult
   }
 
   possible += 1.5;
-  const hallucinationScore = scoreHallucinationResistance({ evalCase, normalizedResponse, reasons });
+  const hallucinationScore = scoreHallucinationResistance({
+    evalCase,
+    normalizedResponse,
+    reasons,
+  });
   earned += hallucinationScore * 1.5;
 
-  const rawScore = Math.max(0, Math.round((earned / possible) * evalCase.maxScore));
+  const rawScore = Math.max(
+    0,
+    Math.round((earned / possible) * evalCase.maxScore),
+  );
   const score = evalCase.critical && hallucinationScore === 0 ? 0 : rawScore;
   const passed = score >= evalCase.maxScore * 0.7;
 
-  return { caseId: evalCase.id, category: evalCase.category, maxScore: evalCase.maxScore, passed, reasons, score };
+  return {
+    caseId: evalCase.id,
+    category: evalCase.category,
+    maxScore: evalCase.maxScore,
+    passed,
+    reasons,
+    score,
+  };
 }
 
 function containsAnyCode(response: string): boolean {
@@ -122,12 +151,17 @@ function containsKeyword(response: string, keyword: string): boolean {
 function hasClarifyingQuestion(response: string): boolean {
   return (
     response.includes("?") &&
-    /\b(clarify|which|what|when|where|who|specific|provide|share|more detail|dataset|goal)\b/i.test(response)
+    /\b(clarify|which|what|when|where|who|specific|provide|share|more detail|dataset|goal)\b/i.test(
+      response,
+    )
   );
 }
 
 function hasHallucinatedFacts(evalCase: EvalCase, response: string): boolean {
-  const promptHasData = /\b(csv|json|table|row|column|sample|dataset:|data:)\b/i.test(evalCase.prompt);
+  const promptHasData =
+    /\b(csv|json|table|row|column|sample|dataset:|data:)\b/i.test(
+      evalCase.prompt,
+    );
   if (promptHasData) {
     return false;
   }
@@ -145,7 +179,10 @@ function promptTerms(prompt: string): string[] {
     .filter((word) => word.length > 3 && !STOPWORDS.has(word));
 }
 
-function scoreClarification(req: { normalizedResponse: string; reasons: string[] }): number {
+function scoreClarification(req: {
+  normalizedResponse: string;
+  reasons: string[];
+}): number {
   if (hasClarifyingQuestion(req.normalizedResponse)) {
     req.reasons.push("Asked a clarifying question");
     return 1;
@@ -154,7 +191,10 @@ function scoreClarification(req: { normalizedResponse: string; reasons: string[]
   return 0;
 }
 
-function scoreCode(req: { normalizedResponse: string; reasons: string[] }): number {
+function scoreCode(req: {
+  normalizedResponse: string;
+  reasons: string[];
+}): number {
   if (containsAnyCode(req.normalizedResponse)) {
     req.reasons.push("Included code-like content");
     return 1;
@@ -191,7 +231,9 @@ function scoreForbiddenKeywords(req: {
   reasons: string[];
 }): number {
   const forbidden = req.evalCase.forbiddenKeywords ?? [];
-  const found = forbidden.filter((keyword) => containsKeyword(req.normalizedResponse, keyword));
+  const found = forbidden.filter((keyword) =>
+    containsKeyword(req.normalizedResponse, keyword),
+  );
   if (found.length === 0) {
     req.reasons.push("No forbidden keywords found");
     return 1;
@@ -208,14 +250,20 @@ function scoreHallucinationResistance(req: {
   reasons: string[];
 }): number {
   if (hasHallucinatedFacts(req.evalCase, req.normalizedResponse)) {
-    req.reasons.push("Detected likely hallucinated facts not supported by the prompt");
+    req.reasons.push(
+      "Detected likely hallucinated facts not supported by the prompt",
+    );
     return 0;
   }
   req.reasons.push("No likely hallucinated facts detected");
   return 1;
 }
 
-function scorePromptCoverage(req: { evalCase: EvalCase; normalizedResponse: string; reasons: string[] }): number {
+function scorePromptCoverage(req: {
+  evalCase: EvalCase;
+  normalizedResponse: string;
+  reasons: string[];
+}): number {
   const terms = promptTerms(req.evalCase.prompt);
   if (terms.length === 0) {
     req.reasons.push("Prompt has no significant terms to match");
@@ -223,7 +271,9 @@ function scorePromptCoverage(req: { evalCase: EvalCase; normalizedResponse: stri
   }
   const matched = terms.filter((term) => req.normalizedResponse.includes(term));
   if (matched.length > 0) {
-    req.reasons.push(`Addressed prompt terms: ${matched.slice(0, 5).join(", ")}`);
+    req.reasons.push(
+      `Addressed prompt terms: ${matched.slice(0, 5).join(", ")}`,
+    );
     return 1;
   }
   req.reasons.push("Response does not clearly address the prompt terms");
@@ -243,7 +293,9 @@ function scoreRequiredBehavior(req: {
   let found = 0;
   for (const behavior of behaviors) {
     const terms = promptTerms(behavior);
-    const matched = terms.filter((term) => req.normalizedResponse.includes(term));
+    const matched = terms.filter((term) =>
+      req.normalizedResponse.includes(term),
+    );
     if (terms.length === 0 || matched.length >= Math.ceil(terms.length / 2)) {
       found += 1;
       req.reasons.push(`Met required behavior: ${behavior}`);

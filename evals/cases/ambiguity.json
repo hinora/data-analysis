@@ -5,7 +5,10 @@
     "prompt": "Analyze this for me.",
     "expectedKeywords": ["clarify", "dataset", "goal"],
     "forbiddenKeywords": ["the answer is", "I found"],
-    "requiredBehavior": ["asks what data or goal is intended", "does not invent an analysis"],
+    "requiredBehavior": [
+      "asks what data or goal is intended",
+      "does not invent an analysis"
+    ],
     "requiresCode": false,
     "requiresClarification": true,
     "critical": false,
@@ -29,7 +32,10 @@
     "prompt": "Build the best model.",
     "expectedKeywords": ["target", "metric", "dataset"],
     "forbiddenKeywords": ["best model is", "guaranteed"],
-    "requiredBehavior": ["asks for target and evaluation metric", "asks about dataset constraints"],
+    "requiredBehavior": [
+      "asks for target and evaluation metric",
+      "asks about dataset constraints"
+    ],
     "requiresCode": false,
     "requiresClarification": true,
     "critical": false,

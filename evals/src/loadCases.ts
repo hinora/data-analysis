@@ -6,7 +6,9 @@ const CASES_DIR = path.resolve(process.cwd(), "evals/cases");
 const CONFIG_PATH = path.resolve(process.cwd(), "evals/eval.config.json");
 
 export async function loadConfig(): Promise<EvalConfig> {
-  const config = JSON.parse(await fs.readFile(CONFIG_PATH, "utf8")) as EvalConfig;
+  const config = JSON.parse(
+    await fs.readFile(CONFIG_PATH, "utf8"),
+  ) as EvalConfig;
   return config;
 }
 
@@ -17,7 +19,9 @@ export async function loadCases(): Promise<EvalCase[]> {
   const groups = await Promise.all(
     filenames.map(async (filename) => {
       const filePath = path.join(CASES_DIR, filename);
-      const parsed = JSON.parse(await fs.readFile(filePath, "utf8")) as EvalCase[] | EvalCase;
+      const parsed = JSON.parse(await fs.readFile(filePath, "utf8")) as
+        | EvalCase[]
+        | EvalCase;
       return Array.isArray(parsed) ? parsed : [parsed];
     }),
   );

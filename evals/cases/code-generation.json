@@ -5,7 +5,10 @@
     "prompt": "Write a TypeScript interface for an eval result with score, maxScore, passed, and reasons.",
     "expectedKeywords": ["interface", "score", "maxScore", "passed", "reasons"],
     "forbiddenKeywords": ["any", "Python"],
-    "requiredBehavior": ["uses TypeScript types", "includes all requested fields"],
+    "requiredBehavior": [
+      "uses TypeScript types",
+      "includes all requested fields"
+    ],
     "requiresCode": true,
     "requiresClarification": false,
     "critical": false,
@@ -53,7 +56,10 @@
     "prompt": "Give TypeScript guidance for handling errors from a local command runner.",
     "expectedKeywords": ["stderr", "exitCode", "try", "error"],
     "forbiddenKeywords": ["ignore errors"],
-    "requiredBehavior": ["captures command failures", "returns structured error information"],
+    "requiredBehavior": [
+      "captures command failures",
+      "returns structured error information"
+    ],
     "requiresCode": true,
     "requiresClarification": false,
     "critical": false,

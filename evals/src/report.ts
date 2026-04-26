@@ -2,7 +2,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { EvaluationResult, ScoreResult } from "./types";
 
-export async function writeMarkdownReport(result: EvaluationResult, reportPath: string): Promise<void> {
+export async function writeMarkdownReport(
+  result: EvaluationResult,
+  reportPath: string,
+): Promise<void> {
   const absolutePath = path.resolve(process.cwd(), reportPath);
   await fs.mkdir(path.dirname(absolutePath), { recursive: true });
   await fs.writeFile(absolutePath, generateMarkdownReport(result), "utf8");
