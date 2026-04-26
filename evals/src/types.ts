@@ -71,7 +71,7 @@ export interface JudgeScore {
   score: number;
 }
 
-export type RunnerKind = "command" | "mock";
+export type RunnerKind = "api" | "command" | "mock";
 
 export interface ScoreResult {
   caseId: string;

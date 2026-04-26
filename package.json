@@ -9,6 +9,7 @@
     "build:lib": "bash scripts/build-lib.sh",
     "db:clear": "ts-node scripts/clear-database.ts",
     "eval": "ts-node evals/src/runEvals.ts",
+    "eval:api": "ts-node evals/src/runEvals.ts --api",
     "eval:command": "ts-node evals/src/runEvals.ts --command",
     "eval:mock": "ts-node evals/src/runEvals.ts --mock",
     "init:microservice": "ts-node scripts/init-microservice.ts",

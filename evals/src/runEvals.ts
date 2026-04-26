@@ -1,5 +1,6 @@
 import { loadCases, loadConfig } from "./loadCases";
 import { writeMarkdownReport } from "./report";
+import { ApiAgentRunner } from "./runners/ApiAgentRunner";
 import { CommandAgentRunner } from "./runners/CommandAgentRunner";
 import { MockAgentRunner } from "./runners/MockAgentRunner";
 import { calculateCategoryScores, scoreResponse } from "./scoreResponse";
@@ -82,18 +83,22 @@ async function main(): Promise<void> {
 
 function createRunner(config: EvalConfig, args: string[]): AgentRunner {
   const requestedRunner = getRequestedRunner(config, args);
+  if (requestedRunner === "api") {
+    return ApiAgentRunner.fromEnvironment();
+  }
   if (requestedRunner === "command" && process.env.AGENT_EVAL_COMMAND) {
     return new CommandAgentRunner(process.env.AGENT_EVAL_COMMAND);
   }
   if (requestedRunner === "command") {
-    console.warn(
-      "AGENT_EVAL_COMMAND is not set; falling back to MockAgentRunner.",
-    );
+    throw new Error("AGENT_EVAL_COMMAND is required when using --command.");
   }
   return new MockAgentRunner();
 }
 
 function getRequestedRunner(config: EvalConfig, args: string[]): RunnerKind {
+  if (args.includes("--api")) {
+    return "api";
+  }
   if (args.includes("--command")) {
     return "command";
   }
@@ -103,7 +108,7 @@ function getRequestedRunner(config: EvalConfig, args: string[]): RunnerKind {
   if (config.defaultRunner === "command" && process.env.AGENT_EVAL_COMMAND) {
     return "command";
   }
-  return "mock";
+  return config.defaultRunner;
 }
 
 function printSummary(req: {

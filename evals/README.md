@@ -6,14 +6,42 @@ This directory contains a local, rule-based evaluation framework for the agent. 
 
 ```bash
 npm run eval
-npm run eval:mock
+npm run eval:api
 ```
 
-Both commands work without an external LLM API. By default, `npm run eval` uses the mock runner configured in `evals/eval.config.json`.
+By default, `npm run eval` uses the API runner configured in `evals/eval.config.json`. The API runner uses the existing project AI adapters, so it can evaluate against Ollama, Gemini, or LM Studio without a mock response.
+
+## API runner
+
+`ApiAgentRunner` calls the configured AI provider through `core.lib/adapters/ai`. Use `AI_PROVIDER` to select the provider, or `AGENT_EVAL_PROVIDER` to override it only for evals.
+
+```bash
+# Ollama, using OLLAMA_HOST / OLLAMA_MODEL defaults if omitted
+AI_PROVIDER=ollama npm run eval
+
+# Gemini
+AI_PROVIDER=gemini GEMINI_API_KEY=... npm run eval:api
+
+# LM Studio
+AI_PROVIDER=lmstudio LM_STUDIO_HOST=http://localhost:1234 npm run eval:api
+```
+
+Optional eval-specific overrides:
+
+| Variable | Description |
+|---|---|
+| `AGENT_EVAL_PROVIDER` | `ollama`, `gemini`, or `lmstudio`; overrides `AI_PROVIDER` for evals |
+| `AGENT_EVAL_HOST` | Provider host override, useful for Ollama or LM Studio |
+| `AGENT_EVAL_MODEL` | Model override for the eval run |
+| `AGENT_EVAL_API_KEY` | API key override, useful for Gemini or LM Studio |
+| `AGENT_EVAL_TEMPERATURE` | Generation temperature, default `0.2` |
+| `AGENT_EVAL_SYSTEM_PROMPT` | System prompt override for eval requests |
+
+If the provider is unavailable or returns an error, the evaluator records the error in the report and the affected case receives an empty response score.
 
 ## Mock runner
 
-`MockAgentRunner` returns deterministic responses. Use it to verify the evaluator, scoring rules, case loading, and report generation without starting a real agent.
+`MockAgentRunner` is still available for local evaluator development, but it is no longer the default. Use it only when you explicitly want deterministic responses without an API call.
 
 ```bash
 npm run eval:mock
@@ -75,7 +103,7 @@ Configuration lives in `evals/eval.config.json`:
 - `passingScorePercent`: minimum total score percentage for a passing run
 - `criticalCategories`: category names treated as critical by convention
 - `reportPath`: Markdown output path
-- `defaultRunner`: `mock` or `command`
+- `defaultRunner`: `api`, `mock`, or `command`
 
 A run exits with code 0 when it passes. It exits with code 1 when the score is below the threshold, when a critical case scores 0, or when the evaluator crashes.
 
@@ -91,4 +119,4 @@ The report includes run metadata, total score, category scores, individual case 
 
 ## CI status
 
-GitHub Actions, CI workflows, and pipeline automation are intentionally not included yet. These evals are local-only npm scripts.
+GitHub Actions, CI workflows, and pipeline automation are intentionally not included yet. These evals are local-only npm scripts. The default local path uses real AI providers through the project API adapters, not mock responses.
