@@ -16,6 +16,7 @@
     "format": "biome format --write .",
     "jaeger:start": "docker compose up -d jaeger",
     "jaeger:stop": "docker compose down jaeger",
+    "eval:agent": "jest evaluation/__tests__/runner --forceExit --verbose",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch"
