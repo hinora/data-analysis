@@ -127,4 +127,4 @@ function printSummary(req: {
   console.log(`Report: ${req.reportPath}`);
 }
 
-void main();
+main();

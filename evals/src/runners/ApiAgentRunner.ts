@@ -51,7 +51,7 @@ export class ApiAgentRunner implements AgentRunner {
 
   async run(prompt: string): Promise<AgentRunResult> {
     try {
-      const result = await this.getAdapter().generateText({
+      const result = await this.ensureAdapter().generateText({
         prompt,
         systemPrompt: this.systemPrompt,
         temperature: this.temperature,
@@ -65,7 +65,7 @@ export class ApiAgentRunner implements AgentRunner {
     }
   }
 
-  private getAdapter(): AIAdapter {
+  private ensureAdapter(): AIAdapter {
     this.adapter ??= createAIAdapter(this.adapterOptions);
     return this.adapter;
   }
