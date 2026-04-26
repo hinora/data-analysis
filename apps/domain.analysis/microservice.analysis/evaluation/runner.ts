@@ -140,8 +140,8 @@ async function seedEvalConversation(req: {
 function createEvalCtx(req: {
   callStubs: Record<string, unknown>;
   conversationId: string;
-  userMessage: string;
   fixtureId: string;
+  userMessage: string;
 }) {
   const { callStubs, conversationId, fixtureId, userMessage } = req;
 

@@ -9,7 +9,7 @@
 import type { ChatWithToolsResponse } from "core.lib/adapters/ai";
 import type { EvalCase } from "../types";
 
-const DATASET_ID = "a1111111-1111-4111-8111-111111111111";
+const DATASET_ID = "77777777-7777-4777-8777-777777777777";
 
 const BASE_RESPONSE: Omit<ChatWithToolsResponse, "content" | "toolCalls"> = {
   completionTokens: 20,

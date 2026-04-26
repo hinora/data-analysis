@@ -169,7 +169,7 @@ The `extractConfidenceScore` function in the action parses `confidence: N` patte
 import type { ChatWithToolsResponse } from "core.lib/adapters/ai";
 import type { EvalCase } from "../types";
 
-const DATASET_ID = "????????-????-4???-8???-????????????";
+const DATASET_ID = "xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx";
 
 const BASE_RESPONSE: Omit<ChatWithToolsResponse, "content" | "toolCalls"> = {
   completionTokens: 20,

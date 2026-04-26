@@ -47,6 +47,8 @@ jest.mock("../../db", () => ({
   Session,
 }));
 
+// toolConfig is used at module load time to build TOOL_TO_ACTION and SUB_AGENT_TOOL_TO_ACTION;
+// re-exporting the real module keeps validation logic intact while allowing future spy injection.
 jest.mock("../../toolConfig", () => {
   const original = jest.requireActual("../../toolConfig");
   return { ...original };
