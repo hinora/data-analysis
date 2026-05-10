@@ -2,6 +2,10 @@
 
 A microservice-based **agentic data analysis** platform built with [Moleculer](https://moleculer.services/) and TypeScript. Upload datasets (CSV, PDF, XLSM), manage analysis sessions and conversations, and interact with your data through an AI-powered chat interface that orchestrates 16 analysis tools automatically.
 
+## Demo
+
+[![Demo Video](https://img.youtube.com/vi/ITPf1mxwzGE/0.jpg)](https://youtu.be/ITPf1mxwzGE?si=SyVSrnD_HTrlOyuO)
+
 ## Architecture
 
 ```mermaid
