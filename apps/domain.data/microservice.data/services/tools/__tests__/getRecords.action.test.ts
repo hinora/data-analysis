@@ -1,5 +1,5 @@
 /**
- * Tests for tools/sampleData.action.ts
+ * Tests for tools/getRecords.action.ts
  */
 
 import { AILog } from "core.lib/database";
@@ -28,7 +28,7 @@ jest.mock("../../../db", () => ({
   },
 }));
 
-import sampleDataAction from "../sampleData.action";
+import getRecordsAction from "../getRecords.action";
 
 beforeAll(async () => {
   testDs = await createTestDataSource([
@@ -58,11 +58,11 @@ const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const FILE_ID = "33333333-3333-4333-8333-333333333333";
 const DATASET_ID = "44444444-4444-4444-8444-444444444444";
 
-describe("tools.sampleData action", () => {
+describe("tools.getRecords action", () => {
   defineTest({
-    name: "should return sample rows from dataset",
-    action: sampleDataAction,
-    params: { datasetId: DATASET_ID },
+    name: "should return rows from dataset using fromRecord/toRecord",
+    action: getRecordsAction,
+    params: { datasetId: DATASET_ID, fromRecord: 0, toRecord: 3 },
     db: () => testDs,
     callStubs: {
       "dataset.getDataset": { id: DATASET_ID },
@@ -122,17 +122,17 @@ describe("tools.sampleData action", () => {
       },
     ],
     assertResult: (result: any) => {
-      expect(result.count).toBe(3);
-      expect(result.results).toHaveLength(3);
-      expect(result.results[0]).toHaveProperty("name");
-      expect(result.results[0]).toHaveProperty("age");
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(3);
+      expect(result[0]).toHaveProperty("name");
+      expect(result[0]).toHaveProperty("age");
     },
   });
 
   defineTest({
-    name: "should respect the limit parameter",
-    action: sampleDataAction,
-    params: { datasetId: DATASET_ID, limit: 2 },
+    name: "should respect the fromRecord/toRecord range",
+    action: getRecordsAction,
+    params: { datasetId: DATASET_ID, fromRecord: 0, toRecord: 2 },
     db: () => testDs,
     callStubs: {
       "dataset.getDataset": { id: DATASET_ID },
@@ -192,15 +192,15 @@ describe("tools.sampleData action", () => {
       },
     ],
     assertResult: (result: any) => {
-      expect(result.count).toBe(2);
-      expect(result.results).toHaveLength(2);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(2);
     },
   });
 
   defineTest({
     name: "should return empty results for dataset with no records",
-    action: sampleDataAction,
-    params: { datasetId: DATASET_ID },
+    action: getRecordsAction,
+    params: { datasetId: DATASET_ID, fromRecord: 0, toRecord: 10 },
     db: () => testDs,
     callStubs: {
       "dataset.getDataset": { id: DATASET_ID },
@@ -240,8 +240,8 @@ describe("tools.sampleData action", () => {
       },
     ],
     assertResult: (result: any) => {
-      expect(result.count).toBe(0);
-      expect(result.results).toHaveLength(0);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(0);
     },
   });
 });

@@ -148,7 +148,7 @@ apps/
 | sessionData | *(event-only)* | Handles `sessionData.sessionDeleted` cascade cleanup |
 | tools | 15 structured + 9 unstructured tools | Data analysis via SQL/pgvector/AI |
 
-**Structured tools:** aggregate, correlateFields, countDistinctValues, detectOutliers, filterByCondition, getDistinctValues, getPercentile, joinDatasets, pivotTable, sampleData, sortByField
+**Structured tools:** aggregate, correlateFields, countDistinctValues, detectOutliers, filterByCondition, getDistinctValues, getPercentile, getRecords, joinDatasets, pivotTable, sortByField
 
 **Unstructured tools:** semanticSearch, getChunks
 

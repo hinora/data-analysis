@@ -147,7 +147,7 @@ flowchart LR
     Q[User Question] --> DT{Dataset Type?}
     DT -->|structured-table| ST[Structured Data Tools]
     DT -->|unstructured-text| UT[Unstructured Text Tools]
-    ST --> R1[aggregate, filterByCondition, sortByField, sampleData, ...]
+    ST --> R1[aggregate, filterByCondition, sortByField, getRecords, ...]
     UT --> R2[semanticSearch, getChunks]
 ```
 
@@ -169,7 +169,7 @@ The system prompt explicitly groups datasets by type and tells the AI:
 | `getPercentile`     | `tools.getPercentile`      | Get percentile values (P25, P50, P75, P99)         |
 | `joinDatasets`      | `tools.joinDatasets`       | Join two datasets on a shared field                |
 | `pivotTable`        | `tools.pivotTable`         | Cross-tabulation by two categorical fields         |
-| `sampleData`        | `tools.sampleData`         | Preview rows from a dataset (default: 10 rows)     |
+| `getRecords`        | `tools.getRecords`         | Retrieve rows from a dataset by record range       |
 | `sortByField`       | `tools.sortByField`        | Sort and return records by field with limit         |
 
 ### Result Size Limits for Grouping Tools

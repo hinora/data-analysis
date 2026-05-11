@@ -28,7 +28,7 @@ Single source of truth containing:
 | Export | Description |
 |--------|-------------|
 | `ToolName` | Union type of all tool names (alphabetical) |
-| `ToolCategory` | `"structured"`, `"unstructured"`, or `"web"` |
+| `ToolCategory` | `"meta"`, `"structured"`, `"unstructured"`, `"visualization"`, or `"web"` |
 | `ToolEnabledConfig` | `Record<ToolName, boolean>` |
 | `ALL_TOOL_NAMES` | Sorted array of every tool name |
 | `getDefaultToolEnabledConfig()` | Returns config with all tools **enabled** |
@@ -62,8 +62,8 @@ automatically when the overrides are shared or centralised.
 Operate on `structured-table` datasets (CSV, Excel rows/columns):
 
 aggregate, correlateFields, countDistinctValues, detectOutliers,
-filterByCondition, getDistinctValues, getPercentile, joinDatasets, pivotTable,
-sampleData, sortByField
+filterByCondition, getDistinctValues, getPercentile, getRecords, joinDatasets,
+pivotTable, sortByField
 
 > **Note:** The `aggregate` tool is the primary tool for all numeric aggregation
 > needs (sum, avg, min, max, count) with optional `groupBy`, `orderBy`, and
@@ -71,7 +71,7 @@ sampleData, sortByField
 > `contains`, `in`). Previously separate tools (`sumField`, `avgField`, `count`,
 > `countAndGroup`, `getMinMax`) have been consolidated into `aggregate`.
 > The `getTopByField` tool has been merged into `sortByField`.
-> A new `sampleData` tool has been added for previewing dataset rows.
+> The `getRecords` tool retrieves rows from a dataset by record range.
 
 ### Unstructured Text Tools (`unstructured`)
 
@@ -106,6 +106,20 @@ webFetch, webSearch
 > JS-heavy sites. Supports `waitForSelector` to wait for specific elements
 > and `maxLength` to truncate large pages. Blocks images, fonts, and stylesheets
 > for faster loading.
+
+### Meta / Advanced Tools (`meta`)
+
+Tools that orchestrate other tools or provide advanced capabilities:
+
+createSubAgent, runPythonScript
+
+- **createSubAgent** — Delegate a self-contained analysis task to a sub-agent.
+  See `docs/domain-knowledge/sub-agent-delegation.md` for details.
+- **runPythonScript** — Execute one or more tools to retrieve data, then run a
+  Python script against the collected results in an isolated Docker sandbox.
+  Each tool result becomes an element of the `input_data` list in Python.
+  The sandbox (`python-sandbox` service in docker-compose.yml) runs with no
+  network access and limited CPU/RAM for security.
 
 ## Adding a New Tool
 

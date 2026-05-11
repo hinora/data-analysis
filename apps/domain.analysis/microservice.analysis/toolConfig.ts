@@ -24,9 +24,10 @@ export type ToolName =
   | "getChunks"
   | "getDistinctValues"
   | "getPercentile"
+  | "getRecords"
   | "joinDatasets"
   | "pivotTable"
-  | "sampleData"
+  | "runPythonScript"
   | "semanticSearch"
   | "sortByField"
   | "webFetch"
@@ -564,25 +565,76 @@ const TOOL_REGISTRY: Record<ToolName, ToolRegistryEntry> = {
     },
   },
 
-  sampleData: {
-    action: "tools.sampleData",
+  runPythonScript: {
+    action: "tools.runPythonScript",
+    category: "meta",
+    definition: {
+      type: "function",
+      function: {
+        name: "runPythonScript",
+        description:
+          "Execute one or more tools to retrieve data, then run a Python script against the collected results in an isolated sandbox. Each tool result becomes an element of the `input_data` list (a Python variable) in strict order. Use this for custom computations, transformations, or analysis that cannot be done with the built-in tools alone.",
+        parameters: {
+          type: "object",
+          properties: {
+            pythonCode: {
+              type: "string",
+              description:
+                "Python code to execute. The variable `input_data` is a list where each element is the result of the corresponding tool call (parsed JSON). Use `print()` to produce output.",
+            },
+            tools: {
+              type: "array",
+              description:
+                "Array of tool calls to execute before running the Python code. Results are collected in order.",
+              items: {
+                type: "object",
+                properties: {
+                  name: {
+                    type: "string",
+                    description:
+                      'Name of the tool to execute (e.g. "getRecords").',
+                  },
+                  params: {
+                    type: "object",
+                    description:
+                      'Arguments to pass to the tool (e.g. {"datasetId": "...", "fromRecord": 0, "toRecord": 10}).',
+                  },
+                },
+                required: ["name", "params"],
+              },
+            },
+          },
+          required: ["tools", "pythonCode"],
+        },
+      },
+    },
+  },
+
+  getRecords: {
+    action: "tools.getRecords",
     category: "structured",
     definition: {
       type: "function",
       function: {
-        name: "sampleData",
+        name: "getRecords",
         description:
-          "[STRUCTURED DATA ONLY] Preview rows from a structured-table dataset. Returns the first N rows so you can understand column formats, data types, and representative values before performing analysis. Use this as a first step to explore unfamiliar data. Do NOT use on unstructured-text datasets.",
+          "[STRUCTURED DATA ONLY] Retrieve rows from a structured-table dataset by record range. Returns a JSON array of records between fromRecord (inclusive, 0-based) and toRecord (exclusive). Maximum 50 records per request. Use this as a first step to explore unfamiliar data. Do NOT use on unstructured-text datasets.",
         parameters: {
           type: "object",
           properties: {
             datasetId: { type: "string", description: "Dataset UUID" },
-            limit: {
+            fromRecord: {
               type: "number",
-              description: "Number of rows to return (default: 10, max: 100)",
+              description:
+                "Start index (0-based, inclusive). First record is 0.",
+            },
+            toRecord: {
+              type: "number",
+              description:
+                "End index (exclusive). Must be greater than fromRecord. Max range: 50.",
             },
           },
-          required: ["datasetId"],
+          required: ["datasetId", "fromRecord", "toRecord"],
         },
       },
     },

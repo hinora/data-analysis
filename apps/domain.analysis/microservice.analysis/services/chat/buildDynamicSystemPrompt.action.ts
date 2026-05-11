@@ -148,11 +148,14 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
 
   if (meta.length > 0) {
     parts.push(
-      "### Sub-Agent Tools",
-      "These tools allow you to delegate self-contained analysis tasks to a sub-agent.",
+      "### Advanced / Meta Tools",
+      "These tools provide advanced capabilities such as delegating tasks to sub-agents or running custom Python scripts against tool results.",
+      `- ${meta.join(", ")}`,
+      "",
+      "#### Sub-Agent Delegation (createSubAgent):",
+      "- Delegate a self-contained analysis task to a sub-agent.",
       "The sub-agent has access to all data tools and can independently gather data, reason, and return results.",
       "Sub-agents CANNOT create further sub-agents.",
-      `- ${meta.join(", ")}`,
       "",
       "#### When to use sub-agents:",
       "- **Complex multi-part questions**: If the user asks something that requires analysing multiple datasets or multiple independent aspects, create one sub-agent per sub-task.",
@@ -165,6 +168,12 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
       "- **Create multiple sub-agents in one turn**: You can call `createSubAgent` multiple times in a single tool-calling turn to run sub-tasks in parallel.",
       "- **Synthesize results**: After all sub-agents return, combine their findings into a coherent final answer for the user.",
       "- **Don't over-use**: For simple single-tool lookups (e.g. one aggregation, one filter), call the tool directly instead of creating a sub-agent. Sub-agents are for tasks that need multiple tool calls and reasoning.",
+      "",
+      "#### Python Script Execution (runPythonScript):",
+      "- Run a custom Python script against data retrieved by any tool.",
+      "- Provide `tools` (array of {name, params} objects for each tool to run) and `pythonCode` (Python script to execute).",
+      "- Each tool result becomes an element of the `input_data` list — use `print()` to produce output.",
+      "- Use this for custom calculations, data transformations, statistical analysis, or any computation not covered by built-in tools.",
       "",
     );
   }
@@ -203,7 +212,7 @@ function buildSystemPrompt(req: { datasets: DatasetInfo[] }): string {
     "- If the response says `truncated: true`, inform the user that results were limited and offer to drill down further (e.g. with filters or a different groupBy).",
     "- NEVER request all grouped results for high-cardinality fields — this wastes context and slows down analysis. Instead, ask targeted questions: 'top 10 by revenue', 'bottom 5 by count', etc.",
     "- The aggregate tool supports rich `conditions` for pre-filtering records before aggregation (operators: eq, neq, gt, gte, lt, lte, contains, in).",
-    "- Use `sampleData` to preview rows from a dataset before analysis to understand column formats and representative values.",
+    "- Use `getRecords` to retrieve rows from a dataset before analysis to understand column formats and representative values.",
   );
 
   parts.push(

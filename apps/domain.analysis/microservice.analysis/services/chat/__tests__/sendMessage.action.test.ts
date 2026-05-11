@@ -520,7 +520,7 @@ describe("chat.sendMessage action", () => {
         toolCalls: [
           {
             function: {
-              name: "sampleData",
+              name: "getRecords",
               arguments: { datasetId: "ds-1", limit: 5 },
             },
           },
@@ -530,7 +530,7 @@ describe("chat.sendMessage action", () => {
       });
 
       // Tool action result
-      callStubs["tools.sampleData"] = {
+      callStubs["tools.getRecords"] = {
         rows: [{ id: 1, name: "Test" }],
         total: 100,
       };
@@ -557,10 +557,10 @@ describe("chat.sendMessage action", () => {
       // Should have tool_start and tool_end events
       const toolStart = parsed.find((e) => e.type === "tool_start");
       expect(toolStart).toBeDefined();
-      expect(toolStart!.payload.toolName).toBe("sampleData");
+      expect(toolStart!.payload.toolName).toBe("getRecords");
 
       const toolEnd = parsed.find(
-        (e) => e.type === "tool_end" && e.payload.toolName === "sampleData",
+        (e) => e.type === "tool_end" && e.payload.toolName === "getRecords",
       );
       expect(toolEnd).toBeDefined();
       expect(toolEnd!.payload.success).toBe(true);
@@ -574,7 +574,7 @@ describe("chat.sendMessage action", () => {
       // Should track tool usage
       expect(doneEvent!.payload.message.toolsUsed).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ toolName: "sampleData" }),
+          expect.objectContaining({ toolName: "getRecords" }),
         ]),
       );
     });
@@ -682,7 +682,7 @@ describe("chat.sendMessage action", () => {
         toolCalls: [
           {
             function: {
-              name: "sampleData",
+              name: "getRecords",
               arguments: {
                 datasetId: "ds-123",
                 datasetName: "My Dataset",
@@ -697,7 +697,7 @@ describe("chat.sendMessage action", () => {
         datasetType: "structured-table",
         name: "My Dataset",
       };
-      callStubs["tools.sampleData"] = { rows: [], total: 0 };
+      callStubs["tools.getRecords"] = { rows: [], total: 0 };
 
       mockAI.chatWithTools.mockResolvedValueOnce({
         ...aiDefaults.chatWithToolsResult,
@@ -733,7 +733,7 @@ describe("chat.sendMessage action", () => {
         toolCalls: [
           {
             function: {
-              name: "sampleData",
+              name: "getRecords",
               arguments: { datasetId: "ds-123" },
             },
           },
@@ -753,7 +753,7 @@ describe("chat.sendMessage action", () => {
         datasetType: "structured-table",
         name: "DS",
       };
-      callStubs["tools.sampleData"] = { rows: [] };
+      callStubs["tools.getRecords"] = { rows: [] };
       callStubs["tools.aggregate"] = { result: 100 };
 
       mockAI.chatWithTools.mockResolvedValueOnce({
@@ -788,7 +788,7 @@ describe("chat.sendMessage action", () => {
             toolCalls: [
               {
                 function: {
-                  name: "sampleData",
+                  name: "getRecords",
                   arguments: { datasetId: "ds-1" },
                 },
               },
@@ -808,7 +808,7 @@ describe("chat.sendMessage action", () => {
         datasetType: "structured-table",
         name: "DS",
       };
-      callStubs["tools.sampleData"] = { rows: [] };
+      callStubs["tools.getRecords"] = { rows: [] };
 
       const result = await sendMessageAction.handler(ctx as never);
       await collectSSEEvents(result);
@@ -1049,7 +1049,7 @@ describe("chat.sendMessage action", () => {
         toolCalls: [
           {
             function: {
-              name: "sampleData",
+              name: "getRecords",
               arguments: { datasetId: "ds-1" },
             },
           },
@@ -1060,7 +1060,7 @@ describe("chat.sendMessage action", () => {
         datasetType: "structured-table",
         name: "DS",
       };
-      callStubs["tools.sampleData"] = {
+      callStubs["tools.getRecords"] = {
         rows: [{ id: 1 }],
         total: 50,
       };
@@ -1087,7 +1087,7 @@ describe("chat.sendMessage action", () => {
       expect(doneEvent).toBeDefined();
       expect(doneEvent!.payload.message.toolsUsed).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ toolName: "sampleData" }),
+          expect.objectContaining({ toolName: "getRecords" }),
         ]),
       );
     });
@@ -1364,7 +1364,7 @@ describe("chat.sendMessage action", () => {
         toolCalls: [
           {
             function: {
-              name: "sampleData",
+              name: "getRecords",
               arguments: { datasetId: "ds-1" },
             },
           },
@@ -1375,7 +1375,7 @@ describe("chat.sendMessage action", () => {
         datasetType: "structured-table",
         name: "DS",
       };
-      callStubs["tools.sampleData"] = { rows: [] };
+      callStubs["tools.getRecords"] = { rows: [] };
 
       mockAI.chatWithTools.mockResolvedValueOnce({
         ...aiDefaults.chatWithToolsResult,
@@ -1390,7 +1390,7 @@ describe("chat.sendMessage action", () => {
       expect(logs).toHaveLength(1);
       expect(logs[0].toolCalls).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ toolName: "sampleData" }),
+          expect.objectContaining({ toolName: "getRecords" }),
         ]),
       );
     });
@@ -1576,7 +1576,7 @@ describe("chat.sendMessage action", () => {
         toolCalls: [
           {
             function: {
-              name: "sampleData",
+              name: "getRecords",
               arguments: { datasetId: "ds-1" },
             },
           },
@@ -1587,7 +1587,7 @@ describe("chat.sendMessage action", () => {
         datasetType: "structured-table",
         name: "DS",
       };
-      callStubs["tools.sampleData"] = { data: [1, 2, 3] };
+      callStubs["tools.getRecords"] = { data: [1, 2, 3] };
 
       mockAI.chatWithTools.mockResolvedValueOnce({
         ...aiDefaults.chatWithToolsResult,
@@ -1600,7 +1600,7 @@ describe("chat.sendMessage action", () => {
       const parsed = parseSSEEvents(events);
 
       const toolEnd = parsed.find(
-        (e) => e.type === "tool_end" && e.payload.toolName === "sampleData",
+        (e) => e.type === "tool_end" && e.payload.toolName === "getRecords",
       );
       expect(toolEnd).toBeDefined();
       expect(toolEnd!.payload.success).toBe(true);
@@ -1620,7 +1620,7 @@ describe("chat.sendMessage action", () => {
         toolCalls: [
           {
             function: {
-              name: "sampleData",
+              name: "getRecords",
               arguments: { datasetId: "ds-1" },
             },
           },
@@ -1631,7 +1631,7 @@ describe("chat.sendMessage action", () => {
         datasetType: "structured-table",
         name: "DS",
       };
-      callStubs["tools.sampleData"] = "plain text result";
+      callStubs["tools.getRecords"] = "plain text result";
 
       mockAI.chatWithTools.mockResolvedValueOnce({
         ...aiDefaults.chatWithToolsResult,
@@ -1905,7 +1905,7 @@ describe("chat.sendMessage action", () => {
         toolCalls: [
           {
             function: {
-              name: "sampleData",
+              name: "getRecords",
               arguments: { datasetId: "ds-1" },
             },
           },
@@ -1916,7 +1916,7 @@ describe("chat.sendMessage action", () => {
         datasetType: "structured-table",
         name: "DS",
       };
-      callStubs["tools.sampleData"] = () => {
+      callStubs["tools.getRecords"] = () => {
         throw new Error("DB connection lost");
       };
 
@@ -1939,7 +1939,7 @@ describe("chat.sendMessage action", () => {
       const toolEnd = parsed.find(
         (e) =>
           e.type === "tool_end" &&
-          e.payload.toolName === "sampleData" &&
+          e.payload.toolName === "getRecords" &&
           !e.payload.success,
       );
       expect(toolEnd).toBeDefined();
