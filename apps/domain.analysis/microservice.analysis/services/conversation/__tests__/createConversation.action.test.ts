@@ -37,11 +37,24 @@ beforeEach(async () => {
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+const TEST_META = {
+  user: {
+    id: TEST_USER_ID,
+    email: "test@example.com",
+    nickName: "Test User",
+    isActive: true,
+    isVerified: false,
+  },
+};
+
 describe("conversation.createConversation action", () => {
   defineTest({
     name: "should create a conversation with custom name",
     action: createConversationAction,
     params: { sessionId: SESSION_ID, name: "My Conversation" },
+    meta: TEST_META,
     db: () => testDs,
     callStubs: {
       "session.updateSessionStatus": { success: true },
@@ -56,6 +69,7 @@ describe("conversation.createConversation action", () => {
             status: SessionStatus.HAS_DATA,
             datasetCount: 1,
             conversationCount: 0,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -82,6 +96,7 @@ describe("conversation.createConversation action", () => {
     name: "should auto-generate name when not provided",
     action: createConversationAction,
     params: { sessionId: SESSION_ID },
+    meta: TEST_META,
     db: () => testDs,
     callStubs: {
       "session.updateSessionStatus": { success: true },
@@ -96,6 +111,7 @@ describe("conversation.createConversation action", () => {
             status: SessionStatus.HAS_DATA,
             datasetCount: 1,
             conversationCount: 0,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -109,6 +125,7 @@ describe("conversation.createConversation action", () => {
     name: "should throw 404 when session not found",
     action: createConversationAction,
     params: { sessionId: "00000000-0000-4000-8000-000000000000" },
+    meta: TEST_META,
     db: () => testDs,
     callStubs: {
       "session.updateSessionStatus": { success: true },
@@ -120,6 +137,7 @@ describe("conversation.createConversation action", () => {
     name: "should call updateSessionStatus after creation",
     action: createConversationAction,
     params: { sessionId: SESSION_ID, name: "Test" },
+    meta: TEST_META,
     db: () => testDs,
     callStubs: {
       "session.updateSessionStatus": { success: true },
@@ -134,6 +152,7 @@ describe("conversation.createConversation action", () => {
             status: SessionStatus.HAS_DATA,
             datasetCount: 1,
             conversationCount: 0,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -147,6 +166,7 @@ describe("conversation.createConversation action", () => {
     name: "should handle updateSessionStatus failure gracefully",
     action: createConversationAction,
     params: { sessionId: SESSION_ID, name: "Test" },
+    meta: TEST_META,
     db: () => testDs,
     callStubs: {
       "session.updateSessionStatus": () => {
@@ -163,6 +183,7 @@ describe("conversation.createConversation action", () => {
             status: SessionStatus.HAS_DATA,
             datasetCount: 1,
             conversationCount: 0,
+            userId: TEST_USER_ID,
           },
         ],
       },

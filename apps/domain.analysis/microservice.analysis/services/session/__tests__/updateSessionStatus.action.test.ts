@@ -34,6 +34,7 @@ beforeEach(async () => {
 });
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
 describe("session.updateSessionStatus action", () => {
   defineTest({
@@ -51,6 +52,7 @@ describe("session.updateSessionStatus action", () => {
             status: SessionStatus.EMPTY,
             datasetCount: 0,
             conversationCount: 0,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -86,6 +88,7 @@ describe("session.updateSessionStatus action", () => {
             status: SessionStatus.HAS_DATA,
             datasetCount: 2,
             conversationCount: 0,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -118,6 +121,7 @@ describe("session.updateSessionStatus action", () => {
             status: SessionStatus.HAS_DATA,
             datasetCount: 1,
             conversationCount: 0,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -147,6 +151,7 @@ describe("session.updateSessionStatus action", () => {
             status: SessionStatus.HAS_DATA,
             datasetCount: 1,
             conversationCount: 0,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -182,6 +187,7 @@ describe("session.updateSessionStatus action", () => {
             status: SessionStatus.ACTIVE,
             datasetCount: 1,
             conversationCount: 2,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -211,6 +217,7 @@ describe("session.updateSessionStatus action", () => {
             status: SessionStatus.EMPTY,
             datasetCount: 0,
             conversationCount: 0,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -235,6 +242,7 @@ describe("session.updateSessionStatus action", () => {
             status: SessionStatus.HAS_DATA,
             datasetCount: 1,
             conversationCount: 0,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -269,6 +277,7 @@ describe("session.updateSessionStatus action", () => {
             status: SessionStatus.ACTIVE,
             datasetCount: 3,
             conversationCount: 1,
+            userId: TEST_USER_ID,
           },
         ],
       },

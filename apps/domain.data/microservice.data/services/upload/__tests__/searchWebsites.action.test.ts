@@ -6,6 +6,17 @@ import { defineTest } from "core.lib/testing";
 import searchWebsitesAction from "../searchWebsites.action";
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+const TEST_META = {
+  user: {
+    id: TEST_USER_ID,
+    email: "test@example.com",
+    nickName: "Test User",
+    isActive: true,
+    isVerified: false,
+  },
+};
 
 const SEARCH_RESULTS_A = {
   count: 2,
@@ -49,7 +60,12 @@ describe("upload.searchWebsites action", () => {
       sessionId: SESSION_ID,
       keywords: ["keyword1"],
     },
+    meta: TEST_META,
     callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webSearch": SEARCH_RESULTS_A,
     },
     assertResult: (result) => {
@@ -69,7 +85,12 @@ describe("upload.searchWebsites action", () => {
       sessionId: SESSION_ID,
       keywords: ["keyword1", "keyword2"],
     },
+    meta: TEST_META,
     callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webSearch": (params: { query: string }) => {
         if (params.query === "keyword1") return SEARCH_RESULTS_A;
         if (params.query === "keyword2") return SEARCH_RESULTS_B;
@@ -100,6 +121,13 @@ describe("upload.searchWebsites action", () => {
       sessionId: "invalid",
       keywords: ["test"],
     },
+    meta: TEST_META,
+    callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
+    },
     expectError: "Invalid or missing sessionId",
   });
 
@@ -110,7 +138,12 @@ describe("upload.searchWebsites action", () => {
       sessionId: SESSION_ID,
       keywords: ["failing-keyword", "keyword1"],
     },
+    meta: TEST_META,
     callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webSearch": (params: { query: string }) => {
         if (params.query === "failing-keyword") {
           throw new Error("API key invalid");
@@ -132,7 +165,12 @@ describe("upload.searchWebsites action", () => {
       sessionId: SESSION_ID,
       keywords: ["bad-keyword"],
     },
+    meta: TEST_META,
     callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webSearch": () => {
         throw new Error("API unavailable");
       },
@@ -151,7 +189,12 @@ describe("upload.searchWebsites action", () => {
       keywords: ["test"],
       count: 10,
     },
+    meta: TEST_META,
     callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "tools.webSearch": (params: { query: string; count: number }) => {
         expect(params.count).toBe(10);
         return { count: 0, query: params.query, results: [] };

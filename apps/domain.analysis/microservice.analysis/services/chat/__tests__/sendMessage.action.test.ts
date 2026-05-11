@@ -69,6 +69,18 @@ import sendMessageAction from "../sendMessage.action";
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const CONVERSATION_ID = "22222222-2222-4222-8222-222222222222";
 
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+const TEST_META = {
+  user: {
+    id: TEST_USER_ID,
+    email: "test@example.com",
+    nickName: "Test User",
+    isActive: true,
+    isVerified: false,
+  },
+};
+
 const entities = [Session, Conversation, ChatMessage, AILog];
 
 // ── Lifecycle ─────────────────────────────────────────────────────────
@@ -152,6 +164,7 @@ async function seedConversation(opts?: {
       status: SessionStatus.ACTIVE,
       datasetCount: 0,
       conversationCount: 1,
+      userId: TEST_USER_ID,
     }),
   );
 
@@ -194,7 +207,7 @@ function createCtx(params: { content: string; conversationId: string }) {
 
   const ctx = {
     params,
-    meta: {} as Record<string, unknown>,
+    meta: { ...TEST_META } as Record<string, unknown>,
     call: callMock,
     emit: jest.fn(),
     broadcast: jest.fn(),
@@ -221,6 +234,10 @@ function registerBasicStubs(callStubs: Record<string, unknown>) {
   callStubs["dataset.listDatasets"] = [];
   callStubs["chat.generateName"] = { name: "Generated Title" };
   callStubs["conversation.renameConversation"] = { success: true };
+  callStubs["session.verifySessionOwnership"] = {
+    sessionId: SESSION_ID,
+    userId: TEST_USER_ID,
+  };
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────
@@ -412,6 +429,10 @@ describe("chat.sendMessage action", () => {
       callStubs["chat.buildDynamicSystemPrompt"] = {
         systemPrompt: "You are a test assistant.",
       };
+      callStubs["session.verifySessionOwnership"] = {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      };
 
       mockAI.chatWithTools.mockResolvedValueOnce({
         ...aiDefaults.chatWithToolsResult,
@@ -437,6 +458,10 @@ describe("chat.sendMessage action", () => {
       });
       callStubs["chat.buildDynamicSystemPrompt"] = {
         systemPrompt: "You are a test assistant.",
+      };
+      callStubs["session.verifySessionOwnership"] = {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
       };
       callStubs["dataset.listDatasets"] = [];
       callStubs["chat.generateName"] = () => {
@@ -474,6 +499,10 @@ describe("chat.sendMessage action", () => {
       });
       callStubs["chat.buildDynamicSystemPrompt"] = {
         systemPrompt: "You are a test assistant.",
+      };
+      callStubs["session.verifySessionOwnership"] = {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
       };
       callStubs["dataset.listDatasets"] = [
         {
@@ -1455,6 +1484,10 @@ describe("chat.sendMessage action", () => {
       callStubs["chat.buildDynamicSystemPrompt"] = {
         systemPrompt: "Updated dynamic system prompt.",
       };
+      callStubs["session.verifySessionOwnership"] = {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      };
 
       mockAI.chatWithTools.mockResolvedValueOnce({
         ...aiDefaults.chatWithToolsResult,
@@ -1954,6 +1987,10 @@ describe("chat.sendMessage action", () => {
         content: "String throw",
         conversationId: CONVERSATION_ID,
       });
+      callStubs["session.verifySessionOwnership"] = {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      };
       callStubs["chat.buildDynamicSystemPrompt"] = () => {
         throw "string error value";
       };

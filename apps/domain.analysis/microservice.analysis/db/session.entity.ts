@@ -27,6 +27,10 @@ export class Session {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
+  @Column("uuid")
+  @Index("idx_sessions_userId")
+  userId: string;
+
   @Column({ length: 200, type: "varchar" })
   name: string;
 

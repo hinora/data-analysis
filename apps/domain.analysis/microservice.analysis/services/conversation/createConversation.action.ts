@@ -7,7 +7,7 @@
  * The system prompt is stored as the first ChatMessage and on the Conversation.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
+import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
@@ -42,6 +42,7 @@ function generateConversationName(): string {
 
 export default defineAction<CreateConversationParams, CreateConversationResult>(
   {
+    authentication: true,
     rest: "POST /",
 
     params: {
@@ -49,13 +50,16 @@ export default defineAction<CreateConversationParams, CreateConversationResult>(
       name: { type: "string", optional: true, min: 1, max: 500 },
     },
 
-    async handler(ctx: TypedContext<CreateConversationParams>) {
+    async handler(ctx: AuthenticatedContext<CreateConversationParams>) {
       const { sessionId } = ctx.params;
       const sessionRepo = dataSource.getRepository(Session);
       const convRepo = dataSource.getRepository(Conversation);
 
-      // Verify session exists
-      const session = await sessionRepo.findOneBy({ id: sessionId });
+      // Verify session exists and ownership
+      const session = await sessionRepo.findOneBy({
+        id: sessionId,
+        userId: ctx.meta.user.id,
+      });
       if (!session) {
         throw new Errors.MoleculerClientError(
           "Session not found",

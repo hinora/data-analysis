@@ -56,12 +56,30 @@ beforeEach(async () => {
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const FILE_ID = "33333333-3333-4333-8333-333333333333";
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+const TEST_META = {
+  user: {
+    id: TEST_USER_ID,
+    email: "test@example.com",
+    nickName: "Test User",
+    isActive: true,
+    isVerified: false,
+  },
+};
 
 describe("dataset.listDatasets action", () => {
   defineTest({
     name: "should return empty array when no datasets exist",
     action: listDatasetsAction,
     params: { sessionId: SESSION_ID },
+    meta: TEST_META,
+    callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
+    },
     db: () => testDs,
     assertResult: (result) => {
       expect(result).toHaveLength(0);
@@ -72,6 +90,13 @@ describe("dataset.listDatasets action", () => {
     name: "should return datasets for a session",
     action: listDatasetsAction,
     params: { sessionId: SESSION_ID },
+    meta: TEST_META,
+    callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
+    },
     db: () => testDs,
     before: [
       {

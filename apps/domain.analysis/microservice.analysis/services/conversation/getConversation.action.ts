@@ -4,7 +4,7 @@
  * Return full conversation details including system prompt.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
+import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
@@ -15,13 +15,14 @@ export interface GetConversationParams {
 }
 
 export default defineAction<GetConversationParams, unknown>({
+  authentication: true,
   rest: "GET /:id",
 
   params: {
     id: { type: "uuid" },
   },
 
-  async handler(ctx: TypedContext<GetConversationParams>) {
+  async handler(ctx: AuthenticatedContext<GetConversationParams>) {
     const { id } = ctx.params;
     const convRepo = dataSource.getRepository(Conversation);
 
@@ -34,6 +35,12 @@ export default defineAction<GetConversationParams, unknown>({
         { id },
       );
     }
+
+    // Verify session ownership
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId: conversation.sessionId,
+      userId: ctx.meta.user.id,
+    });
 
     const promptResult = (await ctx.call("chat.buildDynamicSystemPrompt", {
       sessionId: conversation.sessionId,

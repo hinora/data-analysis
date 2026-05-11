@@ -14,9 +14,9 @@
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { TypedContext } from "core.lib/__generated__";
 import { getParser, getSupportedFormats } from "core.lib/adapters/file-parser";
 import type { ParsedDataset } from "core.lib/adapters/file-parser/types";
+import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
@@ -81,12 +81,13 @@ const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default defineAction<UploadFileParams, UploadFileResult>({
+  authentication: true,
   rest: "POST /:sessionId/upload",
 
   // No params validation — in multipart mode ctx.params is the file stream,
   // route params live in ctx.meta.$multipart.
 
-  async handler(ctx: TypedContext<UploadFileParams>) {
+  async handler(ctx: AuthenticatedContext<UploadFileParams>) {
     const meta = ctx.meta as Record<string, unknown>;
     const multipart = (meta.$multipart ?? {}) as Record<string, unknown>;
 
@@ -111,6 +112,13 @@ export default defineAction<UploadFileParams, UploadFileResult>({
         { sessionId },
       );
     }
+
+    // Verify session ownership
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId,
+      userId: ctx.meta.user.id,
+    });
+
     const filename = (multipart.filename ||
       meta.filename ||
       "unknown") as string;

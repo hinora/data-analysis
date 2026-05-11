@@ -114,6 +114,8 @@ Microservices are organized by domain:
 apps/
 ├── domain.analysis/
 │   └── microservice.analysis/   # AI session & conversation management
+├── domain.auth/
+│   └── microservice.auth/       # User authentication and profile management
 ├── domain.data/
 │   └── microservice.data/       # Data ingestion, metadata, analysis tools
 ├── domain.example/
@@ -121,6 +123,17 @@ apps/
 └── domain.platform/
     └── microservice.proxy/      # API gateway (moleculer-web)
 ```
+
+### Domain: Auth
+
+**microservice.auth** provides JWT-based user authentication, registration, and profile management.
+
+| Service | Actions | Description |
+|---------|---------|-------------|
+| auth | register, login, verifyToken, forgotPassword, getProfile, updateProfile | User registration, authentication, JWT verification, profile CRUD |
+
+**Entities:** User
+**Database:** auth_db (PostgreSQL)
 
 ### Domain: Analysis
 

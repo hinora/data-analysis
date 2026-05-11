@@ -4,7 +4,7 @@
  * Updates a session's name. Name must be 1–200 characters.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
+import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
@@ -16,6 +16,7 @@ export interface RenameSessionParams {
 }
 
 export default defineAction<RenameSessionParams, Session>({
+  authentication: true,
   rest: "PATCH /:id/rename",
 
   params: {
@@ -23,10 +24,13 @@ export default defineAction<RenameSessionParams, Session>({
     name: { type: "string", min: 1, max: 200 },
   },
 
-  async handler(ctx: TypedContext<RenameSessionParams>) {
+  async handler(ctx: AuthenticatedContext<RenameSessionParams>) {
     const repo = dataSource.getRepository(Session);
 
-    const session = await repo.findOneBy({ id: ctx.params.id });
+    const session = await repo.findOneBy({
+      id: ctx.params.id,
+      userId: ctx.meta.user.id,
+    });
 
     if (!session) {
       throw new Errors.MoleculerClientError(

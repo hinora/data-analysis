@@ -4,7 +4,7 @@
  * Retrieve paginated conversation message history in chronological order.
  */
 
-import type { TypedContext } from "core.lib/__generated__";
+import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
 import { Errors } from "moleculer";
 import { dataSource } from "../../db";
@@ -39,6 +39,7 @@ export interface GetHistoryResult {
 }
 
 export default defineAction<GetHistoryParams, GetHistoryResult>({
+  authentication: true,
   rest: "GET /messages",
 
   params: {
@@ -68,7 +69,7 @@ export default defineAction<GetHistoryParams, GetHistoryResult>({
     },
   },
 
-  async handler(ctx: TypedContext<GetHistoryParams>) {
+  async handler(ctx: AuthenticatedContext<GetHistoryParams>) {
     const {
       conversationId,
       page = 1,
@@ -88,6 +89,12 @@ export default defineAction<GetHistoryParams, GetHistoryResult>({
         { id: conversationId },
       );
     }
+
+    // Verify session ownership
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId: conversation.sessionId,
+      userId: ctx.meta.user.id,
+    });
 
     const qb = msgRepo
       .createQueryBuilder("msg")

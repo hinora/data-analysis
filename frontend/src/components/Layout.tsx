@@ -1,15 +1,26 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import type { ReactNode } from "react";
+import { useGetProfile, useLogout } from "@/hooks/useAuth";
 
 interface LayoutProps {
   children: ReactNode;
 }
 
+const PUBLIC_PATHS = ["/login", "/register", "/forgot-password"];
+
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter();
+  const isPublicPath = PUBLIC_PATHS.includes(router.pathname);
+  const { data: user } = useGetProfile();
+  const { logout } = useLogout();
 
   const navItems = [{ href: "/sessions", label: "Sessions" }];
+
+  // Don't show header on auth pages
+  if (isPublicPath) {
+    return <>{children}</>;
+  }
 
   return (
     <div
@@ -45,7 +56,7 @@ export default function Layout({ children }: LayoutProps) {
           >
             Data Analysis
           </Link>
-          <nav style={{ display: "flex", gap: 16 }}>
+          <nav style={{ display: "flex", gap: 16, flex: 1 }}>
             {navItems.map((item) => (
               <Link
                 key={item.href}
@@ -68,6 +79,27 @@ export default function Layout({ children }: LayoutProps) {
               </Link>
             ))}
           </nav>
+          {user && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Link href="/profile" style={{ fontSize: 14, color: "#4b5563" }}>
+                {user.nickName}
+              </Link>
+              <button
+                type="button"
+                onClick={logout}
+                style={{
+                  fontSize: 13,
+                  color: "#dc2626",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "4px 8px",
+                }}
+              >
+                Logout
+              </button>
+            </div>
+          )}
         </div>
       </header>
       <main style={{ flex: 1, overflow: "auto", minHeight: 0 }}>

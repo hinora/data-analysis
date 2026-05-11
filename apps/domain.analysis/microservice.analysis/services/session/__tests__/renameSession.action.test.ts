@@ -34,12 +34,24 @@ beforeEach(async () => {
 });
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+const TEST_META = {
+  user: {
+    email: "test@example.com",
+    id: TEST_USER_ID,
+    isActive: true,
+    isVerified: false,
+    nickName: "Test User",
+  },
+};
 
 describe("session.renameSession action", () => {
   defineTest({
     name: "should rename an existing session",
     action: renameSessionAction,
     params: { id: SESSION_ID, name: "New Name" },
+    meta: TEST_META,
     db: () => testDs,
     before: [
       {
@@ -51,6 +63,7 @@ describe("session.renameSession action", () => {
             status: SessionStatus.EMPTY,
             datasetCount: 0,
             conversationCount: 0,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -74,6 +87,7 @@ describe("session.renameSession action", () => {
     name: "should throw 404 when session not found",
     action: renameSessionAction,
     params: { id: "00000000-0000-4000-8000-000000000000", name: "New" },
+    meta: TEST_META,
     db: () => testDs,
     expectError: "Session not found",
   });

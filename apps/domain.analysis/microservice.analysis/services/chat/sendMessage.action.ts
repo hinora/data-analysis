@@ -12,11 +12,12 @@
 
 import { PassThrough } from "node:stream";
 import { encode as toonEncode } from "@toon-format/toon";
-import type { TypedContext } from "core.lib/__generated__";
 import type { AIMessageWithTools } from "core.lib/adapters/ai";
 import { createAIAdapter } from "core.lib/adapters/ai";
+import type { AuthenticatedContext } from "core.lib/broker";
 import { defineAction } from "core.lib/broker";
 import { AILog, AILogStatus, AILogType } from "core.lib/database";
+import { Errors } from "moleculer";
 import { dataSource } from "../../db";
 import type {
   ChartSpec,
@@ -425,6 +426,7 @@ async function runSubAgent(req: {
 // ── Action ──────────────────────────────────────────────────────────────
 
 export default defineAction<SendMessageParams, SendMessageResult>({
+  authentication: true,
   rest: "POST /messages",
 
   params: {
@@ -432,7 +434,7 @@ export default defineAction<SendMessageParams, SendMessageResult>({
     conversationId: { type: "uuid" },
   },
 
-  async handler(ctx: TypedContext<SendMessageParams>) {
+  async handler(ctx: AuthenticatedContext<SendMessageParams>) {
     // Tell moleculer-web to treat the response as an SSE stream.
     (ctx.meta as Record<string, unknown>).$responseType = "text/event-stream";
     (ctx.meta as Record<string, unknown>).$responseHeaders = {
@@ -466,7 +468,7 @@ interface ConversationContext {
 
 /** Verify conversation, build system prompt, save user message, auto-rename, load history. */
 async function prepareConversation(req: {
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   stream: PassThrough;
 }): Promise<ConversationContext | null> {
   const { ctx, stream } = req;
@@ -484,14 +486,31 @@ async function prepareConversation(req: {
     return null;
   }
 
+  // Verify session ownership
+  try {
+    await ctx.call("session.verifySessionOwnership", {
+      sessionId: conversation.sessionId,
+      userId: ctx.meta.user.id,
+    });
+  } catch (err) {
+    const isMoleculerClientError =
+      err instanceof Error && "code" in err && (err as { code: number }).code === 404;
+    if (!isMoleculerClientError) {
+      ctx.broker.logger.error("Unexpected error verifying session ownership:", err);
+    }
+    writeSSE(stream, { type: "error", message: "Conversation not found" });
+    stream.end();
+    return null;
+  }
+
   const sessionId = conversation.sessionId;
 
   // ── Build system prompt ─────────────────────────────────────────────
   writeSSE(stream, { type: "status", message: "Building context…" });
 
-  const { systemPrompt } = await ctx.call("chat.buildDynamicSystemPrompt", {
+  const { systemPrompt } = (await ctx.call("chat.buildDynamicSystemPrompt", {
     sessionId,
-  });
+  })) as { systemPrompt: string };
   await convRepo.update({ id: conversationId }, { systemPrompt });
 
   // ── Save user message ───────────────────────────────────────────────
@@ -539,7 +558,7 @@ async function autoRenameConversation(req: {
   content: string;
   conversation: Conversation;
   conversationId: string;
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   sessionId: string;
   stream: PassThrough;
 }): Promise<void> {
@@ -560,11 +579,11 @@ async function autoRenameConversation(req: {
 
     const nameContext = `User question: ${content}${datasetSummary}`;
 
-    const { name } = await ctx.call(
+    const { name } = (await ctx.call(
       "chat.generateName",
       { context: nameContext, target: "conversation" as const },
       { timeout: 600000 },
-    );
+    )) as { name: string };
     await ctx.call("conversation.renameConversation", {
       id: conversationId,
       name,
@@ -634,7 +653,7 @@ function stripOrphanChartPlaceholders(
 // ── Sub-agent tool call handler ─────────────────────────────────────────
 
 async function handleSubAgentCall(req: {
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   fnArgs: Record<string, unknown>;
   fnName: string;
   messages: AIMessageWithTools[];
@@ -728,7 +747,7 @@ async function handleSubAgentCall(req: {
 
 async function handleNormalToolInLoop(req: {
   citedSources: CitedSource[];
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   fnArgs: Record<string, unknown>;
   fnName: string;
   messages: AIMessageWithTools[];
@@ -870,7 +889,7 @@ async function handleNormalToolInLoop(req: {
 // ── AI orchestration loop ───────────────────────────────────────────────
 
 async function runOrchestrationLoop(req: {
-  ctx: TypedContext<SendMessageParams>;
+  ctx: AuthenticatedContext<SendMessageParams>;
   messages: AIMessageWithTools[];
   stream: PassThrough;
 }): Promise<OrchestrationResult> {
@@ -1151,7 +1170,7 @@ async function saveAndFinalize(req: {
 // ── Orchestration entry point (runs asynchronously) ─────────────────────
 
 async function processStream(
-  ctx: TypedContext<SendMessageParams>,
+  ctx: AuthenticatedContext<SendMessageParams>,
   stream: PassThrough,
 ): Promise<void> {
   const prepared = await prepareConversation({ ctx, stream });

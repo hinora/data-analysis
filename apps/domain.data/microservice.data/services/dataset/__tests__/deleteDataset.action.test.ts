@@ -57,14 +57,30 @@ beforeEach(async () => {
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const FILE_ID = "33333333-3333-4333-8333-333333333333";
 const DATASET_ID = "44444444-4444-4444-8444-444444444444";
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+const TEST_META = {
+  user: {
+    id: TEST_USER_ID,
+    email: "test@example.com",
+    nickName: "Test User",
+    isActive: true,
+    isVerified: false,
+  },
+};
 
 describe("dataset.deleteDataset action", () => {
   defineTest({
     name: "should delete a dataset and cascade records",
     action: deleteDatasetAction,
     params: { id: DATASET_ID },
+    meta: TEST_META,
     db: () => testDs,
     callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "session.updateSessionStatus": { success: true },
     },
     before: [
@@ -142,8 +158,13 @@ describe("dataset.deleteDataset action", () => {
     name: "should not delete OriginalFile if shared by other datasets",
     action: deleteDatasetAction,
     params: { id: DATASET_ID },
+    meta: TEST_META,
     db: () => testDs,
     callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "session.updateSessionStatus": { success: true },
     },
     before: async (ds) => {
@@ -216,8 +237,13 @@ describe("dataset.deleteDataset action", () => {
     name: "should throw 404 when dataset not found",
     action: deleteDatasetAction,
     params: { id: "00000000-0000-4000-8000-000000000000" },
+    meta: TEST_META,
     db: () => testDs,
     callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "session.updateSessionStatus": { success: true },
     },
     expectError: "Dataset not found",
@@ -227,8 +253,13 @@ describe("dataset.deleteDataset action", () => {
     name: "should handle updateSessionStatus failure gracefully",
     action: deleteDatasetAction,
     params: { id: DATASET_ID },
+    meta: TEST_META,
     db: () => testDs,
     callStubs: {
+      "session.verifySessionOwnership": {
+        sessionId: SESSION_ID,
+        userId: TEST_USER_ID,
+      },
       "session.updateSessionStatus": () => {
         throw new Error("Service unavailable");
       },

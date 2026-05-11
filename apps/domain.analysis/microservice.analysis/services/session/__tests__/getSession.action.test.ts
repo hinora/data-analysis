@@ -34,12 +34,24 @@ beforeEach(async () => {
 });
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
+const TEST_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+const TEST_META = {
+  user: {
+    email: "test@example.com",
+    id: TEST_USER_ID,
+    isActive: true,
+    isVerified: false,
+    nickName: "Test User",
+  },
+};
 
 describe("session.getSession action", () => {
   defineTest({
     name: "should return a session when found",
     action: getSessionAction,
     params: { id: SESSION_ID },
+    meta: TEST_META,
     db: () => testDs,
     before: [
       {
@@ -51,6 +63,7 @@ describe("session.getSession action", () => {
             status: SessionStatus.HAS_DATA,
             datasetCount: 2,
             conversationCount: 1,
+            userId: TEST_USER_ID,
           },
         ],
       },
@@ -68,6 +81,7 @@ describe("session.getSession action", () => {
     name: "should throw 404 when session not found",
     action: getSessionAction,
     params: { id: "00000000-0000-4000-8000-000000000000" },
+    meta: TEST_META,
     db: () => testDs,
     expectError: "Session not found",
   });

@@ -101,9 +101,10 @@ Deletes the session (cascades to conversations and chat messages via FK). Emits 
 
 ## Internal Actions
 
-| Action                          | Visibility  | Description                              |
-|---------------------------------|-------------|------------------------------------------|
-| `session.updateSessionStatus`   | `protected` | Updates session status based on triggers  |
+| Action                            | Visibility  | Description                                          |
+|-----------------------------------|-------------|------------------------------------------------------|
+| `session.updateSessionStatus`     | `protected` | Updates session status based on triggers              |
+| `session.verifySessionOwnership`  | `protected` | Verifies session belongs to a user (sessionId, userId)|
 
 ## Events Emitted
 
