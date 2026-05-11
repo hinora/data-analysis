@@ -1,12 +1,18 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { Context, LoggerInstance, ServiceSchema } from "moleculer";
+import type { Readable } from "node:stream";
+import Busboy from "@fastify/busboy";
+import type {
+  Context,
+  LoggerInstance,
+  ServiceBroker,
+  ServiceSchema,
+} from "moleculer";
 import ApiGateway from "moleculer-web";
 
 /** Gateway request with optional connection info */
-interface GatewayRequest {
+interface GatewayRequest extends IncomingMessage {
+  $params?: Record<string, string>;
   connection?: { remoteAddress?: string; socket?: { remoteAddress?: string } };
-  headers: IncomingMessage["headers"];
-  socket?: { remoteAddress?: string };
 }
 
 /** Extended context meta for gateway requests */
@@ -18,6 +24,7 @@ interface GatewayMeta {
 
 /** Service instance type for lifecycle methods */
 interface GatewayServiceThis {
+  broker: ServiceBroker;
   logger: LoggerInstance;
   settings: { ip: string; port: number };
 }
@@ -132,8 +139,8 @@ const ApiGatewayService: ServiceSchema = {
         // More info: https://github.com/mscdex/busboy#busboy-methods
         busboyConfig: {
           limits: {
-            files: 1,
-            fileSize: 100 * 1024 * 1024, // 100MB
+            files: 10,
+            fileSize: 100 * 1024 * 1024, // 100MB per file
           },
         },
 
@@ -143,8 +150,119 @@ const ApiGatewayService: ServiceSchema = {
           // Health check endpoint
           "GET /health": "proxy.health",
 
-          // File upload — multipart mode so busboy parses and sets ctx.meta.filename/mimetype
-          "POST /sessions/:sessionId/upload": "multipart:upload.uploadFile",
+          // Multi-file upload — custom handler parses all files from the
+          // multipart form, then calls upload.uploadFiles with all files
+          // in a single action call, so ONE metadata event is emitted.
+          "POST /sessions/:sessionId/upload"(
+            this: GatewayServiceThis,
+            req: GatewayRequest,
+            res: ServerResponse,
+          ) {
+            const sessionId = req.$params?.sessionId;
+
+            // Extract auth info from request headers (same as onBeforeCall)
+            const authHeader = req.headers.authorization;
+            const token = authHeader?.startsWith("Bearer ")
+              ? authHeader.slice(7)
+              : undefined;
+            const clientIP =
+              (req.headers["x-forwarded-for"] as string) ||
+              req.connection?.remoteAddress;
+            const userAgent = req.headers["user-agent"];
+
+            // Parse multipart form data — collect ALL files into memory
+            const files: Array<{
+              data: Buffer;
+              filename: string;
+              mimetype: string;
+            }> = [];
+            const filePromises: Array<Promise<void>> = [];
+
+            const bb = new Busboy({
+              headers: req.headers as Record<string, string>,
+              limits: { files: 10, fileSize: 100 * 1024 * 1024 },
+            });
+
+            bb.on(
+              "file",
+              (
+                _name: string,
+                stream: Readable,
+                info: { filename: string; mimeType: string },
+              ) => {
+                filePromises.push(
+                  new Promise<void>((resolve, reject) => {
+                    const chunks: Buffer[] = [];
+                    stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+                    stream.on("end", () => {
+                      files.push({
+                        data: Buffer.concat(chunks),
+                        filename: info.filename,
+                        mimetype: info.mimeType,
+                      });
+                      resolve();
+                    });
+                    stream.on("error", reject);
+                  }),
+                );
+              },
+            );
+
+            bb.on("finish", () => {
+              // Wait for all file streams to finish before calling the action
+              Promise.all(filePromises)
+                .then(() =>
+                  this.broker.call(
+                    "upload.uploadFiles",
+                    { files, sessionId },
+                    {
+                      meta: { clientIP, token, userAgent },
+                      timeout: 600000,
+                    },
+                  ),
+                )
+                .then((result: unknown) => {
+                  res.writeHead(200, {
+                    "Content-Type": "application/json; charset=utf-8",
+                  });
+                  res.end(JSON.stringify(result));
+                })
+                .catch((err: Error & { code?: number | string }) => {
+                  const statusCode =
+                    typeof err.code === "number" &&
+                    err.code >= 100 &&
+                    err.code < 600
+                      ? err.code
+                      : 500;
+                  res.setHeader(
+                    "Content-Type",
+                    "application/json; charset=utf-8",
+                  );
+                  res.writeHead(statusCode);
+                  res.end(
+                    JSON.stringify({
+                      code: statusCode,
+                      message: err.message,
+                      success: false,
+                    }),
+                  );
+                });
+            });
+
+            bb.on("error", (err: Error) => {
+              res.setHeader("Content-Type", "application/json; charset=utf-8");
+              res.writeHead(400);
+              res.end(
+                JSON.stringify({
+                  code: 400,
+                  message: err.message || "Failed to parse upload",
+                  success: false,
+                }),
+              );
+            });
+
+            req.pipe(bb);
+          },
         },
 
         // Calling options

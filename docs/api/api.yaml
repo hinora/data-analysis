@@ -189,16 +189,18 @@ paths:
   /sessions/{sessionId}/upload:
     post:
       tags: [Upload]
-      summary: Upload a file to a session
+      summary: Upload one or more files to a session
       description: |
-        Handles file upload for a session:
-        1. Validates file type and size (max 100MB)
-        2. Computes SHA-256 hash and checks for duplicates
-        3. Saves original file to disk
-        4. Parses file and creates Dataset(s) with DataRecords/TextChunks
-        5. Emits metadata.generateMetadata event for metadata generation
-        6. Updates session datasetCount
-      operationId: uploadFile
+        Handles multi-file upload for a session in a single request:
+        1. Validates each file's type and size (max 100MB per file)
+        2. Computes SHA-256 hash and checks for duplicates per file
+        3. Saves original files to disk
+        4. Parses files and creates Dataset(s) with DataRecords/TextChunks
+        5. Emits ONE metadata.generateMetadata event for ALL datasets
+        6. Updates session datasetCount once
+        Multiple files are processed sequentially; metadata generation
+        runs once for all files, processing datasets one by one.
+      operationId: uploadFiles
       parameters:
         - name: sessionId
           in: path
@@ -212,41 +214,50 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [file]
+              required: [files]
               properties:
-                file:
-                  type: string
-                  format: binary
-                  description: "File to upload (CSV, PDF, XLSX, XLSM)"
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: "Files to upload (CSV, PDF, XLSX, XLSM). Max 10 files, 100MB each."
       responses:
         "200":
-          description: File uploaded and parsed successfully
+          description: Files uploaded and parsed successfully
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  originalFileId:
-                    type: string
-                    format: uuid
-                  datasets:
+                  files:
                     type: array
                     items:
                       type: object
                       properties:
-                        id:
+                        originalFileId:
                           type: string
                           format: uuid
-                        name:
+                        filename:
                           type: string
-                        datasetType:
-                          type: string
-                          enum: [structured-table, unstructured-text]
-                        rowCount:
-                          type: integer
-                        columnCount:
-                          type: integer
-                          nullable: true
+                        datasets:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                              name:
+                                type: string
+                              datasetType:
+                                type: string
+                                enum: [structured-table, unstructured-text]
+                              rowCount:
+                                type: integer
+                              columnCount:
+                                type: integer
+                                nullable: true
         "400":
           description: Invalid file type, file too large, or duplicate file
         "404":
